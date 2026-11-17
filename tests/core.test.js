@@ -37594,6 +37594,51 @@ test('Removed WOOP: Settings has no Last task WOOP, even on a board that saved i
  assert.match(settings,/id="stChainStartsWith"/,'precondition: its neighboring settings are there');
  assert.doesNotMatch(settings,/stLastTaskWoop|WOOP|dislodgements/);
 });
+// A plan exactly as an older version's walkthrough saved it: the plan, its one
+// causal operation and the head naming that operation.
+const savedPlan2421=(over={})=>{
+ const plan={v:1,id:'plan-2421',outcome:'Private outcome 2421',obstacle:'Private obstacle 2421',plan:'If blocked, then act 2421',...over};
+ return {woopPlan:plan,woopHead:'op-2421',woopPlanOps:[{v:1,id:'op-2421',observed:[],value:plan}]};
+};
+async function finalDot2421(task={}){
+ const saved={...syncTask('final','Private final task'),...task},board=syncState({tasks:[saved],settings:{...syncState().settings,lastTaskWoop:true}}),raw=JSON.stringify(board);
+ const app=await loadApp({seed:2421,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}}),{ctx}=app;
+ assert.equal(ctx.state.settings.lastTaskWoop,true,'precondition: the board saved Last task WOOP on');
+ return {...app,task:ctx.state.tasks.find(t=>t.id==='final'),scan:()=>app.shim.document.getElementById('scan').innerHTML};
+}
+const dislodges2421=task=>(task.ratingHistory||[]).filter(row=>row.kind==='dislodge').length;
+test('Removed WOOP: the sole remaining dot after two Dislodges offers no WOOP while paused, with Last task WOOP saved on',async()=>{
+ const {ctx,task,scan}=await finalDot2421();
+ for(let i=0;i<2;i++){ctx.state.chain=[task.id];ctx.state.mode='work';ctx.dislodge();}
+ ctx.state.chain=[task.id];ctx.state.mode='work';ctx.renderScan();
+ assert.equal(dislodges2421(task),2,'precondition: two recorded Dislodges');
+ assert.match(scan(),/class="card bench"[^]*Private final task/,'precondition: the task is the sole dot');
+ assert.doesNotMatch(scan(),/WOOP|data-act="woop-/);
+});
+test('Removed WOOP: the sole dot at End of the list after two real Dislodges offers no WOOP, with Last task WOOP saved on',async()=>{
+ const {ctx,task,scan}=await finalDot2421();
+ const action=name=>ctx.onAction(name,{dataset:name==='dislodge'?{benchmark:task.id}:{}});
+ action('start-scan');
+ for(let count=0;count<2;count++){action('dislodge');action('rescan');action('start-scan');}
+ assert.equal(dislodges2421(ctx.state.tasks.find(t=>t.id===task.id)),2,'precondition: two recorded Dislodges');
+ assert.equal(ctx.state.mode,'scan');assert.equal(ctx.pool().length,0);assert.deepEqual([...ctx.state.chain],[task.id]);
+ assert.match(scan(),/End of the list/,'precondition: the scan is exhausted');
+ assert.doesNotMatch(scan(),/WOOP|data-act="woop-/);
+});
+test('Removed WOOP: a final dot with a saved plan shows no plan and no Delete',async()=>{
+ const {ctx,task,scan}=await finalDot2421(savedPlan2421());
+ ctx.state.chain=[task.id];ctx.state.mode='work';ctx.renderScan();
+ assert.equal(task.woopPlan.outcome,'Private outcome 2421','precondition: the plan is saved on the task');
+ assert.match(scan(),/class="card bench"[^]*Private final task/,'precondition: the task is the sole dot');
+ assert.doesNotMatch(scan(),/Private outcome 2421|Private obstacle 2421|If blocked, then act 2421|WOOP|data-act="woop-/);
+});
+test('Removed WOOP: a final dot with a saved plan in an unrecognized format shows no WOOP notice',async()=>{
+ const {ctx,task,scan}=await finalDot2421({woopPlan:{v:99,private:'future plan 2421'}});
+ ctx.state.chain=[task.id];ctx.state.mode='work';ctx.renderScan();
+ assert.equal(task.woopPlan.v,99,'precondition: the future-format plan is saved on the task');
+ assert.match(scan(),/class="card bench"[^]*Private final task/,'precondition: the task is the sole dot');
+ assert.doesNotMatch(scan(),/WOOP|unrecognized format|future plan 2421/);
+});
 test('RISK overdue scanner layout: enlarged candidate title chips and decision footer wrap without clipping choices',async()=>{
  const {ctx,shim}=await loadApp({seed:971});const b=ctx.addTask('Benchmark'),t=ctx.addTask('A readable overdue task title',false,[],{due:ctx.todayISO(-1)});ctx.dotTask(b.id);ctx.state.mode='scan';ctx.state.candidateId=t.id;ctx.renderScan();
  const markup=shim.document.getElementById('scan').innerHTML;assert.match(markup,/class="card cand"/);assert.match(markup,/class="chiprow"/);assert.match(markup,/class="decide-finish"/);assert.match(markup,/data-act="run-woop"/);

@@ -180,12 +180,6 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
 .btn:active{transform:translateY(1px)}
 .btn.sm{padding:6px 12px;font-size:13px}   /* the siderail size — every action beside a card uses it */
 .btn.dislodge{background:var(--danger)}
-.btn.woop{background:light-dark(#165779,#165779);color:#fff}
-.btn.woop-delete{background:light-dark(#fff,#fff);color:light-dark(#173d53,#173d53);border:1px solid light-dark(#698193,#698193)}
-.woop-saved{overflow-wrap:anywhere}
-.woop-saved dt{font-weight:700;margin-top:10px}
-.woop-saved dd{margin:4px 0;white-space:pre-wrap}
-.woop-answer{width:100%;min-height:100px;font:inherit;line-height:1.5}
 .btn.worked{background:var(--cant)}
 .btn.yes{background:var(--yes)}
 #addButton.yes,[data-preview-id="addButton"].yes{color:light-dark(#071f0d,#071f0d)}
@@ -10821,10 +10815,6 @@ const taskActionOwnerBundle=(()=>{
     }
     if(command.type==="task")return executeTaskAction(command.action,command.taskId,null,null,command.gesture||null);
     if(command.type==="editor")return executeEditorGesture(command);
-    if(command.type==="overdue-woop-dot"){
-      const task=taskById(command.taskId);if(!overdueWoopCandidate(task))return false;
-      return executeTaskAction("dot",task.id,null,"work");
-    }
     return false;
   }
   async function undoReplacement(frame,adoptedGuest=null){
@@ -13754,92 +13744,8 @@ function mergeTaskWoop(winner,other){
   else if(winner.woopPlan===undefined && other.woopPlan!==undefined)winner.woopPlan=JSON.parse(JSON.stringify(other.woopPlan));
   return before!==snapshot(winner);
 }
-function taskDislodgeCount(task){
-  return new Set((Array.isArray(task?.ratingHistory)?task.ratingHistory:[]).filter(row=>validRatingHistoryRow(row)&&row.kind==="dislodge"&&row.id).map(row=>row.id)).size;
-}
-// Exhausting the scan also leaves the final dot ready to work. That screen
-// has no pause control; a new eligible arrival must hide WOOP again.
-function finalWoopTask(task){
-  return !!task && state.settings.lastTaskWoop===true && (state.mode==="work" || state.mode==="scan" && pool().length===0) && !state.interventionActive && state.chain.length===1 && benchmark()?.id===task.id && !task.done;
-}
-let woopDeleteBinding=null;
-function woopHTML(task){
-  if(!supportedWoopEvidence(task))return '<p class="kv">This WOOP plan has unrecognized or conflicting evidence. Its saved data is preserved.</p>';
-  const plan=task.woopPlan;
-  if(validWoopPlan(plan)){
-    woopDeleteBinding={id:uid(),board:state,account:window.CloudSync?.user||null,owner:{syncAccount:state.syncAccount,syncIdentity:state.syncIdentity},taskId:task.id,head:task.woopHead||'',plan:JSON.stringify(plan)};
-    return '<div class="notice woop-saved"><dl><dt>Best outcome</dt><dd>'+esc(plan.outcome)+'</dd><dt>Obstacle</dt><dd>'+esc(plan.obstacle)+'</dd><dt>If/then plan</dt><dd>'+esc(plan.plan)+'</dd></dl><button class="btn woop-delete" data-act="woop-delete" data-benchmark="'+esc(task.id)+'" data-plan="'+esc(plan.id)+'" data-head="'+esc(task.woopHead||'')+'" data-binding="'+esc(woopDeleteBinding.id)+'">Delete WOOP plan</button></div>';
-  }
-  if(plan!==undefined && plan!==null)return '<p class="kv">This WOOP plan uses an unrecognized format. Its saved data is preserved.</p>';
-  if(taskDislodgeCount(task)<2)return '';
-  return '<div class="row"><button class="btn woop" data-act="woop-start" data-benchmark="'+esc(task.id)+'">Walk Thru WOOP for Final Task</button></div>';
-}
-// Offered controls cannot authorize a later board, account or replacement task.
-let overdueWoopBinding=null,overdueWoopSession=null;
-function overdueWoopCandidate(task){
-  return !!task && state.mode==="scan" && !state.interventionActive && offeredCandidateId()===task.id && !!benchmark() && normalizedISODate(task.due) && dueInfo(task.due)?.cls==="due-overdue" && pool().some(t=>t===task) && canDotTask(task);
-}
-function overdueWoopControl(task){
-  if(!overdueWoopCandidate(task))return "";
-  overdueWoopBinding={id:uid(),board:state,task,account:window.CloudSync?.user||null,owner:{syncAccount:state.syncAccount,syncIdentity:state.syncIdentity},benchmark:benchmark().id};
-  return '<button class="btn subtle" data-act="run-woop" data-candidate="'+esc(task.id)+'" data-benchmark="'+esc(benchmark().id)+'" data-binding="'+esc(overdueWoopBinding.id)+'">Run WOOP</button>';
-}
-function validOverdueWoopSession(task){
-  const session=overdueWoopSession;
-  return !!session && session.board===state && session.task===task && sameListOwner(session.owner,state) && session.account===(window.CloudSync?.user||null) && state.mode==="work" && !state.interventionActive && benchmark()===task && task.due===session.due && dueInfo(task.due)?.cls==="due-overdue" && eligibleTasks().includes(task);
-}
-function overdueWoopWalkthrough(task){
-  woopDraft={id:uid(),source:"overdue",taskId:task.id,board:state,owner:{syncAccount:state.syncAccount,syncIdentity:state.syncIdentity},account:window.CloudSync?.user||null,plan:JSON.stringify(task.woopPlan),step:0,answers:[]};renderWoop();
-}
-function runOverdueWoop(data){
-  const binding=overdueWoopBinding,task=taskById(data.candidate);
-  if(woopDraft || !binding || binding.id!==data.binding || binding.board!==state || binding.task!==task || binding.benchmark!==benchmark()?.id || binding.account!==(window.CloudSync?.user||null) || !sameListOwner(binding.owner,state) || !overdueWoopCandidate(task))return;
-  // This user action chooses the existing Dot signal once. Cancel only drops
-  // unfinished answers; Undo can reverse the explicit choice separately.
-  if(!TaskActionOwner.perform({type:"overdue-woop-dot",taskId:task.id}))return;
-  overdueWoopSession={board:state,task,due:task.due,owner:{syncAccount:state.syncAccount,syncIdentity:state.syncIdentity},account:window.CloudSync?.user||null};
-  if(supportedWoopEvidence(task) && task.woopPlan==null)overdueWoopWalkthrough(task);
-  else modalShell('<div class="mtop"><h2>WOOP plan</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div><p>'+esc(task.title)+'</p>'+woopHTML(task)+'<div class="mbtns"><button class="btn subtle" data-act="close-modal">Close</button></div>');
-}
-let woopDraft=null;
-function startWoop(id){
-  const task=taskById(id);
-  if(!finalWoopTask(task) || !supportedWoopEvidence(task) || taskDislodgeCount(task)<2 || task.woopPlan!=null || woopDraft)return;
-  woopDraft={id:uid(),taskId:id,board:state,owner:{syncAccount:state.syncAccount,syncIdentity:state.syncIdentity},account:window.CloudSync?.user||null,plan:JSON.stringify(task.woopPlan),step:0,answers:[]};
-  renderWoop();
-}
-function validWoopDraft(){
-  const draft=woopDraft,task=draft&&taskById(draft.taskId);
-  return !!draft && draft.board===state && sameListOwner(draft.owner,state) && draft.account===(window.CloudSync?.user||null) && (draft.source==="overdue" ? validOverdueWoopSession(task) : finalWoopTask(task) && taskDislodgeCount(task)>=2) && supportedWoopEvidence(task) && JSON.stringify(task.woopPlan)===draft.plan;
-}
-function renderWoop(){
-  const draft=woopDraft;if(!draft)return;
-  const prompts=["What is the best outcome of doing this task?","What obstacle could get in your way?","What is your if/then obstacle-to-action plan?"];
-  modalShell('<div class="mtop"><h2>'+(draft.source==="overdue"?"WOOP for overdue task":"WOOP for final task")+'</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div><p>'+esc(taskById(draft.taskId)?.title||'')+'</p><p class="kv">Step '+(draft.step+1)+' of 3</p><label for="woopAnswer">'+prompts[draft.step]+'</label><textarea id="woopAnswer" class="woop-answer" maxlength="4000"></textarea><p id="woopValidation" class="kv" role="status"></p><div class="mbtns"><button class="btn subtle" data-act="close-modal">Cancel</button><button class="btn woop" data-act="woop-next" data-session="'+esc(draft.id)+'" data-step="'+draft.step+'">'+(draft.step===2?'Save WOOP plan':'Next')+'</button></div>');
-  document.getElementById("woopAnswer")?.focus();
-}
-function advanceWoop(data){
-  const draft=woopDraft;if(!draft || data.session!==draft.id || data.step!==String(draft.step))return;
-  if(!validWoopDraft()){closeModal();toast(draft.source==="overdue"?"This task changed. Your saved plans are preserved.":"This final task changed. Your saved plans are preserved.");return;}
-  const value=document.getElementById("woopAnswer")?.value.trim();
-  if(!value || value.length>4000){document.getElementById("woopValidation").textContent="Enter an answer before continuing (up to 4,000 characters).";return;}
-  draft.answers.push(value);
-  if(draft.step<2){draft.step++;renderWoop();return;}
-  const task=taskById(draft.taskId);pushUndo();writeTaskWoop(task,{v:1,id:uid(),outcome:draft.answers[0],obstacle:draft.answers[1],plan:draft.answers[2]});closeModal();commit();
-}
-function deleteWoop(data){
-  if(data.binding!==undefined){
-    const binding=woopDeleteBinding;
-    if(!binding || binding.id!==data.binding || binding.board!==state || binding.account!==(window.CloudSync?.user||null) || !sameListOwner(binding.owner,state) || binding.taskId!==data.benchmark || binding.head!==(taskById(data.benchmark)?.woopHead||'') || binding.plan!==JSON.stringify(taskById(data.benchmark)?.woopPlan))return;
-  }
-  const task=taskById(data.benchmark);
-  if(!(finalWoopTask(task) || validOverdueWoopSession(task)) || !supportedWoopEvidence(task) || !validWoopPlan(task.woopPlan) || task.woopPlan.id!==data.plan || data.head!==undefined && data.head!==(task.woopHead||''))return;
-  pushUndo();writeTaskWoop(task,null);commit();
-  if(validOverdueWoopSession(task))overdueWoopWalkthrough(task);
-}
 
 function renderScan(){
-  overdueWoopBinding=null;
   const el = document.getElementById("scan");
   if(state&&!liveBoardAccepted){
     el.innerHTML='<div class="panel emptystate"><strong>Your saved source needs recovery.</strong><p>The saved board is unreadable, missing or unsupported. Its originals remain untouched. This view is not an empty recovered board.</p><p>Use Restore in Settings to choose a supported file or paste a saved board. Download backup keeps every readable saved source.</p><div class="mbtns"><button class="btn subtle" data-act="settings">Review recovery in Settings</button></div></div>';return;
@@ -13885,7 +13791,6 @@ function renderScan(){
          + '<button class="btn sm dislodge" data-act="dislodge"'+benchBinding+' title="Lower its preference rating and remove it from the chain for this pass">Dislodge</button>'
          + '<button class="btn sm danger" data-act="delete-task" data-id="'+esc(b.id)+'" title="Delete this task entirely (Delete key)">Delete'+(candShowing?'':'<span class="keyhint">⌫</span>')+'</button>'
          + '</div></div>';
-    if(finalWoopTask(b))html+=woopHTML(b);
     // The dotted task and the candidate are the two things being weighed against
     // each other, so they get a rule between them — but only when both are there.
     if(candShowing) html += '<hr class="sep">';
@@ -14565,7 +14470,7 @@ function closeModal(){
   // panel (Save closes the editor before its redraw), and once a held Enter
   // is released.
   const focusReturn=scanEditorOpener;scanEditorOpener=null;
-  finishActiveApologyNotice();decisionRecoveryReviewSerial++;decisionRecoveryPreview=null;allTasksView.cancelBulkEdit(); woopDraft=null; overdueWoopSession=null; document.getElementById("modalRoot").innerHTML=""; setTimeout(()=>{ resumeDeferredBrowserCopy(); resumeDeferredCloudPull(); showAppUpdateNotice(); window.applyPendingAppUpdate?.(); retryAutomaticApologyNotice(); if(focusReturn)afterEnterReleased(()=>returnFocusToScan(focusReturn)); }, 0);
+  finishActiveApologyNotice();decisionRecoveryReviewSerial++;decisionRecoveryPreview=null;allTasksView.cancelBulkEdit(); document.getElementById("modalRoot").innerHTML=""; setTimeout(()=>{ resumeDeferredBrowserCopy(); resumeDeferredCloudPull(); showAppUpdateNotice(); window.applyPendingAppUpdate?.(); retryAutomaticApologyNotice(); if(focusReturn)afterEnterReleased(()=>returnFocusToScan(focusReturn)); }, 0);
   // Every Settings field saves when committed (#2303), so returning from a
   // recovery review shows the saved values: a repainted draft could show values
   // from before the recovery that were never saved. The debug log keeps its
@@ -19958,10 +19863,6 @@ function onAction(act, el){
     case "postpone": if(state.mode==="scan" && !state.interventionActive && pool().some(t=>t.id===offeredCandidateId()))postponeTask(offeredCandidateId());break;
     case "bench-postpone": if(benchmark())postponeTask(benchmark().id);break;
     case "dislodge": TaskActionOwner.perform({type:"benchmark",action:"dislodge"}); break;
-    case "run-woop": runOverdueWoop(el.dataset); break;
-    case "woop-start": startWoop(el.dataset.benchmark); break;
-    case "woop-next": advanceWoop(el.dataset); break;
-    case "woop-delete": deleteWoop(el.dataset); break;
     case "worked": TaskActionOwner.perform({type:"benchmark",action:"worked"}); break;
     // Answering Continue is deliberate Scan intent, including reaffirmation.
     case "continue-scan": TaskActionOwner.perform({type:"mode",mode:"scan",again:true,snooze:12}); break;
