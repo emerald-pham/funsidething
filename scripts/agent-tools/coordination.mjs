@@ -1336,7 +1336,14 @@ async function completeRemovedEntry(entry, now, readMain) {
     mainSha: main?.mainSha ?? (await readMainRef(process.cwd()).catch(() => undefined))?.sha,
   };
   let releaseEvidence;
-  if (branchSha && main) {
+  // Only work beyond the registration commit can land: the registration commit
+  // itself may be in main while the agent's work, on another branch, never got
+  // there (PR #2413 B1). This is also finish's start-commit ancestry check.
+  // A detached entry is a reviewer's, which makes no work commits.
+  const start = text(entry.startBranchSha).toLowerCase();
+  const workBeyondStart = Boolean(!detached && branchSha &&/^[0-9a-f]{40}$/.test(start) && branchSha !== start &&
+    await gitIsAncestor(start, branchSha, process.cwd()).catch(() => false));
+  if (workBeyondStart && main) {
     try {
       release = await releaseStateAt(release.branchName, branchSha, main, process.cwd());
       releaseEvidence = await proveChainScannerLanding(entry, release, 'chain-scanner', now);
