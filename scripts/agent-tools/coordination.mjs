@@ -1073,8 +1073,32 @@ async function finish(filePath, options) {
 
     completeEntry(entry, { outcome, release, now, result: text(options.result), releaseEvidence });
     await writeState(filePath, state);
+    await removeFinishedPorts(entry, process.cwd()).catch((error) => {
+      console.error(`coordination finish: the prepared ports file was kept: ${error instanceof Error ? error.message : String(error)}`);
+    });
     return entry;
   });
+}
+
+// Finish returns the entry's ports to the pool, so plain test runs in the
+// still-existing worktree must stop reading them from its prepared ports file
+// (PR #2413 N5). The ports module is the checkout's, loaded from there as the
+// release-evidence adapter is, so an installed copy of this client works too.
+async function removeFinishedPorts(entry, worktree) {
+  let ports;
+  try {
+    ports = await import(pathToFileURL(resolve(worktree, 'scripts/agent-tools/worktree-ports.mjs')).href);
+  } catch (error) {
+    if (error?.code === 'ERR_MODULE_NOT_FOUND') return;
+    throw error;
+  }
+  const prepared = {};
+  ports.applyPreparedPorts(prepared, worktree);
+  const named = ports.PORT_VARIABLES.map((name) => prepared[name]).filter(Boolean);
+  const owned = new Set((entry.resources ?? []).map((resource) => String(resource).toLowerCase()));
+  if (named.length && named.every((port) => owned.has(ports.loopbackResource(port)))) {
+    ports.removePreparedPorts(await runGit(['rev-parse', '--absolute-git-dir'], worktree));
+  }
 }
 
 // The completion record that finish and prune both write. A field prune cannot

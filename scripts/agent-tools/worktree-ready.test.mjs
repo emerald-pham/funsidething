@@ -1,7 +1,7 @@
 import '../../tests/isolate-git-env.js';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -189,6 +189,38 @@ test("prepare in a new worktree at a removed worktree's path registers its own e
     assert.equal(previous.status, 'complete', 'the earlier worktree had no work, so its entry is finished');
     assert.equal(previous.outcome, 'discarded');
     assert.equal(previous.finalBranchName, 'agent/agent-reused', 'it keeps its own branch');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+// A finished entry's ports go back to the pool, so plain test runs in the
+// still-existing worktree must stop reading them (PR #2413 N5).
+test('finish in a prepared worktree that still exists removes its prepared ports', () => {
+  const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-finish-');
+  try {
+    git(fixture, 'init', '--bare', '--quiet', join(fixture, 'origin.git'));
+    git(main, 'remote', 'add', 'origin', join(fixture, 'origin.git'));
+    // Finish uses the checkout's own ports module, as every Chain Scanner checkout has.
+    mkdirSync(join(main, 'scripts', 'agent-tools'), { recursive: true });
+    copyFileSync(fileURLToPath(new URL('./worktree-ports.mjs', import.meta.url)), join(main, 'scripts', 'agent-tools', 'worktree-ports.mjs'));
+    git(main, 'add', 'scripts');
+    git(main, 'commit', '--quiet', '-m', 'install the ports module');
+    git(main, 'push', '--quiet', '-u', 'origin', 'main');
+    const agent = addWorktree(main, join(fixture, 'agent-finished'));
+    assert.equal(run(['prepare'], agent, { ledger, npm }).status, 0);
+    assert.match(run(['env'], agent, { ledger, npm }).stdout, /CHAIN_NATIVE_PORT/);
+    const [owner] = ownerOf(ledger, agent);
+
+    const coordinationClient = fileURLToPath(new URL('./coordination.mjs', import.meta.url));
+    const finished = spawnSync(process.execPath, [coordinationClient, 'finish', '--id', owner.id, '--adapter', 'chain-scanner',
+      '--outcome', 'discarded', '--reason', 'Fixture work dropped.'],
+    { cwd: agent, encoding: 'utf8', env: { ...process.env, CODEX_COORDINATION_FILE: ledger, DOW_EMULATOR_COORDINATION_FILE: '' } });
+    assert.equal(finished.status, 0, finished.stderr);
+
+    const exported = run(['env'], agent, { ledger, npm });
+    assert.doesNotMatch(exported.stdout, /CHAIN_NATIVE/, 'no ports are exported after finish');
+    assert.equal(existsSync(join(git(agent, 'rev-parse', '--absolute-git-dir'), 'chain-worktree-ports.env')), false, 'the ports file is gone');
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }
