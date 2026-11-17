@@ -1984,6 +1984,57 @@ test('prune frees a removed worktree with unmerged work at once and records it l
   }
 });
 
+// PR #2413 B1 (probe S4): a worktree re-added at a removed one's path is a new
+// owner. It gets its own entry, and the old entry keeps its ownership.
+test("begin in a new worktree at an earlier worktree's path registers a new entry and leaves the earlier one's ownership alone", () => {
+  const fixture = realpathSync(mkdtempSync(join(tmpdir(), 'chain-coordination-reused-path-')));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'project'), 'work/unused');
+    git(project, 'checkout', '--quiet', 'main');
+    const path = join(fixture, 'agent');
+    const cases = [
+      // The same start commit: only the Git worktree's identity tells them apart.
+      { name: 'identity', port: 47151, before: () => {} },
+      // A legacy entry with no recorded identity, whose start commit the new checkout lacks.
+      { name: 'start commit', port: 47152, before: () => commitDocsNote(path, 'earlier.md', 'Earlier worktree commit.'), legacy: true },
+    ];
+    for (const { name, port, before, legacy } of cases) {
+      git(project, 'worktree', 'add', '--quiet', '-b', `work/earlier-${port}`, path, 'main');
+      before();
+      const resource = `loopback:127.0.0.1:${port}`;
+      const began = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', `Earlier ${name}`, '--resources', resource], path);
+      assert.equal(began.status, 0, began.stderr);
+      const earlier = JSON.parse(began.stdout);
+      if (legacy) {
+        const state = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+        delete state.entries.find((entry) => entry.id === earlier.id).worktreeIdentity;
+        writeFileSync(ledgerPath, JSON.stringify(state));
+      }
+      git(project, 'worktree', 'remove', '--force', path);
+      git(project, 'worktree', 'add', '--quiet', '-b', `work/later-${port}`, path, 'main');
+      const earlierBytes = JSON.stringify(JSON.parse(readFileSync(ledgerPath, 'utf8')).entries.find((entry) => entry.id === earlier.id));
+
+      const taken = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', `Later ${name}`, '--resources', resource], path);
+      assert.notEqual(taken.status, 0, `${name}: the earlier entry still owns its port`);
+      assert.match(taken.stderr, new RegExp(`Conflict with ${earlier.id}`));
+      const later = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', `Later ${name}`], path);
+      assert.equal(later.status, 0, `${name}: a new worktree registers its own entry: ${later.stderr}`);
+      const entry = JSON.parse(later.stdout);
+      assert.notEqual(entry.id, earlier.id);
+      assert.equal(entry.branchName, `work/later-${port}`);
+      const after = JSON.parse(readFileSync(ledgerPath, 'utf8')).entries;
+      assert.equal(JSON.stringify(after.find((candidate) => candidate.id === earlier.id)), earlierBytes, `${name}: the earlier entry is untouched`);
+      const again = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', `Duplicate ${name}`], path);
+      assert.notEqual(again.status, 0, `${name}: the new worktree still cannot register twice`);
+      assert.match(again.stderr, /already exists/);
+      git(project, 'worktree', 'remove', '--force', path);
+    }
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
 test('claim records additional ownership and resources on the active owner entry', () => {
   const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-claim-'));
   try {

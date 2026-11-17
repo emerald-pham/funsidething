@@ -166,6 +166,34 @@ test('prepare after a switch to a branch that holds the registration commit move
   }
 });
 
+// A new worktree at a removed one's path, before any prune ran, took over the
+// old entry with its branch and start commit (PR #2413 B1, probe S4).
+test("prepare in a new worktree at a removed worktree's path registers its own entry instead of adopting the old one", () => {
+  const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-reuse-');
+  try {
+    const path = join(fixture, 'agent-reused');
+    addWorktree(main, path);
+    assert.equal(run(['prepare'], path, { ledger, npm }).status, 0);
+    const [old] = ownerOf(ledger, path);
+    git(main, 'worktree', 'remove', '--force', path);
+    git(main, 'worktree', 'add', '--quiet', '-b', 'agent/second', path, 'main');
+
+    const prepared = run(['prepare'], path, { ledger, npm });
+    assert.equal(prepared.status, 0, prepared.stderr);
+    const owners = ownerOf(ledger, path);
+    assert.equal(owners.length, 1, `one active entry for the path: ${prepared.stderr}`);
+    assert.notEqual(owners[0].id, old.id, 'the old entry is not adopted');
+    assert.equal(owners[0].branchName, 'agent/second');
+    assert.equal(loopbackPorts(owners[0]).length, 2, 'the new worktree gets its own ports');
+    const previous = JSON.parse(readFileSync(ledger, 'utf8')).entries.find((entry) => entry.id === old.id);
+    assert.equal(previous.status, 'complete', 'the earlier worktree had no work, so its entry is finished');
+    assert.equal(previous.outcome, 'discarded');
+    assert.equal(previous.finalBranchName, 'agent/agent-reused', 'it keeps its own branch');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
 test('without a usable ledger, prepare still makes dependencies available, warns which step it skipped and writes no ledger', () => {
   const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-unusable-');
   try {

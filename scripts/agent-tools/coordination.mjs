@@ -852,6 +852,24 @@ function pruneOrphanedConfigurations(state) {
   };
 }
 
+// The checkout's own Git directory. A worktree removed and re-added at the same
+// path gets a new one, so its entry is told apart from the earlier worktree's.
+async function worktreeIdentity(cwd) {
+  const gitDir = await runGit(['rev-parse', '--absolute-git-dir'], cwd);
+  const metadata = await stat(gitDir, { bigint: true });
+  return { gitDir, device: String(metadata.dev), inode: String(metadata.ino) };
+}
+
+// An entry at this path was left by an earlier worktree when its recorded Git
+// directory differs from this checkout's or this checkout lacks its start
+// commit. Adopting it took over the old branch and start commit (PR #2413 B1).
+async function leftByEarlierWorktree(entry, identity, headSha, cwd) {
+  const recorded = objectRecord(entry.worktreeIdentity);
+  if (recorded.inode !== undefined && (recorded.inode !== identity?.inode || recorded.device !== identity?.device)) return true;
+  const start = text(entry.startBranchSha).toLowerCase();
+  return /^[0-9a-f]{40}$/.test(start) && !(await gitIsAncestor(start, headSha, cwd).catch(() => false));
+}
+
 async function begin(filePath, options) {
   const start = await readGitStartState(process.cwd(), options['base-ref']);
   const worktreeRoot = await realpath(start.repositoryRoot);
@@ -863,6 +881,7 @@ async function begin(filePath, options) {
   if (!['product', 'tooling', 'documentation', 'investigation'].includes(workType)) {
     throw new Error('coordination begin requires --work-type product|tooling|documentation|investigation.');
   }
+  const identity = await worktreeIdentity(worktreeRoot);
   return withCoordinationLock(filePath, async () => {
     const state = pruneDeadReservations(await readState(filePath));
     for (const entry of state.entries.filter(ownsCoordination)) {
@@ -877,9 +896,13 @@ async function begin(filePath, options) {
           }
         } catch { /* Missing/offline owners retain their existing ownership and metadata. */ }
       }
-      if (sameWorktree) throw new Error('An active or parked coordination entry already exists for the same Git worktree.');
+      if (sameWorktree && !(await leftByEarlierWorktree(entry, identity, start.branchSha, worktreeRoot))) {
+        throw new Error('An active or parked coordination entry already exists for the same Git worktree.');
+      }
     }
-    const conflict = ownershipConflict(state.entries, undefined, process.cwd(), claims, resources);
+    // Any same-worktree owner was refused above, so an entry left at this path
+    // by an earlier worktree still conflicts on what it owns.
+    const conflict = ownershipConflict(state.entries, undefined, undefined, claims, resources);
     if (conflict) throw new Error(formatOwnershipConflict(conflict));
     const now = new Date().toISOString();
     const implementationPrompt = text(options['implementation-prompt']).toLowerCase();
@@ -896,6 +919,7 @@ async function begin(filePath, options) {
       selectedBase: start.selectedBase,
       repositoryRoot: start.repositoryRoot,
       repositoryIdentity: start.repositoryIdentity,
+      worktreeIdentity: identity,
       intent: text(options.intent, 'Unspecified coordination work.'),
       versionPlan: text(options['version-plan'], 'No application version change.'),
       preemptiveChangelog: text(options['preemptive-changelog'], 'No player-facing change.'),
@@ -1269,29 +1293,33 @@ async function claim(filePath, options) {
   });
 }
 
-// Moves this worktree's active entry to the branch it has switched to, keeping
-// the registration commit, which that branch must hold. Claude Code starts an
-// agent on its own worktree branch before the agent switches to its work
-// branch; an entry left behind let prune judge the wrong commit (PR #2413 B1).
-async function rebind(filePath, options) {
-  if (!options.id) throw new Error('coordination rebind requires --id <entry-id>.');
+// Prints this worktree's own active or parked entry, or null; an entry an
+// earlier worktree left at this path is never its own. After a switch to
+// another branch, which holds the registration commit since the entry is its
+// own, an active entry moves to that branch: Claude Code starts an agent on its
+// own worktree branch before the agent switches to its work branch, and an
+// entry left behind let prune judge the wrong commit (PR #2413 B1).
+async function own(filePath, options) {
+  const worktreeRoot = await realpath(await runGit(['rev-parse', '--show-toplevel']));
+  const [identity, headSha, branchName] = await Promise.all([
+    worktreeIdentity(worktreeRoot),
+    runGit(['rev-parse', 'HEAD'], worktreeRoot),
+    runGit(['rev-parse', '--abbrev-ref', 'HEAD'], worktreeRoot),
+  ]);
   return withCoordinationLock(filePath, async () => {
     const state = await readState(filePath, { pruneReservations: false });
-    const entry = state.entries.find((candidate) => candidate.id === options.id);
-    if (!entry) throw new Error(`No coordination entry found for ${options.id}.`);
-    if (entry.status !== 'active') throw new Error(`Cannot rebind coordination entry ${entry.id}: it is not active.`);
-    if (entry.worktree !== process.cwd()) throw new Error(`Cannot rebind coordination entry ${entry.id} from ${process.cwd()}; it belongs to ${entry.worktree}.`);
-    const current = await readGitStartState(process.cwd(), persistedBaseRef(entry));
-    if (current.detachedHead) throw new Error(`Cannot rebind coordination entry ${entry.id} to a detached checkout.`);
-    if (entry.detachedHead !== true && current.branchName === entry.branchName) return entry;
-    if (entry.startBranchSha && !(await gitIsAncestor(entry.startBranchSha, current.branchSha, process.cwd()).catch(() => false))) {
-      throw new Error(`Cannot rebind coordination entry ${entry.id}: branch ${current.branchName} does not hold its registration commit ${entry.startBranchSha}.`);
+    let entry;
+    for (const candidate of state.entries) {
+      if (!ownsCoordination(candidate) || candidate.worktree !== worktreeRoot) continue;
+      if (!(await leftByEarlierWorktree(candidate, identity, headSha, worktreeRoot))) entry = candidate;
     }
+    if (entry?.status !== 'active' || branchName === 'HEAD' || (entry.detachedHead !== true && entry.branchName === branchName)) return entry ?? null;
+    await readGitStartState(worktreeRoot, persistedBaseRef(entry)); // refuses a protected base branch
     entry.rebinds = [...(entry.rebinds ?? []), {
-      reboundAt: isoNow(options.now), from: entry.detachedHead === true ? 'detached' : entry.branchName, to: current.branchName,
+      reboundAt: isoNow(options.now), from: entry.detachedHead === true ? 'detached' : entry.branchName, to: branchName,
     }];
     delete entry.detachedHead;
-    entry.branchName = current.branchName;
+    entry.branchName = branchName;
     await writeState(filePath, state);
     return entry;
   });
@@ -1321,8 +1349,9 @@ async function releaseClaim(filePath, options) {
 }
 
 // Frees the resources of this repository's active entries that the named setup
-// tool registered and whose worktree directory no longer exists, and completes
-// those whose outcome is settled. Claude Code removes subagent worktrees without
+// tool registered and whose worktree is gone, and completes those whose outcome
+// is settled. A worktree is gone when its directory no longer exists or now
+// holds a different Git worktree. Claude Code removes subagent worktrees without
 // running a removal hook, so their entries could otherwise never be finished
 // (#2364, #2368). Parked, hand-registered and other repositories' entries are
 // never touched: missing paths do not waive their ownership.
@@ -1338,13 +1367,21 @@ async function prune(filePath, options) {
     for (const entry of state.entries) {
       if (entry.status !== 'active' || entry.registeredBy !== registeredBy || entry.repositoryIdentity !== repositoryIdentity) continue;
       if (typeof entry.worktree !== 'string' || !isAbsolute(entry.worktree)) continue;
-      const missing = await lstat(entry.worktree).then(() => false, (error) => error?.code === 'ENOENT');
-      if (!missing) continue;
+      if (!(await worktreeGone(entry))) continue;
       if (await settleRemovedEntry(entry, now, () => main ??= readChainScannerMainState().catch(() => undefined))) pruned.push(entry);
     }
     if (pruned.length) await writeState(filePath, state);
     return pruned;
   });
+}
+
+async function worktreeGone(entry) {
+  const missing = await lstat(entry.worktree).then(() => false, (error) => error?.code === 'ENOENT');
+  if (missing) return true;
+  const recorded = objectRecord(entry.worktreeIdentity);
+  if (recorded.inode === undefined) return false;
+  const current = await worktreeIdentity(entry.worktree).catch(() => undefined);
+  return current?.inode !== recorded.inode || current?.device !== recorded.device;
 }
 
 // A removed worktree's ports go back to the pool at once. Its entry completes
@@ -1499,9 +1536,9 @@ if (command === 'discover') {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 2;
   }
-} else if (command === 'rebind') {
+} else if (command === 'own') {
   try {
-    const entry = await rebind(discover(args), parseOptions(args));
+    const entry = await own(discover(args), parseOptions(args));
     console.log(JSON.stringify(entry, null, 2));
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
@@ -1523,6 +1560,6 @@ if (command === 'discover') {
     process.exitCode = 2;
   }
 } else {
-  console.error('usage: coordination.mjs <discover|export-env|install|migrate|status|begin|heartbeat|claim|release-claim|rebind|prune|park|resume|finish> [options]');
+  console.error('usage: coordination.mjs <discover|export-env|install|migrate|status|begin|heartbeat|claim|release-claim|own|prune|park|resume|finish> [options]');
   process.exitCode = 2;
 }
