@@ -13325,8 +13325,8 @@ const tapControl221 = (shim, control) => shim.document.dispatchEvent({ type: "cl
 const settledBoard221 = () => new Promise(resolve => setTimeout(resolve, 240));   // longer than the pause, as a person reading takes
 test("UI #221: for a moment after Return as candidate closes the editor, a press does nothing wherever it lands, and a moment later it works, Undo included", async t => {
   const uncovered = [
-    ["done adding for now in the pinned row", ({ panel }) => panel.find(control => control.dataset.act === "start-working")],
-    ["the list toggle in the pinned row", ({ panel }) => panel.find(control => control.dataset.act === "toggle-list")],
+    ["done adding for now in the finish row", ({ panel }) => panel.find(control => control.dataset.act === "start-working")],
+    ["the list toggle in the finish row", ({ panel }) => panel.find(control => control.dataset.act === "toggle-list")],
     ["a pill in the chain", ({ panel, first }) => panel.find(control => control.classList.contains("crumb") && control.dataset.id === first.id)],
     ["Done on the benchmark card", ({ panel }) => panel.find(control => control.dataset.act === "bench-done")],
     ["Edit on the candidate card", ({ panel, ctx }) => panel.find(control => control.dataset.act === "edit" && control.dataset.id === ctx.state.candidateId)],
@@ -23199,10 +23199,10 @@ test('Scanner browser: secondary actions dim during scanning and brighten for fo
  }finally{await browser.close();}
 });
 
-// #2312 (spec #2308 slice 4): Yes, No and Can't stay under the thumb. This journey
-// runs at phone size in Chromium and WebKit with real touch taps. Every answer
-// after the first taps the spot Yes, No and Can't first appeared at, across
-// titles from a few words to a full paragraph and a chain that keeps growing.
+// #2312 (spec #2308 slice 4) built this journey; #2420 moved Yes, No and Can't
+// back inside the scanner box. It runs at phone and tablet size in Chromium and
+// WebKit with real touch taps, across titles from a few words to a full
+// paragraph and a chain that keeps growing.
 const STEADY_SCANNER_FILLER='ask for the quote again and compare the two replies before deciding what to keep ';
 const steadyScannerBoard=({tasks=60,showPostpone=false,over={},taskOver=()=>({})}={})=>JSON.stringify(syncState({
  tasks:Array.from({length:tasks},(_,i)=>({...syncTask('steady-'+i,'Steady task '+i+' '+STEADY_SCANNER_FILLER.repeat([0,0,1,3,0,6,1][i%7])),createdAt:1790000000000+i,...taskOver(i)})),
@@ -23226,7 +23226,10 @@ async function steadyScannerPage(browser,board,{width=390,height=844,touch=true}
  return {context,page,errors};
 }
 const steadyScannerCenter=box=>({x:box.left+box.width/2,y:box.top+box.height/2});
+// Since #2420 the choices scroll with the page, so a person scrolls them onto
+// the screen before pressing one; where they are is read from there.
 const steadyScannerControls=page=>page.evaluate(()=>{
+ document.querySelector('.decide,[data-act="continue-scan"]')?.scrollIntoView({block:'center'});
  const box=act=>{const el=document.querySelector(`[data-act="${act}"]`);if(!el)return null;const r=el.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height};};
  return {yes:box('yes'),no:box('no'),cant:box('cant'),continue:box('continue-scan'),candidate:state.candidateId,intervention:!!state.interventionActive,chain:state.chain.length,viewportHeight:innerHeight,viewportWidth:innerWidth};
 });
@@ -23244,26 +23247,45 @@ async function steadyScannerAnswer(page,point,prior){
  await page.touchscreen.tap(point.x,point.y);
  await page.waitForFunction(prior=>state.candidateId!==prior||state.interventionActive,prior,{timeout:10000});
 }
-test('RISK steady scanner browser: Yes No and Cant keep their exact position on screen through a long run of real taps with varied titles in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+// The choices move a little with the title's length (#2420 accepts that), so
+// every answer taps where the choice is now, scrolled onto the screen first as
+// a person would. Scrolling the page by a known amount has to carry the
+// choices by exactly that amount: a row pinned to the screen would stay put.
+test('RISK steady scanner browser: Yes No and Cant sit inside the scanner box below the question and scroll with the page through a long run of real taps with varied titles in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const ANSWERS=36,failures=[];
  for(const [baseEngineName,engine] of await steadyScannerEngines())for(const viewport of [{width:390,height:844},{width:768,height:1024}]){
   const engineName=`${baseEngineName} ${viewport.width}px`;
   const browser=await engine.launch({headless:true,...(baseEngineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
   try{
-   const {page,errors}=await steadyScannerPage(browser,steadyScannerBoard({taskOver:i=>i%11===3?{due:'2026-01-02'}:{}}),viewport);
+   const {page,errors}=await steadyScannerPage(browser,steadyScannerBoard({over:{listOpen:true},taskOver:i=>i%11===3?{due:'2026-01-02'}:{}}),viewport);
    await steadyScannerStart(page);
-   let home=null,answered=0;
+   let answered=0;
    for(let guard=0;answered<ANSWERS&&guard<ANSWERS*3;guard++){
     const now=await steadyScannerControls(page);
     if(now.intervention){const c=steadyScannerCenter(now.continue);await page.touchscreen.tap(c.x,c.y);await page.waitForFunction(()=>!state.interventionActive,null,{timeout:10000});continue;}
     assert.ok(now.yes&&now.no&&now.cant,`${engineName} answer ${answered}: Yes, No and Can't are showing`);
-    home??=now;
+    const placed=await page.evaluate(()=>{
+     const rect=el=>{const r=el.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom};};
+     const at=()=>({scan:rect(document.getElementById('scan')),question:rect(document.querySelector('.qline')),...Object.fromEntries(['yes','no','cant'].map(act=>[act,rect(document.querySelector(`[data-act="${act}"]`))]))});
+     const scroller=document.scrollingElement,from=scroller.scrollTop,before=at();
+     scroller.scrollTop=from>40?from-37:from+37;
+     const moved=scroller.scrollTop-from,after=at();
+     scroller.scrollTop=from;
+     return {before,after,moved};
+    });
+    const {before,after,moved}=placed;
+    assert.ok(Math.abs(moved)>=30,`${engineName} answer ${answered}: positive control: the page scrolled ${moved}px`);
     for(const act of ['yes','no','cant']){
-     assert.ok(Math.abs(now[act].top-home[act].top)<=1&&Math.abs(now[act].left-home[act].left)<=1,`${engineName} answer ${answered}: ${act} stayed where it first appeared (chain ${now.chain}): started at ${Math.round(home[act].left)},${Math.round(home[act].top)} and is now at ${Math.round(now[act].left)},${Math.round(now[act].top)}`);
-     assert.ok(now[act].top>=0&&now[act].bottom<=now.viewportHeight&&now[act].left>=0&&now[act].right<=now.viewportWidth,`${engineName} answer ${answered}: ${act} is fully on screen: bottom ${Math.round(now[act].bottom)} of ${now.viewportHeight}`);
+     const c=before[act];
+     assert.ok(c.left>=before.scan.left&&c.right<=before.scan.right&&c.top>=before.scan.top&&c.bottom<=before.scan.bottom,`${engineName} answer ${answered}: ${act} sits inside the scanner box: ${JSON.stringify(c)} in ${JSON.stringify(before.scan)}`);
+     assert.ok(c.top>=before.question.bottom,`${engineName} answer ${answered}: ${act} sits below the question: starts ${Math.round(c.top)}, the question ends ${Math.round(before.question.bottom)}`);
+     assert.ok(Math.abs((before[act].top-after[act].top)-moved)<=1,`${engineName} answer ${answered}: ${act} scrolls with the page: the page moved ${moved}px and ${act} moved ${Math.round(before[act].top-after[act].top)}px`);
     }
     const act=answered%3===1?'yes':answered%7===5?'cant':'no';
-    await steadyScannerAnswer(page,steadyScannerCenter(home[act]),now.candidate);
+    await page.locator(`[data-act="${act}"]`).evaluate(el=>el.scrollIntoView({block:'center'}));
+    const target=(await steadyScannerControls(page))[act];
+    assert.ok(target.top>=-1&&target.bottom<=now.viewportHeight+1,`${engineName} answer ${answered}: ${act} can be scrolled fully onto the screen: ${JSON.stringify(target)} of ${now.viewportHeight}`);
+    await steadyScannerAnswer(page,steadyScannerCenter(target),now.candidate);
     answered++;
    }
    assert.equal(answered,ANSWERS,`${engineName}: every answer was accepted`);
@@ -23312,17 +23334,23 @@ const STEADY_ENLARGED_TEXT='.btn{font-size:21px!important}.crumbs{font-size:19px
 const steadySeededBoard=({floatingHeader=false,showPostpone=false,tasks=8}={})=>steadyScannerBoard({tasks,showPostpone,
  taskOver:i=>i===2?{due:'2026-01-02'}:{},
  over:{chain:['steady-0','steady-1'],candidateId:'steady-2',settings:{floatingHeader}}});
-test('RISK steady scanner browser: pinned choices stay readable and clear of content across narrow enlarged short-landscape floating-header and Run WOOP views in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+// #2420: the choices scroll with the page, so reachable means a person can
+// scroll each one fully onto the screen, clear of a floating header, and tap it.
+test('RISK steady scanner browser: every choice stays reachable unclipped and inside the scanner box across narrow enlarged short-landscape floating-header and Run WOOP views in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[];
  const measure=page=>page.evaluate(()=>{
   const box=el=>{if(!el)return null;const r=el.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height};};
   const controls=['yes','no','cant','postpone','run-woop'].map(act=>[act,document.querySelector(`[data-act="${act}"]`)]).filter(([,el])=>el);
-  const scroller=document.scrollingElement;scroller.scrollTo(0,scroller.scrollHeight);
-  const foot=box(document.querySelector('.foot')),title=document.querySelector('.card.cand .title');
-  const atEnd={foot,scrollY:scrollY};scroller.scrollTo(0,0);
-  return {controls:Object.fromEntries(controls.map(([act,el])=>[act,{...box(el),clipped:el.scrollWidth>el.clientWidth+1||el.scrollHeight>el.clientHeight+1}])),
-   titleText:title.textContent.trim(),titleClipped:title.scrollWidth>title.clientWidth+1||title.scrollHeight>title.clientHeight+1,atEnd,header:box(document.getElementById('appHeader')),headerFloating:document.getElementById('appHeader').classList.contains('floating'),
-   finishTop:box(document.querySelector('.decide-finish')).top,overflow:document.documentElement.scrollWidth-innerWidth,viewportHeight:innerHeight,viewportWidth:innerWidth};
+  const header=document.getElementById('appHeader'),scan=document.getElementById('scan'),title=document.querySelector('.card.cand .title');
+  const reach=el=>{
+   el.scrollIntoView({block:'center'});
+   const r=box(el),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);
+   return {...r,scan:box(scan),hit:!!hit&&el.contains(hit),clipped:el.scrollWidth>el.clientWidth+1||el.scrollHeight>el.clientHeight+1};
+  };
+  const seen=Object.fromEntries(controls.map(([act,el])=>[act,reach(el)]));
+  document.scrollingElement.scrollTo(0,0);
+  return {controls:seen,titleText:title.textContent.trim(),titleClipped:title.scrollWidth>title.clientWidth+1||title.scrollHeight>title.clientHeight+1,
+   headerFloating:header.classList.contains('floating'),overflow:document.documentElement.scrollWidth-innerWidth,viewportHeight:innerHeight,viewportWidth:innerWidth};
  });
  for(const [engineName,engine] of await steadyScannerEngines()){
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
@@ -23347,27 +23375,25 @@ test('RISK steady scanner browser: pinned choices stay readable and clear of con
      await page.waitForFunction(()=>!!document.querySelector('[data-act="run-woop"]'),null,{timeout:15000}).catch(()=>{throw new Error(`${label}: the overdue candidate offers Run WOOP`);});
      await page.waitForTimeout(80);
      const shot=await measure(page);
-     const pinnedTop=Math.min(shot.finishTop,...Object.values(shot.controls).map(c=>c.top));
      for(const [act,c] of Object.entries(shot.controls)){
-      assert.ok(c.top>=0&&c.bottom<=shot.viewportHeight&&c.left>=0&&c.right<=shot.viewportWidth,`${label}: ${act} is on screen: ${JSON.stringify(c)}`);
+      assert.ok(c.top>=-1&&c.bottom<=shot.viewportHeight+1&&c.left>=0&&c.right<=shot.viewportWidth,`${label}: ${act} can be scrolled fully onto the screen: ${JSON.stringify(c)}`);
+      assert.ok(c.left>=c.scan.left&&c.right<=c.scan.right&&c.top>=c.scan.top&&c.bottom<=c.scan.bottom,`${label}: ${act} sits inside the scanner box`);
+      assert.equal(c.hit,true,`${label}: nothing covers ${act} once it is on screen`);
       assert.equal(c.clipped,false,`${label}: ${act} shows its whole label`);
       assert.ok(c.height>=44,`${label}: ${act} is ${Math.round(c.height)} px tall, too small to tap`);
      }
      assert.ok(shot.overflow<=0,`${label}: no sideways page overflow: ${shot.overflow}`);
-     assert.ok(shot.atEnd.foot.bottom<=pinnedTop+1,`${label}: scrolled to the end, the footer clears the pinned row: footer ends ${Math.round(shot.atEnd.foot.bottom)}, the row starts ${Math.round(pinnedTop)}`);
      assert.equal(shot.titleText,('Steady task 2 '+STEADY_SCANNER_FILLER).trim(),`${label}: the candidate title is shown in full`);
      assert.equal(shot.titleClipped,false,`${label}: the candidate title is not cut off`);
-     if(spec.floatingHeader){assert.equal(shot.headerFloating,true,`${label}: the header floats`);assert.ok(shot.header.bottom<=pinnedTop,`${label}: the floating header and pinned row do not overlap`);}
-     // Run WOOP belongs to one candidate, so it must not move the choices when it goes.
+     if(spec.floatingHeader)assert.equal(shot.headerFloating,true,`${label}: the header floats`);
+     // A real press on No, where a person scrolled it, answers the overdue candidate.
      await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
+     await page.locator('[data-act="no"]').evaluate(el=>el.scrollIntoView({block:'center'}));
      const withWoop=await steadyScannerControls(page);
-     await page.evaluate(()=>document.scrollingElement.scrollTo(0,0));
      const answerAt=steadyScannerCenter(withWoop.no);
      if(spec.touch===false)await page.mouse.click(answerAt.x,answerAt.y);else await page.touchscreen.tap(answerAt.x,answerAt.y);
      await page.waitForFunction(prior=>state.candidateId!==prior,withWoop.candidate,{timeout:10000});
-     const after=await steadyScannerControls(page);
      assert.equal(await page.locator('[data-act="run-woop"]').count(),0,`${label}: the next candidate is not overdue`);
-     for(const act of ['yes','no','cant'])assert.ok(Math.abs(after[act].top-withWoop[act].top)<=1&&Math.abs(after[act].left-withWoop[act].left)<=1,`${label}: ${act} stays put when Run WOOP goes: ${Math.round(withWoop[act].top)} to ${Math.round(after[act].top)}`);
      assert.deepEqual(errors,[],`${label}: no page errors`);
     }catch(error){failures.push(error.message);}finally{await context.close();}
    }
@@ -23376,9 +23402,9 @@ test('RISK steady scanner browser: pinned choices stay readable and clear of con
  assert.deepEqual(failures,[]);
 });
 
-// With the row pinned, a second tap lands on the button of the next candidate
-// before anyone could have read it, so a physical press inside 200 ms of the new
-// task appearing is dropped.
+// When the next title is as long as the last, a second tap lands on the button
+// of the next candidate before anyone could have read it, so a physical press
+// inside 200 ms of the new task appearing is dropped.
 test('RISK steady scanner browser: a double tap or a repeated key answers only the shown task and the next answer after the window is accepted in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[];
  for(const [engineName,engine] of await steadyScannerEngines()){
@@ -23398,7 +23424,9 @@ test('RISK steady scanner browser: a double tap or a repeated key answers only t
      const seen=await page.evaluate(()=>({answered:Object.keys(state.considered),candidate:state.candidateId}));
      assert.deepEqual(seen.answered,[first.candidate],`${label}: only the task on screen was answered: ${seen.answered}`);
      await page.waitForTimeout(400);
-     if(touch)await page.touchscreen.tap(at.x,at.y);else if(input==='two key presses')await page.keyboard.press('n');else await page.mouse.click(at.x,at.y);
+     // The next title can be longer, which moves No (#2420), so the later press goes where No is now.
+     const later=steadyScannerCenter((await steadyScannerControls(page)).no);
+     if(touch)await page.touchscreen.tap(later.x,later.y);else if(input==='two key presses')await page.keyboard.press('n');else await page.mouse.click(later.x,later.y);
      await page.waitForFunction(prior=>state.candidateId!==prior,seen.candidate,{timeout:5000}).catch(()=>{throw new Error(`${label}: an answer after the window was not accepted`);});
      assert.equal(await page.evaluate(id=>state.considered[id],seen.candidate),'no',`${label}: the later answer counted`);
      assert.deepEqual(errors,[],`${label}: no page errors`);
@@ -23438,6 +23466,7 @@ test('RISK steady scanner browser: a double tap on Postpone or Done acts once an
     try{
      const selector=act==='postpone'?'.decide [data-act="postpone"]':`[data-act="${act}"]`;
      await page.waitForSelector(selector,{timeout:15000});await page.waitForTimeout(500);
+     await page.locator(selector).first().scrollIntoViewIfNeeded();
      const before=await page.evaluate(()=>undoStack.length),box=await page.locator(selector).first().boundingBox(),x=box.x+box.width/2,y=box.y+box.height/2;
      await page.touchscreen.tap(x,y);await page.waitForTimeout(60);await page.touchscreen.tap(x,y);
      await page.waitForTimeout(450);
@@ -23450,29 +23479,9 @@ test('RISK steady scanner browser: a double tap on Postpone or Done acts once an
  assert.deepEqual(failures,[]);
 });
 
-// Focus lands on mousedown, so a correction that scrolls then would move the
-// control away before mouseup and lose the click.
-test('RISK steady scanner browser: a mouse press on a control partly under the pinned row still clicks it in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
- const failures=[];
- for(const [engineName,engine] of await steadyScannerEngines()){
-  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
-  const {page,context}=await steadyScannerPage(browser,steadySeededBoard({tasks:12}),{width:1000,height:700,touch:false});
-  try{
-   await page.waitForSelector('.siderail [data-act="edit"]',{timeout:15000});await page.waitForTimeout(200);
-   const rects=()=>page.evaluate(()=>{const e=document.querySelector('.siderail [data-act="edit"]').getBoundingClientRect();return {left:e.left,width:e.width,top:e.top,bottom:e.bottom,rowTop:document.querySelector('.decide').getBoundingClientRect().top,y:scrollY};});
-   const start=await rects();
-   await page.evaluate(by=>scrollBy(0,by),start.top-(start.rowTop-13));await page.waitForTimeout(60);
-   const placed=await rects();
-   assert.ok(placed.top<placed.rowTop&&placed.bottom>placed.rowTop,`${engineName}: positive control: the control straddles the row: ${Math.round(placed.top)}-${Math.round(placed.bottom)}, row ${Math.round(placed.rowTop)}`);
-   await page.mouse.move(placed.left+placed.width/2,placed.top+6);await page.mouse.down();await page.waitForTimeout(90);await page.mouse.up();
-   await page.waitForFunction(()=>!!document.querySelector('#modalRoot [data-act="save-edit"],#modalRoot .frow'),null,{timeout:2000}).catch(()=>{throw new Error('Edit did not open');});
-  }catch(error){failures.push(`${engineName}: ${error.message.split('\n')[0]}`);}finally{await context.close();await browser.close();}
- }
- assert.deepEqual(failures,[]);
-});
-
-// A short page can leave the task being decided on entirely under the pinned row.
-test('RISK steady scanner browser: an answer reveals a next title the pinned row would cover on short screens, and a stable layout does not move between later answers in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+// #2420: nothing scrolls the page after an answer. The next title sits above the
+// choices in the box, and titles of one length keep the choices where they were.
+test('RISK steady scanner browser: an answer leaves the page where it is with the next title above the choices on short screens, and a stable layout does not move between later answers in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[];
  for(const [engineName,engine] of await steadyScannerEngines()){
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
@@ -23489,7 +23498,8 @@ test('RISK steady scanner browser: an answer reveals a next title the pinned row
      await page.keyboard.press('n');
      await page.waitForFunction(prior=>state.candidateId!==prior,opened.candidate,{timeout:5000});await page.waitForTimeout(60);
      const shown=await read();
-     assert.ok(shown.titleBottom<=shown.rowTop&&shown.titleTop>=0,`${label}: the next title is clear of the pinned row: ${Math.round(shown.titleTop)}-${Math.round(shown.titleBottom)}, the row starts ${Math.round(shown.rowTop)}, scrolled ${Math.round(shown.y)}`);
+     assert.equal(shown.y,opened.y,`${label}: the answer does not scroll the page`);
+     assert.ok(shown.titleBottom<=shown.rowTop,`${label}: the next title sits above the choices: ${Math.round(shown.titleTop)}-${Math.round(shown.titleBottom)}, the row starts ${Math.round(shown.rowTop)}`);
      let previous=shown;
      for(let answer=0;answer<3;answer++){
       await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
@@ -23505,27 +23515,6 @@ test('RISK steady scanner browser: an answer reveals a next title the pinned row
     }catch(error){failures.push(`${label}: ${error.message.split('\n')[0]}`);}finally{await context.close();}
    }
   }finally{await browser.close();}
- }
- assert.deepEqual(failures,[]);
-});
-
-// Past the phone widths the row stops reaching the screen edges, so it has to
-// line up with the panels above it. A row wider than them stuck out with square ends.
-test('RISK steady scanner browser: the pinned row lines up with the panels with rounded ends once it no longer reaches the screen edges in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
- const failures=[];
- for(const [engineName,engine] of await steadyScannerEngines()){
-  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
-  try{
-   const {page,context}=await steadyScannerPage(browser,steadySeededBoard(),{width:744,height:1133,touch:false});
-   await page.waitForSelector('[data-act="yes"]',{timeout:15000});
-   for(const width of [733,744,750,760,761,1000]){
-    await page.setViewportSize({width,height:1133});await page.waitForTimeout(60);
-    const seen=await page.evaluate(()=>{const row=document.querySelector('.decide'),a=row.getBoundingClientRect(),b=document.getElementById('listWrap').getBoundingClientRect();return {rowLeft:a.left,rowRight:a.right,panelLeft:b.left,panelRight:b.right,radius:parseFloat(getComputedStyle(row).borderTopLeftRadius)};});
-    if(Math.abs(seen.rowLeft-seen.panelLeft)>1||Math.abs(seen.rowRight-seen.panelRight)>1)failures.push(`${engineName} ${width}px: the row spans ${seen.rowLeft}-${seen.rowRight}, the panels ${seen.panelLeft}-${seen.panelRight}`);
-    if(!(seen.radius>0))failures.push(`${engineName} ${width}px: the row has square ends`);
-   }
-   await context.close();
-  }catch(error){failures.push(`${engineName}: ${error.message.split('\n')[0]}`);}finally{await browser.close();}
  }
  assert.deepEqual(failures,[]);
 });
@@ -23657,12 +23646,13 @@ test('RISK steady scanner browser: the trail fits again when web fonts finish lo
  assert.deepEqual(failures,[]);
 });
 
-// The first candidate after opening, Start or Resume has to be readable too, but
-// a person's own place on the page, such as a restored saved view, comes first.
-test('RISK steady scanner browser: the first candidate after opening Start or Resume is revealed without overriding a restored scroll position in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+// #2420: opening, Start and Resume leave the page where it is (#2312 scrolled
+// to reveal a title under its pinned row), and a restored place on the page stays.
+test('RISK steady scanner browser: opening Start and Resume leave the page where it is and a restored scroll position stays in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[];
- const clear=page=>page.evaluate(()=>{const t=document.querySelector('.card.cand .title')?.getBoundingClientRect(),row=document.querySelector('.decide')?.getBoundingClientRect();return t&&row?{bottom:t.bottom,top:t.top,rowTop:row.top,clear:t.bottom<=row.top&&t.top>=0}:null;});
  const titles=i=>({title:'Same length title number '+String(i).padStart(2,'0')});
+ const settle=page=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ const pressStill=async(page,selector)=>{const control=page.locator(selector).first();await control.scrollIntoViewIfNeeded();await settle(page);const y=await page.evaluate(()=>scrollY);await control.click();return y;};
  for(const [engineName,engine] of await steadyScannerEngines()){
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
   try{
@@ -23672,35 +23662,29 @@ test('RISK steady scanner browser: the first candidate after opening Start or Re
     const opened=await steadyScannerPage(browser,seeded,{...viewport,touch:false});
     try{
      await opened.page.waitForSelector('[data-act="yes"]',{timeout:15000});await opened.page.waitForTimeout(150);
-     const shown=await clear(opened.page);
-     assert.ok(shown?.clear,`${label}: opening reveals the first candidate: ${JSON.stringify(shown)}`);
-     // Resume from work mode, starting at the top of the page.
+     assert.equal(await opened.page.evaluate(()=>scrollY),0,`${label}: opening does not scroll the page`);
+     // Resume from work mode.
      await opened.page.locator('[data-act="start-working"]').first().click();
      await opened.page.waitForSelector('[data-act="resume-scan"]',{timeout:5000});
      await opened.page.evaluate(()=>scrollTo(0,0));
-     await opened.page.locator('[data-act="resume-scan"]').first().click();
+     const beforeResume=await pressStill(opened.page,'[data-act="resume-scan"]');
      await opened.page.waitForSelector('[data-act="yes"]',{timeout:5000});await opened.page.waitForTimeout(100);
-     const resumed=await clear(opened.page);
-     assert.ok(resumed?.clear,`${label}: Resume reveals the candidate: ${JSON.stringify(resumed)}`);
-     // A restored place on the page is the person's, even with the title covered.
-     const covered=await opened.page.evaluate(()=>{scrollTo(0,0);const t=document.querySelector('.card.cand .title').getBoundingClientRect(),row=document.querySelector('.decide').getBoundingClientRect();return t.bottom>row.top+24;});
-     if(covered){
-      await opened.page.evaluate(()=>scrollTo(0,12));await opened.page.waitForTimeout(100);
-      const place=await opened.page.evaluate(()=>scrollY);
-      assert.ok(place>0,`${label}: positive control: the page is scrolled`);
-      await opened.page.reload({waitUntil:'domcontentloaded'});
-      await opened.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true',null,{timeout:30000});await opened.page.waitForTimeout(200);
-      const after=await opened.page.evaluate(()=>scrollY);
-      assert.ok(Math.abs(after-place)<=3,`${label}: a restored position stays: ${place} became ${after}`);
-     }
+     assert.equal(await opened.page.evaluate(()=>scrollY),beforeResume,`${label}: Resume does not scroll the page`);
+     // A restored place on the page is the person's.
+     await opened.page.evaluate(()=>scrollTo(0,12));await opened.page.waitForTimeout(100);
+     const place=await opened.page.evaluate(()=>scrollY);
+     assert.ok(place>0,`${label}: positive control: the page is scrolled`);
+     await opened.page.reload({waitUntil:'domcontentloaded'});
+     await opened.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true',null,{timeout:30000});await opened.page.waitForTimeout(200);
+     const after=await opened.page.evaluate(()=>scrollY);
+     assert.ok(Math.abs(after-place)<=3,`${label}: a restored position stays: ${place} became ${after}`);
      assert.deepEqual(opened.errors,[],`${label}: no page errors`);
     }catch(error){failures.push(`${label}: ${error.message.split('\n')[0]}`);}finally{await opened.context.close();}
     const fresh=await steadyScannerPage(browser,steadyScannerBoard({tasks:12,taskOver:titles}),{...viewport,touch:false});
     try{
-     await fresh.page.locator('[data-act="start-scan"]').first().click();
+     const beforeStart=await pressStill(fresh.page,'[data-act="start-scan"]');
      await fresh.page.waitForFunction(()=>!!state.candidateId&&!!document.querySelector('[data-act="yes"]'),null,{timeout:15000});await fresh.page.waitForTimeout(100);
-     const started=await clear(fresh.page);
-     assert.ok(started?.clear,`${label}: Start reveals the first candidate: ${JSON.stringify(started)}`);
+     assert.equal(await fresh.page.evaluate(()=>scrollY),beforeStart,`${label}: Start does not scroll the page`);
     }catch(error){failures.push(`${label}: ${error.message.split('\n')[0]}`);}finally{await fresh.context.close();}
    }
   }finally{await browser.close();}
@@ -23708,9 +23692,10 @@ test('RISK steady scanner browser: the first candidate after opening Start or Re
  assert.deepEqual(failures,[]);
 });
 
-// The reveal belongs to answering. Undo and context changes are pressed from
-// above the scanner, and moving the page would carry that control off-screen.
-test('RISK steady scanner browser: Undo and a context change leave the page where it is while an answer still reveals a covered title in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+// Undo and context changes are pressed from above the scanner, and moving the
+// page would carry that control off-screen. Since #2420 an answer does not move
+// the page either.
+test('RISK steady scanner browser: an answer Undo and a context change leave the page where it is in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[];
  for(const [engineName,engine] of await steadyScannerEngines()){
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
@@ -23724,15 +23709,14 @@ test('RISK steady scanner browser: Undo and a context change leave the page wher
      const settle=()=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
      const title=()=>page.evaluate(()=>{const t=document.querySelector('.card.cand .title').getBoundingClientRect(),row=document.querySelector('.decide').getBoundingClientRect();return {bottom:t.bottom,rowTop:row.top,y:scrollY,candidate:state.candidateId};});
      const clickOn=async selector=>{const box=await page.locator(selector).first().boundingBox();await page.mouse.click(box.x+box.width/2,box.y+box.height/2);};
-     // Answering from the top of the page reveals the next title.
+     // Answering from the top of the page leaves the page there.
      await page.evaluate(()=>scrollTo(0,0));await settle();
      const opened=await title();
-     assert.ok(opened.bottom>opened.rowTop,`${label}: positive control: the title starts covered: ends ${Math.round(opened.bottom)}, row ${Math.round(opened.rowTop)}`);
      await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
      await page.keyboard.press('n');
      await page.waitForFunction(prior=>state.candidateId!==prior,opened.candidate,{timeout:5000});await settle();
      const answered=await title();
-     assert.ok(answered.bottom<=answered.rowTop,`${label}: the answer reveals the next title: ends ${Math.round(answered.bottom)}, row ${Math.round(answered.rowTop)}`);
+     assert.equal(answered.y,opened.y,`${label}: the answer does not move the page`);
      // Undo, pressed from the header at the top of the page, stays under the finger.
      await page.evaluate(()=>scrollTo(0,0));await settle();
      await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
@@ -23759,11 +23743,11 @@ test('RISK steady scanner browser: Undo and a context change leave the page wher
  assert.deepEqual(failures,[]);
 });
 
-// A fixed row sits over the page without the browser knowing, so a control under
-// it counted as already on screen: Tab stopped there and the focus ring was
-// invisible. Real key presses are the only way to observe the browser's choice.
-// macOS WebKit needs Option for Tab to stop on buttons.
-test('RISK steady scanner browser: Tab never stops on a control hidden behind the pinned row at phone short-landscape and desktop sizes in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+// #2312's pinned row once hid Tab stops and their focus ring. With the choices
+// back in the scanner box (#2420) and nothing pinned over the page, every stop,
+// the choices included, has to be in view. Real key presses are the only way to
+// observe the browser's choice. macOS WebKit needs Option for Tab to stop on buttons.
+test('RISK steady scanner browser: every Tab stop including the choices is in view at phone short-landscape and desktop sizes in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[],STOPS=70;
  for(const [engineName,engine] of await steadyScannerEngines()){
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
@@ -23775,22 +23759,25 @@ test('RISK steady scanner browser: Tab never stops on a control hidden behind th
     try{
      await page.waitForSelector('[data-act="yes"]',{timeout:15000});
      await page.waitForTimeout(80);
-     const hidden=[];let onThePage=0;
+     const hidden=[];let onThePage=0,choices=0;
      for(let i=0;i<STOPS;i++){
       await page.keyboard.press(engineName==='webkit'?'Alt+Tab':'Tab');
       await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
       const stop=await page.evaluate(()=>{
-       const el=document.activeElement,row=document.querySelector('.decide');
-       if(!el||el===document.body||el.closest('.decide'))return null;
+       const el=document.activeElement;
+       if(!el||el===document.body)return null;
        const r=el.getBoundingClientRect();
-       return {name:el.dataset.act||el.id||el.tagName,top:r.top,bottom:r.bottom,rowTop:row.getBoundingClientRect().top};
+       return {name:el.dataset.act||el.id||el.tagName,top:r.top,bottom:r.bottom,inChoices:!!el.closest('.decide'),viewportHeight:innerHeight};
       });
       if(!stop)continue;
-      onThePage++;
-      if(stop.bottom>stop.rowTop)hidden.push(`${stop.name} ends ${Math.round(stop.bottom)}, the row starts ${Math.round(stop.rowTop)}`);
+      onThePage++;choices+=stop.inChoices;
+      // A browser scrolls a stop already partly in view no further, so a
+      // paragraph-long title in All tasks can stay cut by the screen edge.
+      if(stop.bottom<=0||stop.top>=stop.viewportHeight)hidden.push(`${stop.name} spans ${Math.round(stop.top)}-${Math.round(stop.bottom)} of ${stop.viewportHeight}`);
      }
      assert.ok(onThePage>=30,`${label}: the walk reached the page's controls: ${onThePage} stops`);
-     assert.deepEqual(hidden,[],`${label}: ${hidden.length} of ${onThePage} focus stops are behind the pinned row`);
+     assert.ok(choices>=3,`${label}: the walk stopped on the choices: ${choices} stops`);
+     assert.deepEqual(hidden,[],`${label}: ${hidden.length} of ${onThePage} focus stops are off screen`);
      assert.deepEqual(errors,[],`${label}: no page errors`);
     }catch(error){failures.push(error.message.slice(0,900));}finally{await context.close();}
    }
@@ -23799,38 +23786,46 @@ test('RISK steady scanner browser: Tab never stops on a control hidden behind th
  assert.deepEqual(failures,[]);
 });
 
-test('RISK steady scanner browser: the pinned row exists only while a candidate is showing and clears the iPhone safe area and toasts',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
- const failures=[],safeBottom=34;
+// #2420: with the choices back in the scanner box, nothing is pinned to the
+// bottom of the screen, so the page keeps its ordinary bottom room, a toast
+// sits at its ordinary place and focus scrolling reserves nothing, with a
+// candidate showing and after the scan ends.
+test('RISK steady scanner browser: nothing is pinned to the bottom of the screen and the page keeps its ordinary bottom room toast and scroll padding while a candidate is showing',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ const read=page=>page.evaluate(()=>({
+  fixed:[...document.querySelectorAll('#scan *')].filter(e=>['fixed','sticky'].includes(getComputedStyle(e).position)).map(e=>e.dataset.act||e.className),
+  padding:parseFloat(getComputedStyle(document.querySelector('.wrap')).paddingBottom),
+  scrollPadding:getComputedStyle(document.documentElement).scrollPaddingBottom,
+  toastGap:(()=>{const t=document.querySelector('.toast.show');return t?innerHeight-t.getBoundingClientRect().bottom:null;})(),
+ }));
  for(const [engineName,engine] of await steadyScannerEngines()){
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
   try{
-   const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard({tasks:4}));
-   try{
-    await page.waitForSelector('[data-act="yes"]',{timeout:15000});
-    await page.evaluate(()=>toast('Saved'));await page.waitForTimeout(60);
-    const shown=await page.evaluate(()=>{const t=document.querySelector('.toast.show').getBoundingClientRect(),row=document.querySelector('.decide-finish').getBoundingClientRect();return {toastBottom:t.bottom,rowTop:row.top};});
-    assert.ok(shown.toastBottom<=shown.rowTop,`${engineName}: a toast sits above the pinned row: ends ${Math.round(shown.toastBottom)}, row starts ${Math.round(shown.rowTop)}`);
-    if(engineName==='chromium'){
-     const cdp=await context.newCDPSession(page);
-     await cdp.send('Emulation.setSafeAreaInsetsOverride',{insets:{top:47,topMax:47,left:0,leftMax:0,bottom:safeBottom,bottomMax:safeBottom,right:0,rightMax:0}});
+   for(const viewport of [{width:390,height:844},{width:768,height:1024}]){
+    const label=`${engineName} ${viewport.width}px`;
+    const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard({tasks:4}),viewport);
+    try{
+     await page.waitForSelector('[data-act="yes"]',{timeout:15000});
+     await page.evaluate(()=>toast('Saved'));await page.waitForTimeout(60);
+     const shown=await read(page);
+     assert.deepEqual(shown.fixed,[],`${label}: nothing in the scanner is pinned while a candidate is showing`);
+     assert.equal(shown.padding,60,`${label}: the page keeps its ordinary 60px of bottom room`);
+     assert.equal(shown.scrollPadding,'auto',`${label}: focus scrolling reserves no room for a pinned row`);
+     assert.ok(shown.toastGap>=20&&shown.toastGap<=30,`${label}: a toast sits at its ordinary place near the bottom: ${shown.toastGap}px up`);
+     for(let guard=0;guard<12&&await page.locator('[data-act="no"]').count();guard++){
+      const before=await steadyScannerControls(page);if(before.intervention)break;
+      await page.locator('[data-act="no"]').evaluate(el=>el.scrollIntoView({block:'center'}));
+      const no=(await steadyScannerControls(page)).no;
+      await steadyScannerAnswer(page,steadyScannerCenter(no),before.candidate);
+     }
      await page.waitForTimeout(80);
-     const clear=await page.evaluate(()=>({bottom:document.querySelector('[data-act="yes"]').getBoundingClientRect().bottom,height:innerHeight}));
-     assert.ok(clear.bottom<=clear.height-safeBottom,`${engineName}: Yes clears a ${safeBottom}px home indicator: ends ${Math.round(clear.bottom)} of ${clear.height}`);
-     await cdp.send('Emulation.clearSafeAreaInsetsOverride').catch(()=>{});
-    }
-    for(let guard=0;guard<12&&await page.locator('[data-act="no"]').count();guard++){
-     const before=await steadyScannerControls(page);if(before.intervention)break;
-     await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
-     await page.touchscreen.tap(steadyScannerCenter(before.no).x,steadyScannerCenter(before.no).y);
-     await page.waitForFunction(prior=>state.candidateId!==prior||state.interventionActive,before.candidate,{timeout:10000});
-    }
-    await page.waitForTimeout(80);
-    const ended=await page.evaluate(()=>({text:document.getElementById('scan').textContent,fixedDescendants:[...document.querySelectorAll('#scan *')].filter(e=>getComputedStyle(e).position==='fixed').length,padding:parseFloat(getComputedStyle(document.querySelector('.wrap')).paddingBottom)}));
-    assert.match(ended.text,/End of the list/,`${engineName}: the scan ended honestly: ${ended.text.slice(0,80)}`);
-    assert.equal(ended.fixedDescendants,0,`${engineName}: nothing stays pinned without a candidate`);
-    assert.ok(ended.padding<=62+(engineName==='chromium'?safeBottom:0),`${engineName}: the page gives back the room it reserved: ${ended.padding}`);
-    assert.deepEqual(errors,[],`${engineName}: no page errors`);
-   }catch(error){failures.push(error.message);}finally{await context.close();}
+     const ended=await read(page);
+     assert.match(await page.locator('#scan').textContent(),/End of the list/,`${label}: the scan ended honestly`);
+     assert.deepEqual(ended.fixed,[],`${label}: nothing stays pinned without a candidate`);
+     assert.equal(ended.padding,60,`${label}: the bottom room stays ordinary`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(error.message);}finally{await context.close();}
+   }
   }finally{await browser.close();}
  }
  assert.deepEqual(failures,[]);
@@ -41918,12 +41913,12 @@ test('Help answers how the steady scanner, backup list, Debug log link and rank 
  const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();
  const help=app.shim.document.getElementById('modalRoot').innerHTML;
  for(const [topic,answer] of [
-  [/stay at the bottom of the screen\?<\/dt>/,/Yes, No and Can’t stay in one place at the bottom of the screen/],
+  [/Where are Yes, No and Can’t\?<\/dt>/,/Inside the scanner box, under the question[^<]*scroll with the page/],
   [/How long can the dot trail get\?<\/dt>/,/stays on one row[^<]*a count such as \+3 earlier/],
   [/How long can the dot trail get\?<\/dt>/,/up to two of the newest dots, only as many as fit with their titles readable/],
-  [/Can I run WOOP on an overdue task\?<\/dt>/,/Run WOOP appears above the scanner choices/],
+  [/Can I run WOOP on an overdue task\?<\/dt>/,/Run WOOP appears below the scanner choices/],
   [/Why didn’t my second tap count\?<\/dt>/,/ignored for a moment after a new task appears/],
-  [/Why does the page move after I answer\?<\/dt>/,/scrolls just enough to show the next task/],
+  [/Why do Yes, No and Can’t move a little between tasks\?<\/dt>/,/longer or shorter task title moves them[^<]*does not scroll when you answer/],
   [/Why does the rank column take a moment after an answer\?<\/dt>/,/catch up at most once a second/],
   [/Does Settings load every backup\?<\/dt>/,/opened only when you download, restore or delete it[^<]*damaged after it was saved, Restore refuses it/],
   [/How do I open the debug log if Settings will not open\?<\/dt>/,/opens the Debug log directly, without going through Settings/],
