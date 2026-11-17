@@ -37585,6 +37585,15 @@ test('Removed WOOP: an overdue offered candidate gets only the ordinary choices,
  assert.deepEqual(ordinary.slice(0,3),['yes','no','cant'],'precondition: an ordinary candidate gets Yes, No and Can’t');
  assert.deepEqual(overdue,ordinary,'the overdue candidate gets exactly the choices a candidate with no due date gets');
 });
+test('Removed WOOP: Settings has no Last task WOOP, even on a board that saved it on',async()=>{
+ const board=syncState({tasks:[syncTask('a','Private task')],settings:{...syncState().settings,lastTaskWoop:true}}),raw=JSON.stringify(board);
+ const {ctx,shim}=await loadApp({seed:2421,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+ assert.equal(ctx.state.settings.lastTaskWoop,true,'precondition: the saved board has Last task WOOP on');
+ ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(settings,/<summary>Scanning and recurrence<\/summary>/,'precondition: Settings shows Scanning and recurrence');
+ assert.match(settings,/id="stChainStartsWith"/,'precondition: its neighboring settings are there');
+ assert.doesNotMatch(settings,/stLastTaskWoop|WOOP|dislodgements/);
+});
 test('RISK overdue scanner layout: enlarged candidate title chips and decision footer wrap without clipping choices',async()=>{
  const {ctx,shim}=await loadApp({seed:971});const b=ctx.addTask('Benchmark'),t=ctx.addTask('A readable overdue task title',false,[],{due:ctx.todayISO(-1)});ctx.dotTask(b.id);ctx.state.mode='scan';ctx.state.candidateId=t.id;ctx.renderScan();
  const markup=shim.document.getElementById('scan').innerHTML;assert.match(markup,/class="card cand"/);assert.match(markup,/class="chiprow"/);assert.match(markup,/class="decide-finish"/);assert.match(markup,/data-act="run-woop"/);
