@@ -3999,7 +3999,8 @@ test('RISK change records guidance: mounted Help and the changelog say a scanner
  assert.equal(quick.length,1,'one bullet says an answer reaches other open devices within about a second');
  assert.match(quick[0],/without them downloading it/);assert.match(quick[0],/goes up when you reconnect/);assert.match(quick[0],/waits until you finish/);assert.match(quick[0],/answers reach other devices as before/);
  assert.doesNotMatch(quick[0],/saved on this device before it is sent/,'saving on the device first is its own feature');
- assert.ok(items.some(item=>/An answer is now saved on this device before it is sent, so an app closed right after an answer opens with it/.test(item)),'saving an answer on the device first has its own bullet');
+ // #2417 review N3: the feature's limit stays in its bullet: it applies with sync on.
+ assert.ok(items.some(item=>/^With sync on, an answer is now saved on this device before it is sent, so an app closed right after an answer opens with it/.test(item)),'saving an answer on the device first has its own bullet, which says it applies with sync on');
 });
 
 test('RISK sync responsiveness guidance: mounted Help explains large boards and bounded damaged-source recovery',async()=>{
@@ -30505,6 +30506,17 @@ test('RISK BACKWARD COMPATIBILITY: change records keep the supported floor and t
     assert.deepEqual(Array.from(read.changeRecords?.records??[],row=>row.seq),[1],label+': and reapplies the record that copy leaves out');
     let kept=false;await env.withSecurityRulesDisabled(async context=>{kept=(await F.getDoc(F.doc(context.firestore(),'users/owner/changeRecords/answer-'+index))).exists();});
     assert.equal(kept,true,label+': the record stays in the cloud');
+    // #2417 review N2: a root that names the records its copy includes is
+    // read, and published over, by the older version without loss.
+    const rootData=async()=>{let data=null;await env.withSecurityRulesDisabled(async context=>{data=(await F.getDoc(F.doc(context.firestore(),'users/owner'))).data();});return data;};
+    const naming=await next.CS.push(board('newer naming its records'),1,read.rev,null,{includedSeq:1});
+    assert.equal(naming?.ok,true,label+': the newer version publishes a copy naming the record it includes');
+    assert.equal((await rootData()).includedSeq,1,label+': positive control: its root names it');
+    const olderRead=await old.CS.pull();
+    assert.equal(olderRead.payload,board('newer naming its records'),label+': the older version reads that copy');
+    await assertRoundTrip(old.CS,board('older over a naming copy'),olderRead.rev,label+': and publishes over it');
+    assert.equal((await rootData()).includedSeq,undefined,label+': its root names no records');
+    assert.equal((await next.CS.pull()).payload,board('older over a naming copy'),label+': the newer version reads it');
    }finally{for(const handle of handles)await handle.drain();await env.cleanup();}
   }
  }
