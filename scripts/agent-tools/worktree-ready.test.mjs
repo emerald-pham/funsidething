@@ -242,15 +242,17 @@ test('prepare after a switch to a branch that holds the registration commit move
   }
 });
 
-// Invariant 4 with invariant 2 (PR #2413 B1 residual, probe R8): Claude Code
-// starts an agent at the coordinator's commit, and the agent then cuts its work
-// branch from a newer integration head and prepares again. Prune recorded the
-// first-wave merges that branch already had as the agent's landed work, though
-// the agent committed nothing.
-test('prune records discarded for a work branch cut from a newer integration head with no commits of its own, and landed for work beyond the start prepare restarted there', () => {
-  const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-restart-');
+// PR #2413 round 3: prune never records landed. Inferring it from branch state
+// after a worktree was gone kept leaving false-landed paths: a branch name reset
+// and reused for other work (probe R2, and W1 when no prune ran in between), a
+// branch deleted after its merge (R3), a work branch cut from a newer integration
+// head (R8) or fast-forwarded to it (W2). A removed worktree is abandoned work:
+// prune records its entry discarded at once, at its branch's tip then, and frees
+// its ports. Work that merged is finished as landed before its worktree goes.
+test("prune records a removed worktree's entry as discarded and frees its ports, even when its work landed, whatever happened to its branch", () => {
+  const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-discarded-');
   try {
-    const agentStartSha = addReleaseFixture(fixture, main);
+    const startSha = addReleaseFixture(fixture, main);
     git(main, 'checkout', '--quiet', '-b', 'integration/x');
     git(main, 'checkout', '--quiet', '-b', 'ticket/first');
     commitFile(main, 'docs/first.md', 'First-wave task.');
@@ -258,44 +260,86 @@ test('prune records discarded for a work branch cut from a newer integration hea
     git(main, 'merge', '--quiet', '--no-ff', '-m', 'Merge the first wave', 'ticket/first');
     const integrationHead = git(main, 'rev-parse', 'HEAD');
     git(main, 'checkout', '--quiet', 'main');
-    const agent = (name) => {
+    const prepared = (name, branch, at) => {
       const path = join(fixture, name);
-      git(main, 'worktree', 'add', '--quiet', '-b', `worktree-agent-${name}`, path, agentStartSha);
-      assert.equal(run(['prepare'], path, { ledger, npm }).status, 0);
-      git(path, 'checkout', '--quiet', '-b', `ticket/${name}`, 'integration/x');
-      const again = run(['prepare'], path, { ledger, npm });
-      assert.equal(again.status, 0, again.stderr);
-      const [entry] = ownerOf(ledger, path);
-      return { path, entry };
+      git(main, 'worktree', 'add', '--quiet', '-B', branch, path, at);
+      const result = run(['prepare'], path, { ledger, npm });
+      assert.equal(result.status, 0, result.stderr);
+      return { path, id: ownerOf(ledger, path)[0].id };
     };
-    const idle = agent('idle');
-    const working = agent('working');
-    const workSha = commitFile(working.path, 'docs/second.md', 'Second-wave task.');
+    const remove = ({ path }) => git(main, 'worktree', 'remove', '--force', path);
+    const prune = () => assert.equal(run(['prune'], main, { ledger, npm }).status, 0);
+    const tips = {};
+
+    // Its work merges while the worktree lives; the worktree is then removed with no finish.
+    const merged = prepared('merged', 'ticket/merged', startSha);
+    tips.merged = commitFile(merged.path, 'docs/merged.md', 'Work that lands.');
+    // R3: removed and pruned before its work merges, then its branch is deleted.
+    const deleted = prepared('deleted', 'ticket/deleted', startSha);
+    tips.deleted = commitFile(deleted.path, 'docs/deleted.md', 'Work that lands after its worktree is gone.');
+    remove(deleted);
+    prune();
+    // R2: dropped and pruned, then a retry resets the branch name for work that lands.
+    const dropped = prepared('dropped', 'ticket/reused', startSha);
+    tips.dropped = commitFile(dropped.path, 'docs/dropped.md', 'First attempt, dropped.');
+    remove(dropped);
+    prune();
+    const retry = prepared('retry', 'ticket/reused', startSha);
+    tips.retry = commitFile(retry.path, 'docs/retry.md', 'Retry that lands.');
+    // W1: removed with no prune before a retry resets its branch name to the
+    // integration head; the retry's prepare is the first prune to find it gone.
+    const abandoned = prepared('abandoned', 'ticket/reset', startSha);
+    commitFile(abandoned.path, 'docs/abandoned.md', 'First attempt, abandoned.');
+    remove(abandoned);
+    const reset = prepared('reset', 'ticket/reset', 'integration/x');
+    tips.abandoned = integrationHead;
+    tips.reset = commitFile(reset.path, 'docs/reset.md', 'Work on the reset branch name.');
+    // R8: prepared at the agent's start, then moved to a work branch cut from the integration head.
+    const moved = (name) => {
+      const agent = prepared(name, `worktree-agent-${name}`, startSha);
+      git(agent.path, 'checkout', '--quiet', '-b', `ticket/${name}`, 'integration/x');
+      assert.equal(run(['prepare'], agent.path, { ledger, npm }).status, 0);
+      return agent;
+    };
+    const idle = moved('idle');
+    tips.idle = integrationHead;
+    const working = moved('working');
+    tips.working = commitFile(working.path, 'docs/working.md', 'Own work beyond the integration head.');
+    // W2: fast-forwarded to the integration head and prepared again, committing nothing.
+    const forwarded = prepared('forwarded', 'ticket/forwarded', startSha);
+    git(forwarded.path, 'merge', '--quiet', '--ff-only', 'integration/x');
+    assert.equal(run(['prepare'], forwarded.path, { ledger, npm }).status, 0);
+    tips.forwarded = integrationHead;
 
     git(main, 'checkout', '--quiet', 'integration/x');
-    git(main, 'merge', '--quiet', '--no-ff', '-m', 'Merge the second wave', 'ticket/working');
-    const candidateSha = commitFile(main, 'docs/fix.md', 'Integration fix.');
-    recordReceipt(main, fixture, candidateSha, agentStartSha);
-    landIntegration(main, 'integration/x');
-    for (const { path } of [idle, working]) git(main, 'worktree', 'remove', '--force', path);
-
-    const pruned = run(['prune'], main, { ledger, npm });
-    assert.equal(pruned.status, 0, pruned.stderr);
-    const entries = new Map(JSON.parse(readFileSync(ledger, 'utf8')).entries.map((entry) => [entry.id, entry]));
-    const none = entries.get(idle.entry.id);
-    assert.equal(none.outcome, 'discarded', 'no commits of its own: the integration head it was cut from is not its work');
-    assert.equal(none.finalBranchSha, integrationHead);
-    assert.equal(none.releaseEvidence, undefined, 'no receipt is cited for it');
-    const done = entries.get(working.entry.id);
-    assert.equal(done.outcome, 'landed', 'its own commit beyond that start landed');
-    assert.equal(done.finalBranchSha, workSha);
-    assert.equal(done.releaseEvidence.candidate.commitSha, candidateSha);
-    for (const entry of [none, done]) {
-      assert.equal(entry.startBranchSha, integrationHead, "the second prepare moved the start to the work branch's HEAD");
-      assert.equal(entry.rebinds.at(-1).previousStartBranchSha, agentStartSha);
+    for (const branch of ['ticket/merged', 'ticket/deleted', 'ticket/reused', 'ticket/reset', 'ticket/working']) {
+      git(main, 'merge', '--quiet', '--no-ff', '-m', `Merge ${branch}`, branch);
     }
-    assert.deepEqual([none.resources, done.resources], [[], []], 'both entries freed their ports');
-    assert.equal(activeEntries(ledger).length, 0, 'no active entry is left');
+    const candidateSha = commitFile(main, 'docs/fix.md', 'Integration fix.');
+    recordReceipt(main, fixture, candidateSha, startSha);
+    landIntegration(main, 'integration/x');
+    git(main, 'branch', '--quiet', '-D', 'ticket/deleted');
+    for (const agent of [merged, retry, reset, idle, working, forwarded]) remove(agent);
+    prune();
+
+    const agents = { merged, deleted, dropped, retry, abandoned, reset, idle, working, forwarded };
+    const entries = new Map(JSON.parse(readFileSync(ledger, 'utf8')).entries.map((entry) => [entry.id, entry]));
+    const outcome = ({ id }) => {
+      const entry = entries.get(id);
+      return { status: entry.status, outcome: entry.outcome, finalBranchSha: entry.finalBranchSha, ports: entry.resources.length, cites: entry.releaseEvidence?.candidate?.commitSha };
+    };
+    assert.deepEqual(
+      Object.fromEntries(Object.entries(agents).map(([name, agent]) => [name, outcome(agent)])),
+      Object.fromEntries(Object.keys(agents).map((name) => [name, { status: 'complete', outcome: 'discarded', finalBranchSha: tips[name], ports: 0, cites: undefined }])),
+      'every removed worktree is discarded at its tip when prune found it gone, its ports freed',
+    );
+    for (const name of ['merged', 'deleted', 'retry', 'reset', 'working', 'idle', 'forwarded']) {
+      assert.equal(spawnSync('git', ['merge-base', '--is-ancestor', tips[name], 'main'], { cwd: main }).status, 0, `${name}: that tip is in main`);
+    }
+    for (const name of ['idle', 'working']) {
+      assert.equal(entries.get(agents[name].id).startBranchSha, integrationHead, `${name}: the second prepare moved the start to the work branch's HEAD`);
+    }
+    assert.equal(activeEntries(ledger).length, 0, 'no entry is left active, so no port is claimed');
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }
@@ -377,29 +421,31 @@ test("prepare in a new worktree at a removed worktree's path registers its own e
   }
 });
 
-// Invariant 6 (PR #2413 N7): prune leaves an earlier worktree's unsettled entry
-// active, holding nothing, at its old path. Qualification readiness counted the
-// active entries at a path, so a new worktree there refused ("found 2") until
-// that earlier work settled.
-test("qualification readiness in a new worktree at a reused path counts only that worktree's entry, not an earlier worktree's unsettled one", () => {
+// Invariant 6 (PR #2413 N7): an earlier worktree's entry can stay active at a
+// reused path, such as one registered by hand, which prune never touches.
+// Qualification readiness counted the active entries at a path, so a new
+// worktree there refused ("found 2").
+test("qualification readiness in a new worktree at a reused path counts only that worktree's entry, not an earlier worktree's still-active one", () => {
   const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-readiness-');
   try {
     const path = join(fixture, 'agent-reused');
     git(main, 'worktree', 'add', '--quiet', '-b', 'ticket/earlier', path);
-    assert.equal(run(['prepare'], path, { ledger, npm }).status, 0);
-    const [earlier] = ownerOf(ledger, path);
-    commitFile(path, 'docs/earlier.md', 'Unmerged work of the earlier worktree.');
+    const earlierPorts = ['loopback:127.0.0.1:42997', 'loopback:127.0.0.1:42998'];
+    const began = coordination(['begin', '--work-type', 'tooling', '--intent', 'Registered by hand',
+      '--resources', earlierPorts[0], '--resources', earlierPorts[1]], path, ledger);
+    assert.equal(began.status, 0, began.stderr);
+    const earlier = JSON.parse(began.stdout);
     git(main, 'worktree', 'remove', '--force', path);
     git(main, 'worktree', 'add', '--quiet', '-b', 'ticket/later', path, 'main');
     assert.equal(run(['prepare'], path, { ledger, npm }).status, 0);
 
     const owners = ownerOf(ledger, path);
-    assert.equal(owners.length, 2, "the earlier worktree's entry stays active while its work may land");
-    const pending = owners.find((entry) => entry.id === earlier.id);
+    assert.equal(owners.length, 2, "prune leaves the earlier worktree's hand-registered entry active");
+    const kept = owners.find((entry) => entry.id === earlier.id);
     const later = owners.find((entry) => entry.id !== earlier.id);
-    assert.deepEqual(pending.resources, [], 'holding nothing');
-    assert.equal(loopbackPorts(later).length, 2, 'the new worktree holds its own two ports');
-    assert.equal(activeEntries(ledger).flatMap(loopbackPorts).length, 2, 'and they are the only port claims');
+    assert.deepEqual(kept.resources, earlierPorts, 'with its two ports');
+    assert.equal(loopbackPorts(later).length, 2, 'the new worktree holds two other ports');
+    assert.equal(new Set(activeEntries(ledger).flatMap(loopbackPorts)).size, 4, 'four port claims in all');
     const readiness = qualificationReadiness(path, ledger, join(fixture, 'evidence'));
     assert.deepEqual(readiness.errors, [], "readiness counts only the new worktree's entry");
     assert.equal(readiness.status, 0);
