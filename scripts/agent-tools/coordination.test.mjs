@@ -1822,10 +1822,11 @@ test("prune records a removed worktree's merged work as landed through its candi
     assert.equal(pruned.status, 0, pruned.stderr);
     const entries = new Map(JSON.parse(readFileSync(ledgerPath, 'utf8')).entries.map((entry) => [entry.id, entry]));
     for (const entry of entries.values()) {
+      assert.deepEqual(entry.resources, [], `${entry.worktree} releases its port`);
+      if (entry.id === unmerged.id) continue;
       assert.equal(entry.status, 'complete', `${entry.worktree} is finished`);
       assert.ok(['landed', 'discarded'].includes(entry.outcome), `${entry.worktree} records an outcome other ledger clients know, not ${entry.outcome}`);
       assert.equal(entry.completedAt, now, 'prune completes on the coordination clock');
-      assert.deepEqual(entry.resources, [], `${entry.worktree} releases its port`);
     }
 
     const task = entries.get(landed.id);
@@ -1843,11 +1844,11 @@ test("prune records a removed worktree's merged work as landed through its candi
     assert.equal(review.finalBranchSha, candidateSha, 'at the exact commit it recorded');
     assert.equal(review.releaseEvidence, undefined);
 
+    // Its branch still holds work main has not received, which may yet land (PR #2413 N3).
     const stray = entries.get(unmerged.id);
-    assert.equal(stray.outcome, 'discarded', 'work main never received is recorded as discarded');
-    assert.match(stray.discard.reason, /worktree removed before finish/i);
-    assert.equal(stray.finalBranchSha, unmergedSha);
-    assert.equal(stray.mainSha, mainSha);
+    assert.equal(stray.status, 'active', 'unmerged work keeps its entry open');
+    assert.equal(stray.outcome, undefined);
+    assert.equal(git(project, 'rev-parse', 'work/unmerged-task'), unmergedSha);
     assert.equal(stray.releaseEvidence, undefined);
 
     const gone = entries.get(deleted.id);
@@ -1920,6 +1921,64 @@ test('prune records landed only for work beyond the registration commit, never f
     assert.equal(moved.finalBranchSha, firstWaveSha);
     assert.notEqual(moved.finalBranchSha, laterSha);
     assert.equal(moved.releaseEvidence, undefined);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+// PR #2413 N3: a worktree removed before its branch merged still has work that
+// may land. Prune frees its ports at once but keeps the entry open until it can
+// tell the outcome, so the prune after the merge records it as landed.
+test('prune frees a removed worktree with unmerged work at once and records it landed after the merge', () => {
+  const fixture = realpathSync(mkdtempSync(join(tmpdir(), 'chain-coordination-prune-pending-')));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'chain-scanner'), 'work/unused');
+    git(project, 'checkout', '--quiet', 'main');
+    mkdirSync(join(project, 'scripts'), { recursive: true });
+    copyFileSync(releaseEvidenceEntrypoint, join(project, 'scripts/release-evidence.mjs'));
+    git(project, 'add', 'scripts/release-evidence.mjs');
+    git(project, 'commit', '--quiet', '-m', 'install fixture release adapter');
+    const baseSha = git(project, 'rev-parse', 'HEAD');
+    addOrigin(project, fixture);
+    const port = 'loopback:127.0.0.1:47141';
+    const agent = join(fixture, 'agent-pending');
+    git(project, 'worktree', 'add', '--quiet', '-b', 'work/pending', agent, 'main');
+    const began = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Pending fixture',
+      '--registered-by', 'worktree-ready', '--resources', port], agent);
+    assert.equal(began.status, 0, began.stderr);
+    const { id } = JSON.parse(began.stdout);
+    const taskSha = commitDocsNote(agent, 'pending.md', 'Task work merged after its worktree was removed.');
+    git(project, 'worktree', 'remove', '--force', agent);
+    const prune = (now) => {
+      const pruned = command(['prune', '--file', ledgerPath, '--registered-by', 'worktree-ready', '--now', now], project);
+      assert.equal(pruned.status, 0, pruned.stderr);
+      return JSON.parse(readFileSync(ledgerPath, 'utf8')).entries.find((entry) => entry.id === id);
+    };
+
+    const waiting = prune('2026-11-16T12:00:00.000Z');
+    assert.equal(waiting.status, 'active', 'unmerged work keeps its entry open');
+    assert.equal(waiting.outcome, undefined, 'no outcome is recorded before the work lands or is dropped');
+    assert.deepEqual(waiting.resources, [], 'its port is freed at once');
+    assert.deepEqual(waiting.claimReleases.map((release) => release.resources), [[port]]);
+    const other = join(fixture, 'agent-other');
+    git(project, 'worktree', 'add', '--quiet', '-b', 'work/other', other, 'main');
+    const reuse = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Reuse the freed port', '--resources', port], other);
+    assert.equal(reuse.status, 0, `the freed port can be claimed again: ${reuse.stderr}`);
+    assert.equal(prune('2026-11-16T12:30:00.000Z').claimReleases.length, 1, 'a later prune before the merge releases nothing twice');
+
+    git(project, 'checkout', '--quiet', '-b', 'integration/fixture', 'main');
+    git(project, 'merge', '--quiet', '--no-ff', '-m', 'Merge task into integration', 'work/pending');
+    const candidateSha = commitDocsNote(project, 'review-fix.md', 'Review fix on the integration branch.');
+    recordDocsOnlyReceipt(project, fixture, candidateSha, baseSha, 'integration');
+    landIntegrationOnMain(project);
+
+    const landed = prune('2026-11-16T13:00:00.000Z');
+    assert.equal(landed.status, 'complete');
+    assert.equal(landed.outcome, 'landed', 'the prune after the merge records the work as landed');
+    assert.equal(landed.finalBranchSha, taskSha);
+    assert.equal(landed.releaseEvidence.candidate.commitSha, candidateSha);
+    assert.equal(landed.completedAt, '2026-11-16T13:00:00.000Z');
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }

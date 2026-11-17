@@ -1292,12 +1292,12 @@ async function releaseClaim(filePath, options) {
   });
 }
 
-// Completes this repository's active entries that the named setup tool
-// registered and whose worktree directory no longer exists, releasing their
-// resources. Claude Code removes subagent worktrees without running a removal
-// hook, so their entries could otherwise never be finished (#2364, #2368).
-// Parked, hand-registered and other repositories' entries are never touched:
-// missing paths do not waive their ownership.
+// Frees the resources of this repository's active entries that the named setup
+// tool registered and whose worktree directory no longer exists, and completes
+// those whose outcome is settled. Claude Code removes subagent worktrees without
+// running a removal hook, so their entries could otherwise never be finished
+// (#2364, #2368). Parked, hand-registered and other repositories' entries are
+// never touched: missing paths do not waive their ownership.
 async function prune(filePath, options) {
   const registeredBy = text(options['registered-by']);
   if (!registeredBy) throw new Error('coordination prune requires --registered-by <tool>.');
@@ -1312,55 +1312,64 @@ async function prune(filePath, options) {
       if (typeof entry.worktree !== 'string' || !isAbsolute(entry.worktree)) continue;
       const missing = await lstat(entry.worktree).then(() => false, (error) => error?.code === 'ENOENT');
       if (!missing) continue;
-      await completeRemovedEntry(entry, now, () => main ??= readChainScannerMainState().catch(() => undefined));
-      pruned.push(entry);
+      if (await settleRemovedEntry(entry, now, () => main ??= readChainScannerMainState().catch(() => undefined))) pruned.push(entry);
     }
     if (pruned.length) await writeState(filePath, state);
     return pruned;
   });
 }
 
-// A removed worktree's work is landed only when finish's own proof holds for
-// its exact commit: a detached entry's recorded commit, or its branch's tip if
-// the branch still exists. Anything else is discarded, keeping the fields that
-// can still be known, since ledger clients know no other outcome (#2364).
-async function completeRemovedEntry(entry, now, readMain) {
+// A removed worktree's ports go back to the pool at once. Its entry completes
+// only once the outcome is settled (PR #2413 B1, N3):
+// - landed when finish's proof holds for the branch tip and that tip has work
+//   beyond the registration commit. The registration commit itself may be in
+//   main while the agent's work, on another branch, never got there.
+// - discarded when the branch is gone or has nothing beyond that commit. A
+//   detached entry is a reviewer's, which makes no work commits.
+// Otherwise the work may still land: the entry stays active and a later prune
+// decides. Returns whether the entry changed.
+async function settleRemovedEntry(entry, now, readMain) {
+  let changed = false;
+  if ([entry.scopes, entry.claims, entry.resources].some((values) => values?.length)) {
+    entry.claimReleases = [...(entry.claimReleases ?? []), {
+      releasedAt: now, scopes: entry.scopes ?? [], claims: entry.claims ?? [], resources: entry.resources ?? [],
+    }];
+    entry.scopes = [];
+    entry.claims = [];
+    entry.resources = [];
+    changed = true;
+  }
   const detached = entry.detachedHead === true;
   const branchSha = detached
     ? text(entry.startBranchSha).toLowerCase() || undefined
     : await runGit(['rev-parse', '--verify', '--quiet', `refs/heads/${text(entry.branchName)}^{commit}`]).catch(() => undefined);
+  const start = text(entry.startBranchSha).toLowerCase();
+  const ancestor = (older, newer) => gitIsAncestor(older, newer, process.cwd()).catch(() => false);
   const main = await readMain();
   let release = {
     ...(branchSha && !detached ? { branchName: entry.branchName } : {}),
     branchSha,
     mainSha: main?.mainSha ?? (await readMainRef(process.cwd()).catch(() => undefined))?.sha,
   };
+  let outcome;
   let releaseEvidence;
-  // Only work beyond the registration commit can land: the registration commit
-  // itself may be in main while the agent's work, on another branch, never got
-  // there (PR #2413 B1). This is also finish's start-commit ancestry check.
-  // A detached entry is a reviewer's, which makes no work commits.
-  const start = text(entry.startBranchSha).toLowerCase();
-  const workBeyondStart = Boolean(!detached && branchSha &&/^[0-9a-f]{40}$/.test(start) && branchSha !== start &&
-    await gitIsAncestor(start, branchSha, process.cwd()).catch(() => false));
-  if (workBeyondStart && main) {
-    try {
-      release = await releaseStateAt(release.branchName, branchSha, main, process.cwd());
-      releaseEvidence = await proveChainScannerLanding(entry, release, 'chain-scanner', now);
-    } catch {
-      releaseEvidence = undefined;
+  if (detached || !branchSha) outcome = 'discarded';
+  else if (/^[0-9a-f]{40}$/.test(start)) {
+    if (branchSha === start || (await ancestor(branchSha, start))) outcome = 'discarded';
+    else if (main && (await ancestor(start, branchSha))) {
+      try {
+        release = await releaseStateAt(release.branchName, branchSha, main, process.cwd());
+        releaseEvidence = await proveChainScannerLanding(entry, release, 'chain-scanner', now);
+        outcome = 'landed';
+      } catch {
+        releaseEvidence = undefined;
+      }
     }
   }
-  entry.claimReleases = [...(entry.claimReleases ?? []), {
-    releasedAt: now, scopes: entry.scopes ?? [], claims: entry.claims ?? [], resources: entry.resources ?? [],
-  }];
-  entry.scopes = [];
-  entry.claims = [];
-  entry.resources = [];
-  if (!releaseEvidence) entry.discard = { reason: 'Worktree removed before finish.', branchSha };
-  completeEntry(entry, {
-    outcome: releaseEvidence ? 'landed' : 'discarded', release, now, result: 'Worktree directory no longer exists.', releaseEvidence,
-  });
+  if (!outcome) return changed;
+  if (outcome === 'discarded') entry.discard = { reason: 'Worktree removed before finish.', branchSha };
+  completeEntry(entry, { outcome, release, now, result: 'Worktree directory no longer exists.', releaseEvidence });
+  return true;
 }
 
 function parseOptions(args) {
