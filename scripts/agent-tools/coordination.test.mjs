@@ -1096,6 +1096,31 @@ test("finish completes a reviewer's detached entry at its recorded commit and fr
   }
 });
 
+// A parked detached entry has no branch name, so a host migration refuses it
+// (PR #2413 N4). Reviewer checkouts are finished or pruned instead.
+test("park refuses a reviewer's detached entry and leaves it active", () => {
+  const fixture = realpathSync(mkdtempSync(join(tmpdir(), 'chain-coordination-detached-park-')));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'project'), 'work/reviewed');
+    const candidate = git(project, 'rev-parse', 'HEAD');
+    const reviewer = join(fixture, 'reviewer');
+    git(project, 'worktree', 'add', '--quiet', '--detach', reviewer, candidate);
+    const began = command(['begin', '--file', ledgerPath, '--work-type', 'investigation', '--intent', 'Review the exact candidate'], reviewer);
+    assert.equal(began.status, 0, began.stderr);
+    const entry = JSON.parse(began.stdout);
+    const before = readFileSync(ledgerPath, 'utf8');
+
+    const parked = command(['park', '--file', ledgerPath, '--id', entry.id, '--checkpoint-sha', candidate], reviewer);
+    assert.notEqual(parked.status, 0, 'a detached entry cannot be parked');
+    assert.match(parked.stderr, /detached/i);
+    assert.match(parked.stderr, /finish/i, 'the refusal says to finish it instead');
+    assert.equal(readFileSync(ledgerPath, 'utf8'), before, 'the entry is left as it was');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
 test('begin registers a master-only repository without inventing a main SHA', () => {
   const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-master-only-'));
   try {

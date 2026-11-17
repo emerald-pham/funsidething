@@ -978,6 +978,11 @@ async function park(filePath, options) {
     if (!entry) throw new Error(`No coordination entry found for ${options.id}.`);
     if (entry.status !== 'active') throw new Error(`Coordination entry ${entry.id} is already ${text(entry.status, 'historical')}.`);
     if (entry.worktree !== process.cwd()) throw new Error(`Cannot park coordination entry ${entry.id} from ${process.cwd()}; it belongs to ${entry.worktree}.`);
+    // Parked ownership is checked by branch, and a host migration refuses one
+    // without it (PR #2413 N4).
+    if (entry.detachedHead === true) {
+      throw new Error(`Cannot park coordination entry ${entry.id}: it is a detached reviewer checkout. Finish it instead; reviewer checkouts are finished or pruned, never parked.`);
+    }
     const current = await readGitStartState(process.cwd(), persistedBaseRef(entry));
     if (current.branchName !== entry.branchName || current.branchSha.toLowerCase() !== checkpoint) {
       throw new Error(`Cannot park coordination entry ${entry.id}: checkpoint or branch does not match the current checkout.`);
