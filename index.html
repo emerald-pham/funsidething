@@ -205,7 +205,9 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
 .decide{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
 .decide>.btn{min-height:44px}
 .decide-finish{display:flex;align-items:center;gap:8px;margin-left:auto;min-width:0;flex:1 1 290px;justify-content:flex-end}
-.decide-finish .btn{white-space:nowrap}
+/* The finish row's button shares the choices' line above 560px, so it takes their
+   tap height too and the two never stand side by side at different heights. */
+.decide-finish .btn{white-space:nowrap;min-height:44px}
 .decide-finish .sparkbox{margin-left:auto;min-width:0;flex:0 1 auto}
 .decide-finish .spark{width:clamp(56px,12vw,84px);max-width:84px;height:20px}
 .keyhint{font-size:10px;opacity:.7;font-weight:500;margin-left:5px}

@@ -23302,6 +23302,8 @@ test('RISK steady scanner browser: every choice stays reachable unclipped and in
    return {...r,scan:box(scan),hit:!!hit&&el.contains(hit),clipped:el.scrollWidth>el.clientWidth+1||el.scrollHeight>el.clientHeight+1};
   };
   const seen=Object.fromEntries(controls.map(([act,el])=>[act,reach(el)]));
+  // #2422 review B1: the finish row's button is a decision-row button too.
+  const finish=document.querySelector('.decide-finish [data-act="start-working"]');if(finish)seen['start-working']=reach(finish);
   document.scrollingElement.scrollTo(0,0);
   return {controls:seen,titleText:title.textContent.trim(),titleClipped:title.scrollWidth>title.clientWidth+1||title.scrollHeight>title.clientHeight+1,
    headerFloating:header.classList.contains('floating'),overflow:document.documentElement.scrollWidth-innerWidth,viewportHeight:innerHeight,viewportWidth:innerWidth};
@@ -23338,6 +23340,12 @@ test('RISK steady scanner browser: every choice stays reachable unclipped and in
       assert.equal(c.clipped,false,`${label}: ${act} shows its whole label`);
       assert.ok(c.height>=44,`${label}: ${act} is ${Math.round(c.height)} px tall, too small to tap`);
      }
+     // Two buttons on one line of the row stand at one height: a 38px "done adding
+     // for now" beside the 44px choices read as a defect (#2422 review B1).
+     const doneAdding=shot.controls['start-working'],yes=shot.controls.yes;
+     assert.ok(doneAdding,`${label}: done adding for now is offered while dots are on the chain`);
+     const middle=c=>(c.top+c.bottom)/2-c.scan.top;
+     if(Math.abs(middle(doneAdding)-middle(yes))<=yes.height/2)assert.ok(Math.abs(doneAdding.height-yes.height)<=1,`${label}: done adding for now shares the choices' line at ${Math.round(doneAdding.height)} px beside ${Math.round(yes.height)} px`);
      assert.ok(shot.overflow<=0,`${label}: no sideways page overflow: ${shot.overflow}`);
      assert.equal(shot.titleText,('Steady task 2 '+STEADY_SCANNER_FILLER).trim(),`${label}: the candidate title is shown in full`);
      assert.equal(shot.titleClipped,false,`${label}: the candidate title is not cut off`);
