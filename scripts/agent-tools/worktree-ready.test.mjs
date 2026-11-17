@@ -138,6 +138,34 @@ test('prepare claims ports from a host-sized ledger and reuses ports the worktre
   }
 });
 
+// Claude Code starts an agent on its own worktree branch, and the agent then
+// works on its ticket branch. An entry left on the first branch let prune judge
+// the wrong commit (PR #2413 B1).
+test('prepare after a switch to a branch that holds the registration commit moves the same entry and ports to that branch', () => {
+  const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-switch-');
+  try {
+    const agent = addWorktree(main, join(fixture, 'agent-switch'));
+    assert.equal(run(['prepare'], agent, { ledger, npm }).status, 0);
+    const [first] = ownerOf(ledger, agent);
+    assert.equal(first.branchName, 'agent/agent-switch');
+    git(agent, 'checkout', '--quiet', '-b', 'ticket/1-switch');
+    writeFileSync(join(agent, 'work.md'), 'Ticket work.\n');
+    git(agent, 'add', 'work.md');
+    git(agent, 'commit', '--quiet', '-m', 'ticket work');
+
+    const again = run(['prepare'], agent, { ledger, npm });
+    assert.equal(again.status, 0, again.stderr);
+    const owners = ownerOf(ledger, agent);
+    assert.equal(owners.length, 1, 'no second entry is registered');
+    assert.equal(owners[0].id, first.id, 'the same entry is kept');
+    assert.equal(owners[0].branchName, 'ticket/1-switch', 'the entry now records the work branch');
+    assert.equal(owners[0].startBranchSha, first.startBranchSha, 'the registration commit is kept');
+    assert.deepEqual(loopbackPorts(owners[0]), loopbackPorts(first), 'the worktree keeps its ports');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
 test('without a usable ledger, prepare still makes dependencies available, warns which step it skipped and writes no ledger', () => {
   const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-unusable-');
   try {

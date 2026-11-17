@@ -1269,6 +1269,34 @@ async function claim(filePath, options) {
   });
 }
 
+// Moves this worktree's active entry to the branch it has switched to, keeping
+// the registration commit, which that branch must hold. Claude Code starts an
+// agent on its own worktree branch before the agent switches to its work
+// branch; an entry left behind let prune judge the wrong commit (PR #2413 B1).
+async function rebind(filePath, options) {
+  if (!options.id) throw new Error('coordination rebind requires --id <entry-id>.');
+  return withCoordinationLock(filePath, async () => {
+    const state = await readState(filePath, { pruneReservations: false });
+    const entry = state.entries.find((candidate) => candidate.id === options.id);
+    if (!entry) throw new Error(`No coordination entry found for ${options.id}.`);
+    if (entry.status !== 'active') throw new Error(`Cannot rebind coordination entry ${entry.id}: it is not active.`);
+    if (entry.worktree !== process.cwd()) throw new Error(`Cannot rebind coordination entry ${entry.id} from ${process.cwd()}; it belongs to ${entry.worktree}.`);
+    const current = await readGitStartState(process.cwd(), persistedBaseRef(entry));
+    if (current.detachedHead) throw new Error(`Cannot rebind coordination entry ${entry.id} to a detached checkout.`);
+    if (entry.detachedHead !== true && current.branchName === entry.branchName) return entry;
+    if (entry.startBranchSha && !(await gitIsAncestor(entry.startBranchSha, current.branchSha, process.cwd()).catch(() => false))) {
+      throw new Error(`Cannot rebind coordination entry ${entry.id}: branch ${current.branchName} does not hold its registration commit ${entry.startBranchSha}.`);
+    }
+    entry.rebinds = [...(entry.rebinds ?? []), {
+      reboundAt: isoNow(options.now), from: entry.detachedHead === true ? 'detached' : entry.branchName, to: current.branchName,
+    }];
+    delete entry.detachedHead;
+    entry.branchName = current.branchName;
+    await writeState(filePath, state);
+    return entry;
+  });
+}
+
 async function releaseClaim(filePath, options) {
   if (!options.id) throw new Error('coordination release-claim requires --id <entry-id>.');
   const { scopes, claims, resources } = normalizeOwnership(options);
@@ -1471,6 +1499,14 @@ if (command === 'discover') {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 2;
   }
+} else if (command === 'rebind') {
+  try {
+    const entry = await rebind(discover(args), parseOptions(args));
+    console.log(JSON.stringify(entry, null, 2));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 2;
+  }
 } else if (command === 'prune') {
   try {
     console.log(JSON.stringify(await prune(discover(args), parseOptions(args)), null, 2));
@@ -1487,6 +1523,6 @@ if (command === 'discover') {
     process.exitCode = 2;
   }
 } else {
-  console.error('usage: coordination.mjs <discover|export-env|install|migrate|status|begin|heartbeat|claim|release-claim|prune|park|resume|finish> [options]');
+  console.error('usage: coordination.mjs <discover|export-env|install|migrate|status|begin|heartbeat|claim|release-claim|rebind|prune|park|resume|finish> [options]');
   process.exitCode = 2;
 }
