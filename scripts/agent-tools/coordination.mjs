@@ -1333,7 +1333,9 @@ async function claim(filePath, options) {
 // prune judge the wrong commit (PR #2413 B1). The move restarts the start at
 // HEAD, so commits the branch already had are never the agent's work; keeping
 // the old start counted a newer integration head's merges as work (PR #2413 B1
-// residual, N8). Each move is kept in `rebinds` with the previous start.
+// residual, N8). Each move is kept in `rebinds` with the previous start. An own
+// entry is live, so a removal prune recorded while its directory was away is
+// dropped; the final removal records the tip anew.
 async function own(filePath, options) {
   const worktreeRoot = await realpath(await runGit(['rev-parse', '--show-toplevel']));
   const [identity, headSha, branchName] = await Promise.all([
@@ -1348,20 +1350,24 @@ async function own(filePath, options) {
       if (!ownsCoordination(candidate) || candidate.worktree !== worktreeRoot) continue;
       if (!(await leftByEarlierWorktree(candidate, identity, headSha, worktreeRoot))) entry = candidate;
     }
-    if (entry?.status !== 'active' || branchName === 'HEAD') return entry ?? null;
+    if (entry?.status !== 'active') return entry ?? null;
+    let changed = Object.hasOwn(entry, 'removal');
+    delete entry.removal;
     const start = text(entry.startBranchSha).toLowerCase();
-    const moved = entry.detachedHead === true || entry.branchName !== branchName;
+    const moved = branchName !== 'HEAD' && (entry.detachedHead === true || entry.branchName !== branchName);
     const holdsStart = /^[0-9a-f]{40}$/.test(start) && (await gitIsAncestor(start, headSha, worktreeRoot).catch(() => false));
-    if (!moved && holdsStart) return entry;
-    await readGitStartState(worktreeRoot, persistedBaseRef(entry)); // refuses a protected base branch
-    entry.rebinds = [...(entry.rebinds ?? []), {
-      reboundAt: isoNow(options.now), from: entry.detachedHead === true ? 'detached' : entry.branchName, to: branchName,
-      previousStartBranchSha: entry.startBranchSha,
-    }];
-    delete entry.detachedHead;
-    entry.branchName = branchName;
-    entry.startBranchSha = headSha;
-    await writeState(filePath, state);
+    if (branchName !== 'HEAD' && (moved || !holdsStart)) {
+      await readGitStartState(worktreeRoot, persistedBaseRef(entry)); // refuses a protected base branch
+      entry.rebinds = [...(entry.rebinds ?? []), {
+        reboundAt: isoNow(options.now), from: entry.detachedHead === true ? 'detached' : entry.branchName, to: branchName,
+        previousStartBranchSha: entry.startBranchSha,
+      }];
+      delete entry.detachedHead;
+      entry.branchName = branchName;
+      entry.startBranchSha = headSha;
+      changed = true;
+    }
+    if (changed) await writeState(filePath, state);
     return entry;
   });
 }

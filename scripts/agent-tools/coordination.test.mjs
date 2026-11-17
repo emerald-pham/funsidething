@@ -2158,6 +2158,40 @@ test('prune records landed for work whose branch was deleted after it merged, fr
   }
 });
 
+// Invariants 1 and 3: a worktree prune found gone can come back, such as a
+// directory moved away and back. The entry is still that worktree's own, so the
+// removal prune recorded is stale: own drops it, and the final removal records
+// the tip anew. Settling on the old tip ignored every commit after the return.
+test("own keeps a returned worktree's entry and drops the removal prune recorded, so prune settles on the tip at its final removal", () => {
+  const { fixture, ledgerPath, project, register, prune, land, active } = createPruneFixture('chain-coordination-prune-returned-');
+  try {
+    const agent = join(fixture, 'agent');
+    git(project, 'worktree', 'add', '--quiet', '-b', 'work/returned', agent, 'main');
+    const id = register(agent, 47201);
+    const awaySha = commitDocsNote(agent, 'before.md', 'Work before the directory moved away.');
+    renameSync(agent, `${agent}-away`);
+    const away = prune('2026-11-16T12:00:00.000Z').get(id);
+    assert.deepEqual([away.status, away.resources, away.removal?.branchSha], ['active', [], awaySha], 'prune found the worktree gone');
+    renameSync(`${agent}-away`, agent);
+    const owned = command(['own', '--file', ledgerPath], agent);
+    assert.equal(owned.status, 0, owned.stderr);
+    const laterSha = commitDocsNote(agent, 'after.md', 'Work after the directory came back.');
+    git(project, 'worktree', 'remove', '--force', agent);
+    const candidateSha = land('work/returned');
+
+    const landed = prune('2026-11-16T13:00:00.000Z').get(id);
+    assert.deepEqual([landed.status, landed.outcome, landed.finalBranchSha], ['complete', 'landed', laterSha], 'it settles on the tip at its final removal');
+    assert.deepEqual(landed.removal, { observedAt: '2026-11-16T13:00:00.000Z', branchSha: laterSha });
+    assert.equal(landed.releaseEvidence.candidate.commitSha, candidateSha);
+    const returned = JSON.parse(owned.stdout);
+    assert.equal(returned.id, id, 'the returned worktree kept its entry');
+    assert.equal(returned.removal, undefined, 'own dropped the removal recorded while it was away');
+    assert.equal(active().length, 0, 'no active entry or port claim is left');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
 // Invariant 5: prune records discarded only when the outcome is settled: the
 // entry is detached, its branch was gone when prune first found the worktree
 // gone, or the commit prune judges is not strictly beyond the start commit.
