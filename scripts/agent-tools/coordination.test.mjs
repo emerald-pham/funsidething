@@ -2057,6 +2057,88 @@ test("own moves an entry to the checkout's new branch, or to history without its
   }
 });
 
+// Invariant 5: prune records discarded only when the outcome is settled: the
+// entry is detached, its branch was gone when prune first found the worktree
+// gone, or the commit prune judges is not strictly beyond the start commit.
+// That includes work that left the start's history, which stayed active for
+// good before. Anything else, including work prune cannot judge while origin is
+// unreachable, stays active and holds nothing.
+test('prune records discarded only for a detached entry, a branch already gone, or a commit not strictly beyond the start, and keeps other removed work active without ports', () => {
+  const fixture = realpathSync(mkdtempSync(join(tmpdir(), 'chain-coordination-prune-settled-')));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'chain-scanner'), 'work/unused');
+    git(project, 'checkout', '--quiet', 'main');
+    mkdirSync(join(project, 'scripts'), { recursive: true });
+    copyFileSync(releaseEvidenceEntrypoint, join(project, 'scripts/release-evidence.mjs'));
+    git(project, 'add', 'scripts/release-evidence.mjs');
+    git(project, 'commit', '--quiet', '-m', 'install fixture release adapter');
+    const baseSha = git(project, 'rev-parse', 'HEAD');
+    const remote = addOrigin(project, fixture);
+    let port = 47170;
+    const agent = (name, { detached = false, before = () => {} } = {}) => {
+      const worktree = join(fixture, name);
+      if (detached) git(project, 'worktree', 'add', '--quiet', '--detach', worktree, 'main');
+      else git(project, 'worktree', 'add', '--quiet', '-b', `work/${name}`, worktree, 'main');
+      before(worktree);
+      port += 1;
+      const began = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', `Settled fixture ${name}`,
+        '--registered-by', 'worktree-ready', '--resources', `loopback:127.0.0.1:${port}`], worktree);
+      assert.equal(began.status, 0, began.stderr);
+      return { worktree, id: JSON.parse(began.stdout).id };
+    };
+
+    const reviewer = agent('reviewer', { detached: true });
+    const gone = agent('gone');
+    const idle = agent('idle');
+    const diverged = agent('diverged', { before: (worktree) => commitDocsNote(worktree, 'registered.md', 'Registered after this commit.') });
+    git(diverged.worktree, 'reset', '--quiet', '--hard', 'main');
+    const divergedSha = commitDocsNote(diverged.worktree, 'diverged.md', 'Work outside the start commit\'s history.');
+    const pending = agent('pending');
+    commitDocsNote(pending.worktree, 'pending.md', 'Work main has not received.');
+    const offline = agent('offline');
+    const offlineSha = commitDocsNote(offline.worktree, 'offline.md', 'Work that lands while origin is unreachable.');
+    git(project, 'checkout', '--quiet', '-b', 'integration/fixture', 'main');
+    git(project, 'merge', '--quiet', '--no-ff', '-m', 'Merge task into integration', 'work/offline');
+    const candidateSha = commitDocsNote(project, 'review-fix.md', 'Review fix on the integration branch.');
+    recordDocsOnlyReceipt(project, fixture, candidateSha, baseSha, 'integration');
+    landIntegrationOnMain(project);
+    for (const { worktree } of [reviewer, gone, idle, diverged, pending, offline]) git(project, 'worktree', 'remove', '--force', worktree);
+    git(project, 'branch', '--quiet', '-D', 'work/gone');
+
+    const prune = (now) => {
+      const pruned = command(['prune', '--file', ledgerPath, '--registered-by', 'worktree-ready', '--now', now], project);
+      assert.equal(pruned.status, 0, pruned.stderr);
+      return new Map(JSON.parse(readFileSync(ledgerPath, 'utf8')).entries.map((entry) => [entry.id, entry]));
+    };
+    const settled = (entries, id) => {
+      const { status, outcome, finalBranchSha, resources } = entries.get(id);
+      return { status, outcome, finalBranchSha, resources };
+    };
+    git(project, 'remote', 'set-url', 'origin', join(fixture, 'unreachable.git'));
+    const offlinePrune = prune('2026-11-16T12:00:00.000Z');
+    assert.deepEqual(settled(offlinePrune, reviewer.id), { status: 'complete', outcome: 'discarded', finalBranchSha: baseSha, resources: [] }, 'a detached entry');
+    assert.deepEqual(settled(offlinePrune, gone.id), { status: 'complete', outcome: 'discarded', finalBranchSha: undefined, resources: [] }, 'a branch already gone');
+    assert.deepEqual(settled(offlinePrune, idle.id), { status: 'complete', outcome: 'discarded', finalBranchSha: baseSha, resources: [] }, 'nothing beyond the start');
+    assert.deepEqual(settled(offlinePrune, diverged.id), { status: 'complete', outcome: 'discarded', finalBranchSha: divergedSha, resources: [] },
+      "work outside the start commit's history is not beyond it");
+    for (const id of [pending.id, offline.id]) {
+      assert.deepEqual(settled(offlinePrune, id), { status: 'active', outcome: undefined, finalBranchSha: undefined, resources: [] }, 'unsettled work stays active and holds nothing');
+    }
+    const active = () => [...JSON.parse(readFileSync(ledgerPath, 'utf8')).entries].filter((entry) => entry.status === 'active');
+    assert.deepEqual(active().map((entry) => entry.id).sort(), [pending.id, offline.id].sort(), 'two active entries are left');
+    assert.equal(active().flatMap((entry) => entry.resources).length, 0, 'and no port claims');
+
+    git(project, 'remote', 'set-url', 'origin', remote);
+    const online = prune('2026-11-16T13:00:00.000Z');
+    assert.deepEqual(settled(online, offline.id), { status: 'complete', outcome: 'landed', finalBranchSha: offlineSha, resources: [] }, 'it lands once origin answers');
+    assert.equal(online.get(offline.id).releaseEvidence.candidate.commitSha, candidateSha);
+    assert.deepEqual(active().map((entry) => entry.id), [pending.id], 'only the unmerged work stays active');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
 // PR #2413 B1 (probe S4): a worktree re-added at a removed one's path is a new
 // owner. It gets its own entry, and the old entry keeps its ownership.
 test("begin in a new worktree at an earlier worktree's path registers a new entry and leaves the earlier one's ownership alone", () => {

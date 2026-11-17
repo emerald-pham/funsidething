@@ -1450,7 +1450,6 @@ async function settleRemovedEntry(entry, now, readMain) {
     ? text(entry.startBranchSha).toLowerCase() || undefined
     : await runGit(['rev-parse', '--verify', '--quiet', `refs/heads/${text(entry.branchName)}^{commit}`]).catch(() => undefined);
   const start = text(entry.startBranchSha).toLowerCase();
-  const ancestor = (older, newer) => gitIsAncestor(older, newer, process.cwd()).catch(() => false);
   const main = await readMain();
   let release = {
     ...(branchSha && !detached ? { branchName: entry.branchName } : {}),
@@ -1461,8 +1460,15 @@ async function settleRemovedEntry(entry, now, readMain) {
   let releaseEvidence;
   if (detached || !branchSha) outcome = 'discarded';
   else if (/^[0-9a-f]{40}$/.test(start)) {
-    if (branchSha === start || (await ancestor(branchSha, start))) outcome = 'discarded';
-    else if (main && (await ancestor(start, branchSha))) {
+    let beyondStart;
+    try {
+      beyondStart = branchSha !== start && (await gitIsAncestor(start, branchSha, process.cwd()));
+    } catch {
+      return changed; // Git could not tell; a later prune decides.
+    }
+    // At, behind or beside the start commit, none of it is this entry's work.
+    if (!beyondStart) outcome = 'discarded';
+    else if (main) {
       try {
         release = await releaseStateAt(release.branchName, branchSha, main, process.cwd());
         releaseEvidence = await proveChainScannerLanding(entry, release, 'chain-scanner', now);
