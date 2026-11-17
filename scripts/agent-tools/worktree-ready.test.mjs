@@ -1,7 +1,7 @@
 import '../../tests/isolate-git-env.js';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -133,6 +133,94 @@ test('prepare claims ports from a host-sized ledger and reuses ports the worktre
     assert.equal(again.status, 0, again.stderr);
     assert.equal(ownerOf(ledger, agent).length, 1, 'a second prepare registers no second entry');
     assert.deepEqual(exportedPorts(run(['env'], agent, { ledger, npm }).stdout), claimed, 'it keeps exporting the ports it holds');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+// Claude Code starts an agent on its own worktree branch, and the agent then
+// works on its ticket branch. An entry left on the first branch let prune judge
+// the wrong commit (PR #2413 B1).
+test('prepare after a switch to a branch that holds the registration commit moves the same entry and ports to that branch', () => {
+  const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-switch-');
+  try {
+    const agent = addWorktree(main, join(fixture, 'agent-switch'));
+    assert.equal(run(['prepare'], agent, { ledger, npm }).status, 0);
+    const [first] = ownerOf(ledger, agent);
+    assert.equal(first.branchName, 'agent/agent-switch');
+    git(agent, 'checkout', '--quiet', '-b', 'ticket/1-switch');
+    writeFileSync(join(agent, 'work.md'), 'Ticket work.\n');
+    git(agent, 'add', 'work.md');
+    git(agent, 'commit', '--quiet', '-m', 'ticket work');
+
+    const again = run(['prepare'], agent, { ledger, npm });
+    assert.equal(again.status, 0, again.stderr);
+    const owners = ownerOf(ledger, agent);
+    assert.equal(owners.length, 1, 'no second entry is registered');
+    assert.equal(owners[0].id, first.id, 'the same entry is kept');
+    assert.equal(owners[0].branchName, 'ticket/1-switch', 'the entry now records the work branch');
+    assert.equal(owners[0].startBranchSha, first.startBranchSha, 'the registration commit is kept');
+    assert.deepEqual(loopbackPorts(owners[0]), loopbackPorts(first), 'the worktree keeps its ports');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+// A new worktree at a removed one's path, before any prune ran, took over the
+// old entry with its branch and start commit (PR #2413 B1, probe S4).
+test("prepare in a new worktree at a removed worktree's path registers its own entry instead of adopting the old one", () => {
+  const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-reuse-');
+  try {
+    const path = join(fixture, 'agent-reused');
+    addWorktree(main, path);
+    assert.equal(run(['prepare'], path, { ledger, npm }).status, 0);
+    const [old] = ownerOf(ledger, path);
+    git(main, 'worktree', 'remove', '--force', path);
+    git(main, 'worktree', 'add', '--quiet', '-b', 'agent/second', path, 'main');
+
+    const prepared = run(['prepare'], path, { ledger, npm });
+    assert.equal(prepared.status, 0, prepared.stderr);
+    const owners = ownerOf(ledger, path);
+    assert.equal(owners.length, 1, `one active entry for the path: ${prepared.stderr}`);
+    assert.notEqual(owners[0].id, old.id, 'the old entry is not adopted');
+    assert.equal(owners[0].branchName, 'agent/second');
+    assert.equal(loopbackPorts(owners[0]).length, 2, 'the new worktree gets its own ports');
+    const previous = JSON.parse(readFileSync(ledger, 'utf8')).entries.find((entry) => entry.id === old.id);
+    assert.equal(previous.status, 'complete', 'the earlier worktree had no work, so its entry is finished');
+    assert.equal(previous.outcome, 'discarded');
+    assert.equal(previous.finalBranchName, 'agent/agent-reused', 'it keeps its own branch');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+// A finished entry's ports go back to the pool, so plain test runs in the
+// still-existing worktree must stop reading them (PR #2413 N5).
+test('finish in a prepared worktree that still exists removes its prepared ports', () => {
+  const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-finish-');
+  try {
+    git(fixture, 'init', '--bare', '--quiet', join(fixture, 'origin.git'));
+    git(main, 'remote', 'add', 'origin', join(fixture, 'origin.git'));
+    // Finish uses the checkout's own ports module, as every Chain Scanner checkout has.
+    mkdirSync(join(main, 'scripts', 'agent-tools'), { recursive: true });
+    copyFileSync(fileURLToPath(new URL('./worktree-ports.mjs', import.meta.url)), join(main, 'scripts', 'agent-tools', 'worktree-ports.mjs'));
+    git(main, 'add', 'scripts');
+    git(main, 'commit', '--quiet', '-m', 'install the ports module');
+    git(main, 'push', '--quiet', '-u', 'origin', 'main');
+    const agent = addWorktree(main, join(fixture, 'agent-finished'));
+    assert.equal(run(['prepare'], agent, { ledger, npm }).status, 0);
+    assert.match(run(['env'], agent, { ledger, npm }).stdout, /CHAIN_NATIVE_PORT/);
+    const [owner] = ownerOf(ledger, agent);
+
+    const coordinationClient = fileURLToPath(new URL('./coordination.mjs', import.meta.url));
+    const finished = spawnSync(process.execPath, [coordinationClient, 'finish', '--id', owner.id, '--adapter', 'chain-scanner',
+      '--outcome', 'discarded', '--reason', 'Fixture work dropped.'],
+    { cwd: agent, encoding: 'utf8', env: { ...process.env, CODEX_COORDINATION_FILE: ledger, DOW_EMULATOR_COORDINATION_FILE: '' } });
+    assert.equal(finished.status, 0, finished.stderr);
+
+    const exported = run(['env'], agent, { ledger, npm });
+    assert.doesNotMatch(exported.stdout, /CHAIN_NATIVE/, 'no ports are exported after finish');
+    assert.equal(existsSync(join(git(agent, 'rev-parse', '--absolute-git-dir'), 'chain-worktree-ports.env')), false, 'the ports file is gone');
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }

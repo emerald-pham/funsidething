@@ -13,9 +13,10 @@ your full spec.
 ## Branch and worktree
 
 - Base: `<base branch>` at <sha>. If your worktree isn't on it, `git fetch
-  origin` and reset onto `origin/<base branch>`. Work on `ticket/<N>-<slug>`.
-- From the worktree root, run `npm run agent:worktree-ready -- prepare` for
-  dependencies and ports (docs/agents/host-coordination.md).
+  origin` and reset onto `origin/<base branch>`.
+- Create or switch to `ticket/<N>-<slug>` first, then from the worktree root
+  run `npm run agent:worktree-ready -- prepare` for dependencies and ports
+  (docs/agents/host-coordination.md).
 
 ## How to work
 

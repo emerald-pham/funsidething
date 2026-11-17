@@ -118,7 +118,11 @@ function resources(pair) {
 function claimPorts(root, ledger) {
   let state = ledger.state;
   for (let attempt = 0; attempt < CLAIM_ATTEMPTS; attempt += 1) {
-    const owner = state.entries.find((entry) => entry.worktree === root && (entry.status === 'active' || entry.status === 'parked'));
+    // `own` never returns an entry an earlier worktree left at this path, and
+    // moves this worktree's entry to its current branch (PR #2413 B1).
+    const owned = coordination(['own'], root);
+    if (owned.failure) return { reason: owned.failure };
+    const owner = JSON.parse(owned.stdout);
     if (owner?.status === 'parked') return { reason: `this worktree's ledger entry ${owner.id} is parked; resume it first` };
     const held = loopbackPorts(owner);
     if (held.length >= 2) return { ports: held.slice(0, 2) };
