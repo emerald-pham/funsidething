@@ -860,18 +860,13 @@ async function woopFixture(){
  const task=ctx.addTask('Private final task');ctx.state.mode='work';ctx.state.chain=[task.id];
  return {...app,task};
 }
-function woopStep(app,value){
- const {ctx,shim}=app;shim.document.getElementById('woopAnswer').value=value;
- const session=vm.runInContext('woopDraft',ctx);
- ctx.onAction('woop-next',{dataset:{session:session.id,step:String(session.step)}});
-}
-function woopDislodgeTwice(app){
- const {ctx,task}=app;
- // #2406 review: with Last task WOOP on, a Dislodge records its History before
- // the screen updates; with it off that History catches up just after.
- ctx.state.settings.lastTaskWoop=true;
- for(let i=0;i<2;i++){ctx.state.chain=[task.id];ctx.dislodge();}
- ctx.state.chain=[task.id];ctx.state.mode='work';
+// #2421: this version no longer writes WOOP plans. The kept WOOP data tests
+// stand in for the write an older version made, a plan from its walkthrough or
+// null from its Delete WOOP plan, with the same Undo frame and save it took.
+let olderWoopPlanCount2421=0;
+const olderWoopPlan2421=(outcome,obstacle,plan)=>({v:1,id:'older-plan-'+(++olderWoopPlanCount2421),outcome,obstacle,plan});
+function olderWoopWrite2421(ctx,task,value){
+ ctx.pushUndo();assert.equal(ctx.writeTaskWoop(task,value),true,'the older version wrote its WOOP plan');ctx.commit();
 }
 
 const ratingHistoryCopy = value => JSON.parse(JSON.stringify(value));
@@ -3831,18 +3826,6 @@ function sharedSkywriterConsumer(seen=false,empty=false,source=fs.readFileSync(p
  return {selected,flights,context,paintContext:paint,paintSource:branch};
 }
 
-async function overdueWoopFixture(){
- const app=await loadApp({seed:971}),{ctx}=app;
- const base=ctx.addTask('Private benchmark'),task=ctx.addTask('Private overdue',false,[],{due:ctx.todayISO(-1)});
- ctx.dotTask(base.id);ctx.onAction('start-scan',{dataset:{}});ctx.state.candidateId=task.id;ctx.renderScan();
- return {...app,base,task};
-}
-function overdueWoopControl(app){
- const html=app.shim.document.getElementById('scan').innerHTML;
- const tag=html.match(/<button[^>]*data-act="run-woop"[^>]*>/)?.[0];assert.ok(tag,'overdue offered task must expose Run WOOP');
- return {dataset:Object.fromEntries([...tag.matchAll(/data-([a-z]+)="([^"]*)"/g)].map(m=>[m[1],m[2]]))};
-}
-
 
 // A finite display recipe is not another admission reservation. The source bound
 // covers at most one ordinary draw per eight seconds and independent short streams.
@@ -4180,7 +4163,7 @@ export {
   rewriteGenerationFixture, conflictingPriorGeneration2201, coldDamagedSourceWithoutAck214,
   APOLOGY_NOTICE_ID, ORIGINAL_APOLOGY, channelReleaseEnvelope, LEGACY_COMPLETION_RELEASE,
   legacyCompletionSource173, closeLegacyApp173, upgradedLegacyApp173, releasedExpiryStartSource173,
-  scopedUndoClients, woopFixture, woopStep, woopDislodgeTwice, ratingHistoryCopy, ratingHistoryTask,
+  scopedUndoClients, woopFixture, olderWoopPlan2421, olderWoopWrite2421, ratingHistoryCopy, ratingHistoryTask,
   ratingHistoryFixture, __dirname, HTML_PATH, html, lzStringSrc, sceneTimelineScripts,
   runSceneTimelineScript, sceneTimeline, livingSky, livingLocation, landscapeLuminance,
   manifestHrefFromHtml, serviceWorkerSource, appShellContract, serviceWorkerHarness, slice, engineSrc,
@@ -4227,7 +4210,7 @@ export {
   privateExpiryLegacyRows, privateExpirySave, privateExpiryAssertCurrentBoard,
   mountPrivateEditInterval, installPrivateDateValueDescriptors, SCALED_REVIEW_POLICY_TEXT,
   makeScaledReviewFixture, scaledPlan, SCALED_FAQ_COVERAGE,
-  chanceWeatherPaint, sharedSkywriterConsumer, overdueWoopFixture, overdueWoopControl,
+  chanceWeatherPaint, sharedSkywriterConsumer,
   pedestrianReservationPolicy, pedestrianDaytimeSpawnPolicy, assertPedestrianReservationBound,
   pedestrianFrameSelection, pedestrianPresentationConsumer, paintedMotionWorldXs,
   heldDecisionFixture188, heldDecisionApp188, settleRecovery188, recoveryReleasedArtifacts188,

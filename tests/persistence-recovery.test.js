@@ -15363,30 +15363,6 @@ test('RISK started pass sync: benchmark Done after No — work the chain and Con
 // The overdue task is added before Start, so it is not the Start dot (oldest
 // first), and adding no task after Start keeps clear of the separate hold an
 // added task causes at the next answer.
-test('RISK started pass sync: Run WOOP on an overdue candidate after No — work the chain and Continue scanning stays in work mode through sync and on a second device',async t=>{
- const device=await startedPassDevice2359(t,'woop-work'),{ctx,shim}=device;
- await device.signIn();
- for(const title of ['Task A 2376','Task B 2376','Task C 2376']){shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});}
- const overdue=ctx.addTask('Overdue Task 2376',false,[],{due:ctx.todayISO(-1)});
- await savesSettled2334(device);await syncSettle(300);
- await device.act('start-scan');
- assert.notEqual(ctx.state.chain[0],overdue.id,'precondition: Start dotted another task');
- await device.act('start-working');
- await device.act('continue-scan');
- ctx.state.candidateId=overdue.id;ctx.renderScan();   // as overdueWoopFixture offers it
- const tag=shim.document.getElementById('scan').innerHTML.match(/<button[^>]*data-act="run-woop"[^>]*>/)?.[0];
- assert.ok(tag,'precondition: the overdue candidate offers Run WOOP');
- const control={dataset:Object.fromEntries([...tag.matchAll(/data-([a-z]+)="([^"]*)"/g)].map(m=>[m[1],m[2]]))};
- const chain0=Array.from(ctx.state.chain);
- await ctx.onAction('run-woop',control);ctx.closeModal();await flush();await savesSettled2334(device);await syncSettle(300);
- assert.deepEqual(Array.from(ctx.state.chain),[...chain0,overdue.id],'positive control: Run WOOP dotted the overdue task');
- assert.equal(ctx.state.mode,'work','and switched to work mode');
- assert.equal(device.status().text,'☁ synced','sync is not held: '+device.status().title);
- const peer=await secondDevice2376(t,device,'woop-work-peer');
- assert.equal(peer.status().text,'☁ synced','the second device syncs: '+peer.status().title);
- assert.equal(peer.ctx.state.mode,'work','the second device shows work mode');
- assert.deepEqual(Array.from(peer.ctx.state.chain),[...chain0,overdue.id],'and the same chain');
-});
 
 // #2376 contract for every routed control: on the same board, the direct path
 // (no decision history yet) and the replay (history that replays) give the
