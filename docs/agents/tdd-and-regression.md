@@ -40,14 +40,18 @@ undo, import or restore, deletion, and cross-device reconciliation when those
 paths touch the change. For a visual or motion change, cover the numerical
 geometry or paint contract, reduced motion, and relevant phone, tablet, and
 short-landscape viewports. For offline changes, check the asset fingerprint and
-offline reload. The changelog app fingerprint and the worker `CACHE_NAME` are
+offline reload. A scheduling or debounce test runs at the timings in the
+spec's field evidence. For a sync or scanner hot path, add the work-count test in
+[responsiveness](responsiveness.md). The changelog app fingerprint and the worker `CACHE_NAME` are
 never committed: the checkout keeps placeholders, and every consumer that
 serves the shell (the Pages deploy, `npm run serve`, the test harness, the native
 cases and Beta packaging) stamps values computed from the files it serves (`scripts/shell-fingerprints.mjs`,
 #2380), so a shell edit needs no refresh commit. A text or styling fix needs a direct UI assertion that would
 have failed before the edit. Run the focused tests and affected regression
 cohort; broaden to the full suite when risk or a required release gate warrants
-it. Inspect the rendered result when pixels or controls changed. Record test, browser,
+it. A test that fails under group load but passes alone is a race until main
+fails under the same load (#2408 dismissed a real one as flakiness, and CI
+failed on it). Inspect the rendered result when pixels or controls changed. Record test, browser,
 offline, CI, and live results separately.
 
 A `PreToolUse` hook (`.claude/hooks/test-first-guard.sh`) enforces the ordering: an edit

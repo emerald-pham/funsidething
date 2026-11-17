@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 import { tmpdir } from 'node:os';
-import { dirname, isAbsolute, resolve } from 'node:path';
-import { link, lstat, mkdir, open, readFile, realpath, rename, stat, unlink, writeFile } from 'node:fs/promises';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { link, lstat, mkdir, open, readdir, readFile, realpath, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -812,18 +812,20 @@ async function readGitStartState(cwd = process.cwd(), baseRefSelector) {
     runGit(['rev-parse', '--show-toplevel'], cwd),
     runGit(['rev-parse', '--path-format=absolute', '--git-common-dir'], cwd),
   ]);
-  if (branchName === 'HEAD') throw new Error('coordination begin requires an attached branch.');
+  // A reviewer checks out the exact candidate commit detached; it registers as
+  // that commit rather than attaching a throwaway branch (#2364, #2406 retro 4).
+  const detachedHead = branchName === 'HEAD';
   let main;
   if (baseRefSelector === undefined) main = await readMainRef(cwd);
   else main = await readMainRef(cwd).catch(() => undefined);
   const selectedBase = baseRefSelector === undefined
     ? { ref: main.fullRef, sha: main.sha, localBranchName: 'main' }
     : await readSelectedBaseRef(cwd, baseRefSelector);
-  if (branchName === 'main' || branchName === selectedBase.localBranchName) {
+  if (!detachedHead && (branchName === 'main' || branchName === selectedBase.localBranchName)) {
     throw new Error(`coordination begin refuses to register work directly on protected base branch ${branchName}.`);
   }
   return {
-    branchName,
+    ...(detachedHead ? { detachedHead } : { branchName }),
     branchSha,
     mainSha: main?.sha,
     selectedBase: { ref: selectedBase.ref, sha: selectedBase.sha },
@@ -850,6 +852,27 @@ function pruneOrphanedConfigurations(state) {
   };
 }
 
+// The checkout's own Git directory. A worktree removed and re-added at the same
+// path gets a new one, so its entry is told apart from the earlier worktree's.
+async function worktreeIdentity(cwd) {
+  const gitDir = await runGit(['rev-parse', '--absolute-git-dir'], cwd);
+  const metadata = await stat(gitDir, { bigint: true });
+  return { gitDir, device: String(metadata.dev), inode: String(metadata.ino) };
+}
+
+// An entry at this path was left by an earlier worktree when its recorded Git
+// directory differs from this checkout's. Adopting it took over the old branch
+// and start commit (PR #2413 B1). An entry with this checkout's Git directory is
+// its own whatever the checkout's history: judging it by the start commit gave a
+// live worktree a second entry after a reset or switch (PR #2413 B3). Only a
+// legacy entry, recorded before identities, falls back to the start commit.
+async function leftByEarlierWorktree(entry, identity, headSha, cwd) {
+  const recorded = objectRecord(entry.worktreeIdentity);
+  if (recorded.inode !== undefined) return recorded.inode !== identity?.inode || recorded.device !== identity?.device;
+  const start = text(entry.startBranchSha).toLowerCase();
+  return /^[0-9a-f]{40}$/.test(start) && !(await gitIsAncestor(start, headSha, cwd).catch(() => false));
+}
+
 async function begin(filePath, options) {
   const start = await readGitStartState(process.cwd(), options['base-ref']);
   const worktreeRoot = await realpath(start.repositoryRoot);
@@ -861,6 +884,7 @@ async function begin(filePath, options) {
   if (!['product', 'tooling', 'documentation', 'investigation'].includes(workType)) {
     throw new Error('coordination begin requires --work-type product|tooling|documentation|investigation.');
   }
+  const identity = await worktreeIdentity(worktreeRoot);
   return withCoordinationLock(filePath, async () => {
     const state = pruneDeadReservations(await readState(filePath));
     for (const entry of state.entries.filter(ownsCoordination)) {
@@ -875,9 +899,13 @@ async function begin(filePath, options) {
           }
         } catch { /* Missing/offline owners retain their existing ownership and metadata. */ }
       }
-      if (sameWorktree) throw new Error('An active or parked coordination entry already exists for the same Git worktree.');
+      if (sameWorktree && !(await leftByEarlierWorktree(entry, identity, start.branchSha, worktreeRoot))) {
+        throw new Error('An active or parked coordination entry already exists for the same Git worktree.');
+      }
     }
-    const conflict = ownershipConflict(state.entries, undefined, process.cwd(), claims, resources);
+    // Any same-worktree owner was refused above, so an entry left at this path
+    // by an earlier worktree still conflicts on what it owns.
+    const conflict = ownershipConflict(state.entries, undefined, undefined, claims, resources);
     if (conflict) throw new Error(formatOwnershipConflict(conflict));
     const now = new Date().toISOString();
     const implementationPrompt = text(options['implementation-prompt']).toLowerCase();
@@ -888,12 +916,13 @@ async function begin(filePath, options) {
       startedAt: now,
       heartbeatAt: now,
       status: 'active',
-      branchName: start.branchName,
+      ...(start.detachedHead ? { detachedHead: true } : { branchName: start.branchName }),
       startBranchSha: start.branchSha,
       ...(start.mainSha ? { startMainSha: start.mainSha } : {}),
       selectedBase: start.selectedBase,
       repositoryRoot: start.repositoryRoot,
       repositoryIdentity: start.repositoryIdentity,
+      worktreeIdentity: identity,
       intent: text(options.intent, 'Unspecified coordination work.'),
       versionPlan: text(options['version-plan'], 'No application version change.'),
       preemptiveChangelog: text(options['preemptive-changelog'], 'No player-facing change.'),
@@ -904,6 +933,7 @@ async function begin(filePath, options) {
       requestedScopes: scopes,
       requestedClaims: claims,
       ...(implementationPrompt ? { implementationPrompt } : {}),
+      ...(text(options['registered-by']) ? { registeredBy: text(options['registered-by']) } : {}),
     };
     state.entries.push(entry);
     await writeState(filePath, pruneOrphanedConfigurations(state));
@@ -951,6 +981,11 @@ async function park(filePath, options) {
     if (!entry) throw new Error(`No coordination entry found for ${options.id}.`);
     if (entry.status !== 'active') throw new Error(`Coordination entry ${entry.id} is already ${text(entry.status, 'historical')}.`);
     if (entry.worktree !== process.cwd()) throw new Error(`Cannot park coordination entry ${entry.id} from ${process.cwd()}; it belongs to ${entry.worktree}.`);
+    // Parked ownership is checked by branch, and a host migration refuses one
+    // without it (PR #2413 N4).
+    if (entry.detachedHead === true) {
+      throw new Error(`Cannot park coordination entry ${entry.id}: it is a detached reviewer checkout. Finish it instead; reviewer checkouts are finished or pruned, never parked.`);
+    }
     const current = await readGitStartState(process.cwd(), persistedBaseRef(entry));
     if (current.branchName !== entry.branchName || current.branchSha.toLowerCase() !== checkpoint) {
       throw new Error(`Cannot park coordination entry ${entry.id}: checkpoint or branch does not match the current checkout.`);
@@ -1024,29 +1059,11 @@ async function finish(filePath, options) {
     if (entry.status !== 'active') throw new Error(`Coordination entry ${entry.id} is already ${text(entry.status, 'historical')}.`);
     if (entry.worktree !== process.cwd()) throw new Error(`Cannot finish coordination entry ${entry.id} from ${process.cwd()}; it belongs to ${entry.worktree}.`);
 
+    const now = isoNow(options.now);
     const release = await readChainScannerReleaseState(entry);
     let releaseEvidence;
     if (outcome === 'landed') {
-      if (release.mainContainsBranch !== true) {
-        throw new Error(`Cannot complete coordination entry ${entry.id}: local main does not contain exact task commit ${release.branchSha}.`);
-      }
-      if (release.originMainSha !== release.mainSha) {
-        throw new Error(`Cannot complete coordination entry ${entry.id}: origin/main (${release.originMainSha}) does not match local main (${release.mainSha}).`);
-      }
-      const verified = await verifyChainScannerReleaseEvidence(release.repositoryRoot, release.branchSha);
-      if (!verified.ok) throw new Error(`Cannot complete coordination entry ${entry.id}: Chain Scanner release evidence failed: ${verified.errors.join(' ')}`);
-      releaseEvidence = {
-        adapter,
-        receiptPath: verified.receiptPath,
-        receiptSha256: verified.receipt.receiptSha256,
-        candidate: {
-          commitSha: verified.receipt.candidate.commitSha,
-          treeSha: verified.receipt.candidate.treeSha,
-          baseSha: verified.receipt.candidate.baseSha,
-        },
-        reviewPlan: verified.receipt.reviewPlan,
-        verifiedAt: new Date().toISOString(),
-      };
+      releaseEvidence = await proveChainScannerLanding(entry, release, adapter, now);
     } else if (outcome === 'preserved') {
       const destination = text(options['preserve-ref']);
       if (!destination) throw new Error(`Cannot preserve coordination entry ${entry.id}: --preserve-ref is required.`);
@@ -1055,44 +1072,121 @@ async function finish(filePath, options) {
       const ref = `refs/heads/${destination.slice(separator + 1)}`;
       const actual = (await runGit(['ls-remote', '--exit-code', destination.slice(0, separator), ref], release.repositoryRoot)).split(/\s+/)[0];
       if (actual !== release.branchSha) throw new Error(`Preserved ref ${destination} does not contain ${release.branchSha}.`);
-      entry.preservation = { destination, commitSha: release.branchSha, verifiedAt: new Date().toISOString() };
+      entry.preservation = { destination, commitSha: release.branchSha, verifiedAt: now };
     } else {
       const reason = text(options.reason);
       if (!reason) throw new Error(`Cannot discard coordination entry ${entry.id}: --reason is required.`);
       entry.discard = { reason, branchSha: release.branchSha };
     }
 
-    entry.status = 'complete';
-    entry.outcome = outcome;
-    entry.completedAt = new Date().toISOString();
-    if (text(options.result)) entry.result = text(options.result);
-    entry.finalBranchName = release.branchName;
-    entry.finalBranchSha = release.branchSha;
-    entry.mainSha = release.mainSha;
-    entry.originMainSha = release.originMainSha;
-    entry.pushed = outcome === 'landed' && release.originMainSha === release.mainSha;
-    if (releaseEvidence) entry.releaseEvidence = releaseEvidence;
+    completeEntry(entry, { outcome, release, now, result: text(options.result), releaseEvidence });
     await writeState(filePath, state);
+    await removeFinishedPorts(entry, process.cwd()).catch((error) => {
+      console.error(`coordination finish: the prepared ports file was kept: ${error instanceof Error ? error.message : String(error)}`);
+    });
     return entry;
   });
 }
 
+// Finish returns the entry's ports to the pool, so plain test runs in the
+// still-existing worktree must stop reading them from its prepared ports file
+// (PR #2413 N5). The ports module is the checkout's, loaded from there as the
+// release-evidence adapter is, so an installed copy of this client works too.
+async function removeFinishedPorts(entry, worktree) {
+  let ports;
+  try {
+    ports = await import(pathToFileURL(resolve(worktree, 'scripts/agent-tools/worktree-ports.mjs')).href);
+  } catch (error) {
+    if (error?.code === 'ERR_MODULE_NOT_FOUND') return;
+    throw error;
+  }
+  const prepared = {};
+  ports.applyPreparedPorts(prepared, worktree);
+  const named = ports.PORT_VARIABLES.map((name) => prepared[name]).filter(Boolean);
+  const owned = new Set((entry.resources ?? []).map((resource) => String(resource).toLowerCase()));
+  if (named.length && named.every((port) => owned.has(ports.loopbackResource(port)))) {
+    ports.removePreparedPorts(await runGit(['rev-parse', '--absolute-git-dir'], worktree));
+  }
+}
+
+// The completion record that finish and prune both write. A field prune cannot
+// know, such as a deleted branch's tip, is left out.
+function completeEntry(entry, { outcome, release, now, result, releaseEvidence }) {
+  entry.status = 'complete';
+  entry.outcome = outcome;
+  entry.completedAt = now;
+  if (result) entry.result = result;
+  entry.finalBranchName = release.branchName;
+  entry.finalBranchSha = release.branchSha;
+  entry.mainSha = release.mainSha;
+  entry.originMainSha = release.originMainSha;
+  entry.pushed = outcome === 'landed' && release.originMainSha === release.mainSha;
+  if (releaseEvidence) entry.releaseEvidence = releaseEvidence;
+}
+
+// Landed needs the exact task commit in local main, local main equal to the
+// actual origin main, and a valid receipt for that commit or for the merged
+// candidate that reviewed it (#2412).
+async function proveChainScannerLanding(entry, release, adapter, now) {
+  if (release.mainContainsBranch !== true) {
+    throw new Error(`Cannot complete coordination entry ${entry.id}: local main does not contain exact task commit ${release.branchSha}.`);
+  }
+  if (release.originMainSha !== release.mainSha) {
+    throw new Error(`Cannot complete coordination entry ${entry.id}: origin/main (${release.originMainSha}) does not match local main (${release.mainSha}).`);
+  }
+  const verified = await verifyChainScannerLandingEvidence(release.repositoryRoot, release.branchSha, release.mainSha);
+  if (!verified.ok) throw new Error(`Cannot complete coordination entry ${entry.id}: Chain Scanner release evidence failed: ${verified.errors.join(' ')}`);
+  return {
+    adapter,
+    receiptPath: verified.receiptPath,
+    receiptSha256: verified.receipt.receiptSha256,
+    candidate: {
+      commitSha: verified.receipt.candidate.commitSha,
+      treeSha: verified.receipt.candidate.treeSha,
+      baseSha: verified.receipt.candidate.baseSha,
+    },
+    reviewPlan: verified.receipt.reviewPlan,
+    verifiedAt: now,
+  };
+}
+
+// A detached entry, a reviewer's exact-commit checkout, finishes at the commit
+// it recorded (#2364 spec c); any other entry at its task branch's current tip.
 async function readChainScannerReleaseState(entry, cwd = process.cwd()) {
-  const [branchName, branchSha, repositoryRoot, main] = await Promise.all([
+  const [branchName, headSha] = await Promise.all([
     runGit(['rev-parse', '--abbrev-ref', 'HEAD'], cwd),
     runGit(['rev-parse', 'HEAD'], cwd),
-    runGit(['rev-parse', '--show-toplevel'], cwd),
-    readMainRef(cwd),
   ]);
-  const root = resolve(repositoryRoot);
-  if (branchName === 'HEAD' || branchName === 'main') throw new Error('Chain Scanner completion requires the task branch, not detached HEAD or main.');
-  if (branchName !== entry.branchName) throw new Error(`Cannot finish coordination entry ${entry.id}: checkout branch ${branchName} does not match ${entry.branchName}.`);
+  const detached = entry.detachedHead === true;
+  const branchSha = detached ? text(entry.startBranchSha).toLowerCase() : headSha;
+  if (detached && !/^[0-9a-f]{40}$/.test(branchSha)) {
+    throw new Error(`Cannot finish coordination entry ${entry.id}: its detached registration recorded no exact commit.`);
+  }
+  if (!detached && (branchName === 'HEAD' || branchName === 'main')) throw new Error('Chain Scanner completion requires the task branch, not detached HEAD or main.');
+  if (!detached && branchName !== entry.branchName) throw new Error(`Cannot finish coordination entry ${entry.id}: checkout branch ${branchName} does not match ${entry.branchName}.`);
   if ((await runGit(['status', '--porcelain', '--untracked-files=all'], cwd)).trim()) {
     throw new Error(`Cannot finish coordination entry ${entry.id}: the checkout is not clean.`);
   }
   if (entry.startBranchSha && !(await gitIsAncestor(entry.startBranchSha, branchSha, cwd))) {
     throw new Error(`Cannot finish coordination entry ${entry.id}: its registered start commit is not an ancestor of the task branch.`);
   }
+  return releaseStateAt(detached ? undefined : branchName, branchSha, await readChainScannerMainState(cwd), cwd);
+}
+
+async function releaseStateAt(branchName, branchSha, main, cwd) {
+  return {
+    ...(branchName ? { branchName } : {}),
+    branchSha,
+    ...main,
+    mainContainsBranch: await gitIsAncestor(branchSha, main.mainSha, cwd),
+  };
+}
+
+async function readChainScannerMainState(cwd = process.cwd()) {
+  const [repositoryRoot, main] = await Promise.all([
+    runGit(['rev-parse', '--show-toplevel'], cwd),
+    readMainRef(cwd),
+  ]);
   let originTrackingMainSha;
   try {
     originTrackingMainSha = await runGit(['rev-parse', '--verify', 'origin/main^{commit}'], cwd);
@@ -1107,8 +1201,7 @@ async function readChainScannerReleaseState(entry, cwd = process.cwd()) {
   }
   const originMainSha = originMainLine.split(/\s+/)[0];
   if (!/^[0-9a-f]{40}$/.test(originMainSha)) throw new Error('Cannot finish Chain Scanner work: origin returned an invalid main SHA.');
-  const mainContainsBranch = await gitIsAncestor(branchSha, main.sha, cwd);
-  return { branchName, branchSha, repositoryRoot: root, mainSha: main.sha, mainRef: main.ref, originTrackingMainSha, originMainSha, mainContainsBranch };
+  return { repositoryRoot: resolve(repositoryRoot), mainSha: main.sha, mainRef: main.ref, originTrackingMainSha, originMainSha };
 }
 
 async function gitIsAncestor(ancestor, descendant, cwd) {
@@ -1133,6 +1226,46 @@ async function verifyChainScannerReleaseEvidence(repositoryRoot, commitSha) {
     throw new Error(`Chain Scanner release-evidence adapter at ${modulePath} does not export verifyReleaseEvidence().`);
   }
   return releaseEvidenceModule.verifyReleaseEvidence(repositoryRoot, commitSha);
+}
+
+// Work merged through an integration branch has no receipt of its own: the
+// receipt binds the integration candidate that was reviewed and merged (#2412).
+// The task commit's exact receipt still decides when it exists, so direct-to-main
+// work finishes as before. Otherwise a sibling receipt counts only when its
+// candidate is merged into main, contains the task commit, and its reviewed diff
+// (base..candidate) includes it: a later release whose base already held the
+// commit did not review it.
+async function verifyChainScannerLandingEvidence(repositoryRoot, commitSha, mainSha) {
+  const exact = await verifyChainScannerReleaseEvidence(repositoryRoot, commitSha);
+  if (exact.ok || !exact.receiptPath || (await metadataIfPresent(exact.receiptPath))) return exact;
+  // The adapter owns the receipt layout; its exact path names the shared receipt directory.
+  const receiptRoot = dirname(dirname(exact.receiptPath));
+  const errors = [`No valid release receipt for task commit ${commitSha} or for a merged candidate that contains it.`, ...exact.errors];
+  let names = [];
+  try {
+    names = (await readdir(receiptRoot)).filter((name) => /^[0-9a-f]{40}$/.test(name));
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
+  const recorded = new Set(names);
+  // Newest first from rev-list; the oldest containing candidate brought the commit to main.
+  const between = recorded.size
+    ? (await runGit(['rev-list', '--ancestry-path', `${commitSha}..${mainSha}`], repositoryRoot)).split(/\s+/)
+    : [];
+  for (const candidateSha of between.filter((sha) => recorded.has(sha)).reverse()) {
+    let baseSha;
+    try {
+      baseSha = JSON.parse(await readFile(join(receiptRoot, candidateSha, 'receipt.json'), 'utf8'))?.candidate?.baseSha;
+    } catch {
+      baseSha = undefined;
+    }
+    // An unreadable base cannot prove the commit was already there; full verification decides.
+    if (typeof baseSha === 'string' && /^[0-9a-f]{40}$/.test(baseSha) && (await gitIsAncestor(commitSha, baseSha, repositoryRoot))) continue;
+    const verified = await verifyChainScannerReleaseEvidence(repositoryRoot, candidateSha);
+    if (verified.ok) return verified;
+    errors.push(`Containing candidate ${candidateSha}: ${verified.errors.join(' ')}`);
+  }
+  return { ...exact, errors };
 }
 
 function shellQuote(value) {
@@ -1192,6 +1325,47 @@ async function claim(filePath, options) {
   });
 }
 
+// Prints this worktree's own active or parked entry, or null; an entry an
+// earlier worktree left at this path is never its own. When the checkout is on
+// another branch, or no longer holds the start commit, an active entry moves to
+// the checkout's branch: Claude Code starts an agent on its own worktree branch
+// before the agent switches to its work branch, and an entry left behind judged
+// the wrong commit (PR #2413 B1). The move restarts the start at HEAD, so
+// commits the branch already had are never the agent's work; keeping the old
+// start counted a newer integration head's merges as work (PR #2413 B1
+// residual, N8). Each move is kept in `rebinds` with the previous start.
+async function own(filePath, options) {
+  const worktreeRoot = await realpath(await runGit(['rev-parse', '--show-toplevel']));
+  const [identity, headSha, branchName] = await Promise.all([
+    worktreeIdentity(worktreeRoot),
+    runGit(['rev-parse', 'HEAD'], worktreeRoot),
+    runGit(['rev-parse', '--abbrev-ref', 'HEAD'], worktreeRoot),
+  ]);
+  return withCoordinationLock(filePath, async () => {
+    const state = await readState(filePath, { pruneReservations: false });
+    let entry;
+    for (const candidate of state.entries) {
+      if (!ownsCoordination(candidate) || candidate.worktree !== worktreeRoot) continue;
+      if (!(await leftByEarlierWorktree(candidate, identity, headSha, worktreeRoot))) entry = candidate;
+    }
+    if (entry?.status !== 'active' || branchName === 'HEAD') return entry ?? null;
+    const start = text(entry.startBranchSha).toLowerCase();
+    const moved = entry.detachedHead === true || entry.branchName !== branchName;
+    const holdsStart = /^[0-9a-f]{40}$/.test(start) && (await gitIsAncestor(start, headSha, worktreeRoot).catch(() => false));
+    if (!moved && holdsStart) return entry;
+    await readGitStartState(worktreeRoot, persistedBaseRef(entry)); // refuses a protected base branch
+    entry.rebinds = [...(entry.rebinds ?? []), {
+      reboundAt: isoNow(options.now), from: entry.detachedHead === true ? 'detached' : entry.branchName, to: branchName,
+      previousStartBranchSha: entry.startBranchSha,
+    }];
+    delete entry.detachedHead;
+    entry.branchName = branchName;
+    entry.startBranchSha = headSha;
+    await writeState(filePath, state);
+    return entry;
+  });
+}
+
 async function releaseClaim(filePath, options) {
   if (!options.id) throw new Error('coordination release-claim requires --id <entry-id>.');
   const { scopes, claims, resources } = normalizeOwnership(options);
@@ -1213,6 +1387,72 @@ async function releaseClaim(filePath, options) {
     await writeState(filePath, state);
     return entry;
   });
+}
+
+// Frees the resources of this repository's active entries that the named setup
+// tool registered and whose worktree is gone, and completes each as discarded.
+// A worktree is gone when its directory no longer exists or now holds a
+// different Git worktree. Claude Code removes subagent worktrees without
+// running a removal hook, so their entries could otherwise never be finished
+// (#2364, #2368). Parked, hand-registered and other repositories' entries are
+// never touched: missing paths do not waive their ownership.
+async function prune(filePath, options) {
+  const registeredBy = text(options['registered-by']);
+  if (!registeredBy) throw new Error('coordination prune requires --registered-by <tool>.');
+  const repositoryIdentity = resolve(await runGit(['rev-parse', '--path-format=absolute', '--git-common-dir']));
+  return withCoordinationLock(filePath, async () => {
+    const state = await readState(filePath, { pruneReservations: false });
+    const now = isoNow(options.now);
+    const pruned = [];
+    for (const entry of state.entries) {
+      if (entry.status !== 'active' || entry.registeredBy !== registeredBy || entry.repositoryIdentity !== repositoryIdentity) continue;
+      if (typeof entry.worktree !== 'string' || !isAbsolute(entry.worktree)) continue;
+      if (!(await worktreeGone(entry))) continue;
+      await discardRemovedEntry(entry, now);
+      pruned.push(entry);
+    }
+    if (pruned.length) await writeState(filePath, state);
+    return pruned;
+  });
+}
+
+async function worktreeGone(entry) {
+  const missing = await lstat(entry.worktree).then(() => false, (error) => error?.code === 'ENOENT');
+  if (missing) return true;
+  const recorded = objectRecord(entry.worktreeIdentity);
+  if (recorded.inode === undefined) return false;
+  const current = await worktreeIdentity(entry.worktree).catch(() => undefined);
+  return current?.inode !== recorded.inode || current?.device !== recorded.device;
+}
+
+// A removed worktree is abandoned work: its claims and resources go back to the
+// pool, and its entry completes at once as discarded, at its branch's tip then
+// when the branch still exists, or at a detached entry's recorded commit.
+// Prune never records landed. Judging landed from branch state after the
+// worktree was gone kept recording work that never reached main, through a
+// branch name reset for a retry or a work branch cut from a newer integration
+// head (PR #2413 B1, B2, R8). Work that merged is finished as landed in its live
+// worktree before removal.
+async function discardRemovedEntry(entry, now) {
+  if ([entry.scopes, entry.claims, entry.resources].some((values) => values?.length)) {
+    entry.claimReleases = [...(entry.claimReleases ?? []), {
+      releasedAt: now, scopes: entry.scopes ?? [], claims: entry.claims ?? [], resources: entry.resources ?? [],
+    }];
+    entry.scopes = [];
+    entry.claims = [];
+    entry.resources = [];
+  }
+  const detached = entry.detachedHead === true;
+  const branchSha = detached
+    ? text(entry.startBranchSha).toLowerCase() || undefined
+    : await runGit(['rev-parse', '--verify', '--quiet', `refs/heads/${text(entry.branchName)}^{commit}`]).catch(() => undefined);
+  const release = {
+    ...(branchSha && !detached ? { branchName: entry.branchName } : {}),
+    branchSha,
+    mainSha: (await readMainRef(process.cwd()).catch(() => undefined))?.sha,
+  };
+  entry.discard = { reason: 'Worktree removed before finish.', branchSha };
+  completeEntry(entry, { outcome: 'discarded', release, now, result: 'Worktree directory no longer exists.' });
 }
 
 function parseOptions(args) {
@@ -1314,6 +1554,21 @@ if (command === 'discover') {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 2;
   }
+} else if (command === 'own') {
+  try {
+    const entry = await own(discover(args), parseOptions(args));
+    console.log(JSON.stringify(entry, null, 2));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 2;
+  }
+} else if (command === 'prune') {
+  try {
+    console.log(JSON.stringify(await prune(discover(args), parseOptions(args)), null, 2));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 2;
+  }
 } else if (command === 'release-claim') {
   try {
     const entry = await releaseClaim(discover(args), parseOptions(args));
@@ -1323,6 +1578,6 @@ if (command === 'discover') {
     process.exitCode = 2;
   }
 } else {
-  console.error('usage: coordination.mjs <discover|export-env|install|migrate|status|begin|heartbeat|claim|release-claim|park|resume|finish> [options]');
+  console.error('usage: coordination.mjs <discover|export-env|install|migrate|status|begin|heartbeat|claim|release-claim|own|prune|park|resume|finish> [options]');
   process.exitCode = 2;
 }

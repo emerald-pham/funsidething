@@ -196,7 +196,9 @@ One independent reviewer, distinct from the owner, covers in one pass:
 2. Relevant tests: an observed behavioral RED and GREEN for each functional
    change, discriminating assertions with independent expected values, a test
    for every case each FAQ answer or changelog line promises, and no removed or
-   weakened protection without a recorded rationale.
+   weakened protection without a recorded rationale. For a scheduling or
+   debounce test, check its timings against
+   [TDD and regression gates](tdd-and-regression.md#forced-risk-based-tdd-and-regression-gates).
 3. User-visible and data safety: what users see and do, saved boards, backups,
    cloud sync, Undo and offline behavior affected by the change, and the
    extended FAQ where behavior changed.
@@ -278,10 +280,12 @@ theme verification, follow the theme capture rule in [CLAUDE.md](../../CLAUDE.md
 
 ## Final-candidate timing
 
-Push the work branch, open its PR and let CI run first. Request reviews once the candidate is
-CI-green; before merging, classify the exact
-final commit under the risk-based plan above and record the rationale with
-release evidence.
+Push the work branch and open its PR. Reviews may start alongside CI on the
+pushed head: the CI monitor reports only failures, and agents don't poll CI. If
+the head then changes, re-review it incrementally as described below. Before
+merging, classify the exact final commit under the risk-based plan above and
+record the rationale with release evidence. Brief each reviewer from the
+[reviewer brief](reviewer-brief.md).
 
 Reviewers tag each finding blocking (correctness, data safety, accessibility or
 a user-visible defect) or non-blocking. Fix blocking findings before release.

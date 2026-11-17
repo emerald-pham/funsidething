@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { chmodSync, copyFileSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { recordReleaseEvidence } from '../release-evidence.mjs';
@@ -1018,14 +1018,104 @@ test('begin protects main and the selected local base branch, including for orig
       assert.match(result.stderr, reason);
       assert.equal(readFileSync(ledgerPath, 'utf8'), originalContents, `${branch} rejection must not mutate the ledger`);
     }
-    git(project, 'checkout', '--detach', '--quiet', 'HEAD');
-    const detached = command([
-      'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Reject detached registration',
-      '--base-ref', 'master',
-    ], project);
-    assert.notEqual(detached.status, 0);
-    assert.match(detached.stderr, /attached branch/i);
-    assert.equal(readFileSync(ledgerPath, 'utf8'), originalContents, 'detached rejection must not mutate the ledger');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+// A reviewer checks out the exact candidate commit detached. Retro 4 of #2406
+// (approved 2026-11-16): the ledger refused that checkout, so the typography
+// reviewer had to attach a throwaway local branch just to claim its ports (#2364).
+test("begin registers a reviewer's detached checkout at an exact commit, which can then claim ports", () => {
+  const fixture = realpathSync(mkdtempSync(join(tmpdir(), 'chain-coordination-detached-')));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'project'), 'work/reviewed');
+    writeFileSync(join(project, 'candidate.md'), 'Candidate under review.\n');
+    git(project, 'add', 'candidate.md');
+    git(project, 'commit', '--quiet', '-m', 'candidate');
+    const candidate = git(project, 'rev-parse', 'HEAD');
+    const reviewer = join(fixture, 'reviewer');
+    git(project, 'worktree', 'add', '--quiet', '--detach', reviewer, candidate);
+    const branchesBefore = git(project, 'branch', '--list');
+
+    const began = command([
+      'begin', '--file', ledgerPath, '--work-type', 'investigation', '--intent', 'Review the exact candidate',
+      '--resources', 'loopback:127.0.0.1:47101',
+    ], reviewer);
+    assert.equal(began.status, 0, `a detached reviewer checkout must register: ${began.stderr}`);
+    const entry = JSON.parse(began.stdout);
+    assert.equal(entry.worktree, reviewer);
+    assert.equal(entry.detachedHead, true, 'the entry says the checkout is detached');
+    assert.equal(entry.startBranchSha, candidate, 'the entry records the exact reviewed commit');
+    assert.equal(entry.branchName, undefined, 'no branch name is invented for a detached checkout');
+
+    const claimed = command(['claim', '--file', ledgerPath, '--id', entry.id, '--resources', 'loopback:127.0.0.1:47102'], reviewer);
+    assert.equal(claimed.status, 0, claimed.stderr);
+    const saved = JSON.parse(readFileSync(ledgerPath, 'utf8')).entries.find((candidateEntry) => candidateEntry.id === entry.id);
+    assert.deepEqual(saved.resources, ['loopback:127.0.0.1:47101', 'loopback:127.0.0.1:47102']);
+    assert.equal(git(project, 'branch', '--list'), branchesBefore, 'registration creates no throwaway branch');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+// Finishing the reviewer's entry is how its ports go back to the pool (#2364 spec c).
+test("finish completes a reviewer's detached entry at its recorded commit and frees its ports", () => {
+  const fixture = realpathSync(mkdtempSync(join(tmpdir(), 'chain-coordination-detached-finish-')));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'project'), 'work/reviewed');
+    addOrigin(project, fixture);
+    writeFileSync(join(project, 'candidate.md'), 'Candidate under review.\n');
+    git(project, 'add', 'candidate.md');
+    git(project, 'commit', '--quiet', '-m', 'candidate');
+    const candidate = git(project, 'rev-parse', 'HEAD');
+    const reviewer = join(fixture, 'reviewer');
+    git(project, 'worktree', 'add', '--quiet', '--detach', reviewer, candidate);
+    const port = 'loopback:127.0.0.1:47111';
+    const began = command(['begin', '--file', ledgerPath, '--work-type', 'investigation', '--intent', 'Review the exact candidate',
+      '--resources', port], reviewer);
+    assert.equal(began.status, 0, began.stderr);
+    const entry = JSON.parse(began.stdout);
+
+    const finished = command(['finish', '--file', ledgerPath, '--id', entry.id, '--adapter', 'chain-scanner',
+      '--outcome', 'discarded', '--reason', 'Review complete; the reviewer changes nothing.'], reviewer);
+    assert.equal(finished.status, 0, `a detached reviewer entry must finish: ${finished.stderr}`);
+    const completed = JSON.parse(finished.stdout);
+    assert.equal(completed.status, 'complete');
+    assert.equal(completed.outcome, 'discarded');
+    assert.equal(completed.finalBranchSha, candidate, 'the entry finishes at the exact reviewed commit');
+    assert.equal(completed.finalBranchName, undefined, 'no branch name is invented for a detached checkout');
+
+    const next = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Reuse the freed port',
+      '--resources', port], project);
+    assert.equal(next.status, 0, `the finished reviewer's port is free again: ${next.stderr}`);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+// A parked detached entry has no branch name, so a host migration refuses it
+// (PR #2413 N4). Reviewer checkouts are finished or pruned instead.
+test("park refuses a reviewer's detached entry and leaves it active", () => {
+  const fixture = realpathSync(mkdtempSync(join(tmpdir(), 'chain-coordination-detached-park-')));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'project'), 'work/reviewed');
+    const candidate = git(project, 'rev-parse', 'HEAD');
+    const reviewer = join(fixture, 'reviewer');
+    git(project, 'worktree', 'add', '--quiet', '--detach', reviewer, candidate);
+    const began = command(['begin', '--file', ledgerPath, '--work-type', 'investigation', '--intent', 'Review the exact candidate'], reviewer);
+    assert.equal(began.status, 0, began.stderr);
+    const entry = JSON.parse(began.stdout);
+    const before = readFileSync(ledgerPath, 'utf8');
+
+    const parked = command(['park', '--file', ledgerPath, '--id', entry.id, '--checkpoint-sha', candidate], reviewer);
+    assert.notEqual(parked.status, 0, 'a detached entry cannot be parked');
+    assert.match(parked.stderr, /detached/i);
+    assert.match(parked.stderr, /finish/i, 'the refusal says to finish it instead');
+    assert.equal(readFileSync(ledgerPath, 'utf8'), before, 'the entry is left as it was');
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }
@@ -1569,6 +1659,369 @@ test('Chain Scanner landed finish rejects a stale remote even when local main re
     assert.notEqual(result.status, 0, 'a stale actual remote must block a landed completion');
     assert.match(result.stderr, /remote|origin\/main/i);
     assert.equal(JSON.parse(readFileSync(ledgerPath, 'utf8')).entries[0].status, 'active');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+function recordDocsOnlyReceipt(project, fixture, candidateSha, baseSha, label) {
+  const ownerEvidencePath = join(fixture, `${label}-owner-review.md`);
+  const ownerEvidence = `Owner reviewed the full exact ${label} documentation candidate in this fixture.`;
+  writeFileSync(ownerEvidencePath, `${ownerEvidence}\n`);
+  return recordReleaseEvidence(project, {
+    schemaVersion: 2,
+    candidate: { commitSha: candidateSha, treeSha: git(project, 'rev-parse', `${candidateSha}^{tree}`), baseSha },
+    ownerReview: {
+      task: `owner-review-2412-${label}`, outcome: 'approved', reviewedSha: candidateSha,
+      completedAt: '2026-11-16T11:00:00.000Z',
+      summary: ownerEvidence,
+      scope: { fullDiff: true, rationale: 'This fixture candidate only changes non-policy documentation notes.' },
+      evidencePath: ownerEvidencePath,
+      evidenceSha256: createHash('sha256').update(`${ownerEvidence}\n`).digest('hex'),
+    },
+  });
+}
+
+function commitDocsNote(project, name, body) {
+  mkdirSync(join(project, 'docs'), { recursive: true });
+  writeFileSync(join(project, 'docs', name), `${body}\n`);
+  git(project, 'add', join('docs', name));
+  git(project, 'commit', '--quiet', '-m', body);
+  return git(project, 'rev-parse', 'HEAD');
+}
+
+// The #2406 shape: a task branch merges into an integration branch, review fixes
+// land there, and the receipt binds the integration candidate, not the task commit.
+function createIntegrationFixture(fixture, branch) {
+  const ledgerPath = join(fixture, 'host-ledger.json');
+  const project = createProject(join(fixture, 'chain-scanner'), branch);
+  git(project, 'checkout', '--quiet', 'main');
+  mkdirSync(join(project, 'scripts'), { recursive: true });
+  copyFileSync(releaseEvidenceEntrypoint, join(project, 'scripts/release-evidence.mjs'));
+  git(project, 'add', 'scripts/release-evidence.mjs');
+  git(project, 'commit', '--quiet', '-m', 'install fixture release adapter');
+  const integrationBaseSha = git(project, 'rev-parse', 'HEAD');
+  addOrigin(project, fixture);
+  git(project, 'checkout', '--quiet', branch);
+  git(project, 'merge', '--quiet', '--ff-only', 'main');
+  const began = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Integration landing fixture'], project);
+  assert.equal(began.status, 0, began.stderr);
+  const entry = JSON.parse(began.stdout);
+  const taskSha = commitDocsNote(project, 'task-note.md', 'Task change merged through an integration branch.');
+  git(project, 'checkout', '--quiet', '-b', 'integration/fixture', 'main');
+  git(project, 'merge', '--quiet', '--no-ff', '-m', 'Merge task into integration', branch);
+  const candidateSha = commitDocsNote(project, 'review-fix.md', 'Review fix on the integration branch.');
+  return { ledgerPath, project, entry, taskSha, candidateSha, integrationBaseSha };
+}
+
+function landIntegrationOnMain(project, { push = true } = {}) {
+  git(project, 'checkout', '--quiet', 'main');
+  git(project, 'merge', '--quiet', '--no-ff', '-m', 'Merge integration into main', 'integration/fixture');
+  const mergeSha = git(project, 'rev-parse', 'HEAD');
+  if (push) advanceOriginMain(project);
+  return mergeSha;
+}
+
+test('Chain Scanner landed finish records the merged integration candidate whose receipt reviewed the task commit', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-integration-'));
+  try {
+    const { ledgerPath, project, entry, taskSha, candidateSha, integrationBaseSha } = createIntegrationFixture(fixture, 'work/integration-task');
+    const candidateReceipt = recordDocsOnlyReceipt(project, fixture, candidateSha, integrationBaseSha, 'integration');
+    const mergeSha = landIntegrationOnMain(project, { push: false });
+    // A later main release also contains the task commit, but its receipt reviewed
+    // only what came after the merge, so it is not the task's release evidence.
+    const laterSha = commitDocsNote(project, 'later-release.md', 'Later unrelated release on main.');
+    recordDocsOnlyReceipt(project, fixture, laterSha, mergeSha, 'later');
+    advanceOriginMain(project);
+    git(project, 'checkout', '--quiet', entry.branchName);
+
+    const finished = command([
+      'finish', '--file', ledgerPath, '--id', entry.id, '--outcome', 'landed', '--adapter', 'chain-scanner',
+      '--result', 'Task landed through the integration candidate.',
+    ], project);
+
+    assert.equal(finished.status, 0, finished.stderr);
+    const completed = JSON.parse(finished.stdout);
+    assert.equal(completed.status, 'complete');
+    assert.equal(completed.outcome, 'landed');
+    assert.equal(completed.finalBranchSha, taskSha);
+    assert.equal(completed.mainSha, laterSha);
+    assert.equal(completed.originMainSha, laterSha);
+    assert.equal(completed.pushed, true);
+    assert.equal(completed.releaseEvidence.candidate.commitSha, candidateSha);
+    assert.equal(completed.releaseEvidence.candidate.baseSha, integrationBaseSha);
+    assert.equal(completed.releaseEvidence.receiptPath, candidateReceipt.receiptPath);
+    assert.equal(completed.releaseEvidence.receiptSha256, candidateReceipt.receipt.receiptSha256);
+    assert.equal(JSON.parse(readFileSync(ledgerPath, 'utf8')).entries[0].outcome, 'landed');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('Chain Scanner landed finish through an integration branch refuses unmerged work, a stale remote and receipts that did not review the task', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-integration-refusals-'));
+  try {
+    const { ledgerPath, project, entry, taskSha, candidateSha, integrationBaseSha } = createIntegrationFixture(fixture, 'work/integration-refusals');
+    const candidateReceipt = recordDocsOnlyReceipt(project, fixture, candidateSha, integrationBaseSha, 'integration');
+    const finish = () => command([
+      'finish', '--file', ledgerPath, '--id', entry.id, '--outcome', 'landed', '--adapter', 'chain-scanner',
+    ], project);
+
+    // A valid receipt on a candidate that main has not merged does not land the task.
+    git(project, 'checkout', '--quiet', entry.branchName);
+    const unmerged = finish();
+    assert.notEqual(unmerged.status, 0);
+    assert.match(unmerged.stderr, new RegExp(`local main does not contain exact task commit ${taskSha}`));
+
+    const mergeSha = landIntegrationOnMain(project, { push: false });
+    git(project, 'checkout', '--quiet', entry.branchName);
+    const unpushed = finish();
+    assert.notEqual(unpushed.status, 0);
+    assert.match(unpushed.stderr, /origin\/main \([0-9a-f]{40}\) does not match local main/);
+
+    // Main moves on with its own release, then the integration receipt is lost:
+    // the later receipt's base already held the task commit, so it never reviewed it.
+    git(project, 'checkout', '--quiet', 'main');
+    const laterSha = commitDocsNote(project, 'later-release.md', 'Later unrelated release on main.');
+    recordDocsOnlyReceipt(project, fixture, laterSha, mergeSha, 'later');
+    advanceOriginMain(project);
+    git(project, 'checkout', '--quiet', entry.branchName);
+    rmSync(dirname(candidateReceipt.receiptPath), { recursive: true, force: true });
+    const unreviewed = finish();
+    assert.notEqual(unreviewed.status, 0, 'a later release that did not review the task commit cannot land it');
+    assert.match(unreviewed.stderr, new RegExp(`no valid release receipt for task commit ${taskSha} or for a merged candidate that contains it`, 'i'));
+
+    const after = JSON.parse(readFileSync(ledgerPath, 'utf8')).entries[0];
+    assert.equal(after.status, 'active', 'every refusal keeps the active owner');
+    assert.equal(after.releaseEvidence, undefined);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+// Prune finishes the entries of worktrees Claude Code removed without a finish
+// (#2364 spec a2 and c). A removed worktree is abandoned work, so prune records
+// its entry discarded at once, with the fields finish writes, even when its work
+// merged and a receipt reviewed it: inferring landed from branch state after the
+// worktree was gone kept leaving false-landed paths (PR #2413 round 3). Work that
+// merged is finished as landed from its live worktree before removal.
+test("prune records each removed worktree's entry as discarded at once with the fields finish writes, merged work included, and frees its ports", () => {
+  const fixture = realpathSync(mkdtempSync(join(tmpdir(), 'chain-coordination-prune-outcomes-')));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'chain-scanner'), 'work/unused');
+    git(project, 'checkout', '--quiet', 'main');
+    mkdirSync(join(project, 'scripts'), { recursive: true });
+    copyFileSync(releaseEvidenceEntrypoint, join(project, 'scripts/release-evidence.mjs'));
+    git(project, 'add', 'scripts/release-evidence.mjs');
+    git(project, 'commit', '--quiet', '-m', 'install fixture release adapter');
+    const integrationBaseSha = git(project, 'rev-parse', 'HEAD');
+    addOrigin(project, fixture);
+    const register = (worktree, port) => {
+      const began = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', `Prune fixture ${worktree}`,
+        '--registered-by', 'worktree-ready', '--resources', `loopback:127.0.0.1:${port}`], worktree);
+      assert.equal(began.status, 0, began.stderr);
+      return JSON.parse(began.stdout).id;
+    };
+    const agent = (name, port) => {
+      const worktree = join(fixture, name);
+      git(project, 'worktree', 'add', '--quiet', '-b', `work/${name}`, worktree, 'main');
+      return { worktree, id: register(worktree, port) };
+    };
+
+    const landed = agent('landed-task', 47121);
+    const taskSha = commitDocsNote(landed.worktree, 'task-note.md', 'Task change merged through an integration branch.');
+    const unmerged = agent('unmerged-task', 47122);
+    const unmergedSha = commitDocsNote(unmerged.worktree, 'unmerged-note.md', 'Task change that never reached main.');
+    const deleted = agent('deleted-branch', 47123);
+    git(project, 'checkout', '--quiet', '-b', 'integration/fixture', 'main');
+    git(project, 'merge', '--quiet', '--no-ff', '-m', 'Merge task into integration', 'work/landed-task');
+    const candidateSha = commitDocsNote(project, 'review-fix.md', 'Review fix on the integration branch.');
+    recordDocsOnlyReceipt(project, fixture, candidateSha, integrationBaseSha, 'integration');
+    const reviewer = join(fixture, 'reviewer');
+    git(project, 'worktree', 'add', '--quiet', '--detach', reviewer, candidateSha);
+    const reviewerId = register(reviewer, 47124);
+    const mainSha = landIntegrationOnMain(project);
+    for (const worktree of [landed.worktree, unmerged.worktree, deleted.worktree, reviewer]) git(project, 'worktree', 'remove', '--force', worktree);
+    git(project, 'branch', '--quiet', '-D', 'work/deleted-branch');
+
+    const now = '2026-11-16T12:00:00.000Z';
+    const pruned = command(['prune', '--file', ledgerPath, '--registered-by', 'worktree-ready', '--now', now], project);
+    assert.equal(pruned.status, 0, pruned.stderr);
+    const entries = new Map(JSON.parse(readFileSync(ledgerPath, 'utf8')).entries.map((entry) => [entry.id, entry]));
+    const record = (id) => {
+      const entry = entries.get(id);
+      return {
+        status: entry.status, outcome: entry.outcome, completedAt: entry.completedAt, reason: entry.discard?.reason,
+        finalBranchName: entry.finalBranchName, finalBranchSha: entry.finalBranchSha, mainSha: entry.mainSha, pushed: entry.pushed,
+        cites: entry.releaseEvidence?.candidate?.commitSha, resources: entry.resources,
+      };
+    };
+    const discarded = {
+      status: 'complete', outcome: 'discarded', completedAt: now, reason: 'Worktree removed before finish.',
+      mainSha, pushed: false, cites: undefined, resources: [],
+    };
+    assert.deepEqual(record(landed.id), { ...discarded, finalBranchName: 'work/landed-task', finalBranchSha: taskSha },
+      'merged work whose candidate has a receipt is discarded too: its worktree was removed before finish');
+    assert.deepEqual(record(unmerged.id), { ...discarded, finalBranchName: 'work/unmerged-task', finalBranchSha: unmergedSha }, 'unmerged work, at its tip then');
+    assert.deepEqual(record(deleted.id), { ...discarded, finalBranchName: undefined, finalBranchSha: undefined }, 'no tip is invented for a deleted branch');
+    assert.deepEqual(record(reviewerId), { ...discarded, finalBranchName: undefined, finalBranchSha: candidateSha }, "a reviewer's detached entry, at the exact commit it recorded");
+    assert.equal(JSON.parse(readFileSync(ledgerPath, 'utf8')).entries.filter((entry) => entry.status === 'active').length, 0,
+      'no entry is left active, so no port is claimed');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+// PR #2413 N3 and round 3: prune frees a removed worktree's port at once, which
+// another worktree can then claim, and settles its entry at once as discarded.
+// No entry is left pending, so a later merge of its work reopens nothing.
+test("prune frees a removed worktree's port at once and records it discarded, and a later merge of its work changes nothing", () => {
+  const fixture = realpathSync(mkdtempSync(join(tmpdir(), 'chain-coordination-prune-pending-')));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'chain-scanner'), 'work/unused');
+    git(project, 'checkout', '--quiet', 'main');
+    mkdirSync(join(project, 'scripts'), { recursive: true });
+    copyFileSync(releaseEvidenceEntrypoint, join(project, 'scripts/release-evidence.mjs'));
+    git(project, 'add', 'scripts/release-evidence.mjs');
+    git(project, 'commit', '--quiet', '-m', 'install fixture release adapter');
+    const baseSha = git(project, 'rev-parse', 'HEAD');
+    addOrigin(project, fixture);
+    const port = 'loopback:127.0.0.1:47141';
+    const agent = join(fixture, 'agent-pending');
+    git(project, 'worktree', 'add', '--quiet', '-b', 'work/pending', agent, 'main');
+    const began = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Pending fixture',
+      '--registered-by', 'worktree-ready', '--resources', port], agent);
+    assert.equal(began.status, 0, began.stderr);
+    const { id } = JSON.parse(began.stdout);
+    const taskSha = commitDocsNote(agent, 'pending.md', 'Task work merged after its worktree was removed.');
+    git(project, 'worktree', 'remove', '--force', agent);
+    const prune = (now) => {
+      const pruned = command(['prune', '--file', ledgerPath, '--registered-by', 'worktree-ready', '--now', now], project);
+      assert.equal(pruned.status, 0, pruned.stderr);
+      return JSON.parse(readFileSync(ledgerPath, 'utf8')).entries.find((entry) => entry.id === id);
+    };
+
+    const settled = prune('2026-11-16T12:00:00.000Z');
+    assert.deepEqual([settled.status, settled.outcome, settled.finalBranchSha, settled.completedAt], ['complete', 'discarded', taskSha, '2026-11-16T12:00:00.000Z'],
+      'the entry is settled at once as discarded, at its tip then');
+    assert.deepEqual(settled.resources, [], 'its port is freed at once');
+    assert.deepEqual(settled.claimReleases.map((release) => release.resources), [[port]]);
+    const other = join(fixture, 'agent-other');
+    git(project, 'worktree', 'add', '--quiet', '-b', 'work/other', other, 'main');
+    const reuse = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Reuse the freed port', '--resources', port], other);
+    assert.equal(reuse.status, 0, `the freed port can be claimed again: ${reuse.stderr}`);
+
+    git(project, 'checkout', '--quiet', '-b', 'integration/fixture', 'main');
+    git(project, 'merge', '--quiet', '--no-ff', '-m', 'Merge task into integration', 'work/pending');
+    const candidateSha = commitDocsNote(project, 'review-fix.md', 'Review fix on the integration branch.');
+    recordDocsOnlyReceipt(project, fixture, candidateSha, baseSha, 'integration');
+    landIntegrationOnMain(project);
+    assert.equal(spawnSync('git', ['merge-base', '--is-ancestor', taskSha, 'main'], { cwd: project }).status, 0, 'its work has landed');
+
+    assert.deepEqual(prune('2026-11-16T13:00:00.000Z'), settled, 'the prune after the merge changes nothing');
+    const active = JSON.parse(readFileSync(ledgerPath, 'utf8')).entries.filter((entry) => entry.status === 'active');
+    assert.deepEqual(active.map((entry) => [entry.id, entry.resources]), [[JSON.parse(reuse.stdout).id, [port]]], 'one active entry, the one that claimed the freed port');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+// Invariant 2 (PR #2413 B1 residual and N8, probe R8): an entry that own moved
+// to a new branch kept its old start commit, so commits the new branch already
+// had, such as an integration head's first wave, counted as the agent's work.
+// Own now restarts the start at the checkout's HEAD, as it does when the
+// checkout no longer holds the start commit, and keeps the previous one.
+test("own moves an entry to the checkout's new branch, or to history without its start commit, with the start restarted at HEAD and the previous start kept in rebinds", () => {
+  const fixture = realpathSync(mkdtempSync(join(tmpdir(), 'chain-coordination-own-restart-')));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'chain-scanner'), 'integration/x');
+    const firstWaveSha = commitDocsNote(project, 'first-wave.md', 'First-wave task merged into integration.');
+    git(project, 'checkout', '--quiet', 'main');
+    const mainSha = git(project, 'rev-parse', 'HEAD');
+    const agent = join(fixture, 'agent');
+    git(project, 'worktree', 'add', '--quiet', '-b', 'worktree-agent-own', agent, 'main');
+    const port = 'loopback:127.0.0.1:47161';
+    const began = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Own restart fixture',
+      '--registered-by', 'worktree-ready', '--resources', port], agent);
+    assert.equal(began.status, 0, began.stderr);
+    const { id } = JSON.parse(began.stdout);
+    const own = (now) => {
+      const owned = command(['own', '--file', ledgerPath, '--now', now], agent);
+      assert.equal(owned.status, 0, owned.stderr);
+      return JSON.parse(owned.stdout);
+    };
+
+    git(agent, 'checkout', '--quiet', '-b', 'ticket/own', 'integration/x');
+    const moved = own('2026-11-16T12:00:00.000Z');
+    assert.equal(moved.id, id);
+    assert.equal(moved.branchName, 'ticket/own');
+    assert.equal(moved.startBranchSha, firstWaveSha, "the start restarts at the checkout's HEAD, so the branch's base is never work");
+    assert.deepEqual(moved.rebinds, [{ reboundAt: '2026-11-16T12:00:00.000Z', from: 'worktree-agent-own', to: 'ticket/own', previousStartBranchSha: mainSha }]);
+
+    git(agent, 'reset', '--quiet', '--hard', 'main');
+    const rewritten = own('2026-11-16T12:30:00.000Z');
+    assert.equal(rewritten.branchName, 'ticket/own');
+    assert.equal(rewritten.startBranchSha, mainSha, 'a checkout without the start commit restarts it at HEAD too');
+    assert.deepEqual(rewritten.rebinds.at(-1), { reboundAt: '2026-11-16T12:30:00.000Z', from: 'ticket/own', to: 'ticket/own', previousStartBranchSha: firstWaveSha });
+
+    const unchanged = own('2026-11-16T13:00:00.000Z');
+    assert.deepEqual(unchanged, rewritten, 'nothing moves while the checkout stays on its branch and start');
+    const active = JSON.parse(readFileSync(ledgerPath, 'utf8')).entries.filter((entry) => entry.status === 'active');
+    assert.deepEqual(active.map((entry) => [entry.id, entry.resources]), [[id, [port]]], 'one active entry, holding its one port');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+// PR #2413 B1 (probe S4): a worktree re-added at a removed one's path is a new
+// owner. It gets its own entry, and the old entry keeps its ownership.
+test("begin in a new worktree at an earlier worktree's path registers a new entry and leaves the earlier one's ownership alone", () => {
+  const fixture = realpathSync(mkdtempSync(join(tmpdir(), 'chain-coordination-reused-path-')));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'project'), 'work/unused');
+    git(project, 'checkout', '--quiet', 'main');
+    const path = join(fixture, 'agent');
+    const cases = [
+      // The same start commit: only the Git worktree's identity tells them apart.
+      { name: 'identity', port: 47151, before: () => {} },
+      // A legacy entry with no recorded identity, whose start commit the new checkout lacks.
+      { name: 'start commit', port: 47152, before: () => commitDocsNote(path, 'earlier.md', 'Earlier worktree commit.'), legacy: true },
+    ];
+    for (const { name, port, before, legacy } of cases) {
+      git(project, 'worktree', 'add', '--quiet', '-b', `work/earlier-${port}`, path, 'main');
+      before();
+      const resource = `loopback:127.0.0.1:${port}`;
+      const began = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', `Earlier ${name}`, '--resources', resource], path);
+      assert.equal(began.status, 0, began.stderr);
+      const earlier = JSON.parse(began.stdout);
+      if (legacy) {
+        const state = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+        delete state.entries.find((entry) => entry.id === earlier.id).worktreeIdentity;
+        writeFileSync(ledgerPath, JSON.stringify(state));
+      }
+      git(project, 'worktree', 'remove', '--force', path);
+      git(project, 'worktree', 'add', '--quiet', '-b', `work/later-${port}`, path, 'main');
+      const earlierBytes = JSON.stringify(JSON.parse(readFileSync(ledgerPath, 'utf8')).entries.find((entry) => entry.id === earlier.id));
+
+      const taken = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', `Later ${name}`, '--resources', resource], path);
+      assert.notEqual(taken.status, 0, `${name}: the earlier entry still owns its port`);
+      assert.match(taken.stderr, new RegExp(`Conflict with ${earlier.id}`));
+      const later = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', `Later ${name}`], path);
+      assert.equal(later.status, 0, `${name}: a new worktree registers its own entry: ${later.stderr}`);
+      const entry = JSON.parse(later.stdout);
+      assert.notEqual(entry.id, earlier.id);
+      assert.equal(entry.branchName, `work/later-${port}`);
+      const after = JSON.parse(readFileSync(ledgerPath, 'utf8')).entries;
+      assert.equal(JSON.stringify(after.find((candidate) => candidate.id === earlier.id)), earlierBytes, `${name}: the earlier entry is untouched`);
+      const again = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', `Duplicate ${name}`], path);
+      assert.notEqual(again.status, 0, `${name}: the new worktree still cannot register twice`);
+      assert.match(again.stderr, /already exists/);
+      git(project, 'worktree', 'remove', '--force', path);
+    }
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }

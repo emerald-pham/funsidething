@@ -12,6 +12,7 @@
     "agent:checkpoint": "node scripts/agent-tools/checkpoint.mjs",
     "agent:native-task-smoke": "node scripts/agent-tools/native-task-smoke.mjs",
     "agent:host-coordination": "node scripts/agent-tools/coordination.mjs",
+    "agent:worktree-ready": "node scripts/agent-tools/worktree-ready.mjs",
     "agent:preflight": "node scripts/agent-tools/preflight.mjs",
     "agent:browser-audit": "node scripts/agent-tools/browser-audit.mjs",
     "agent:ci-monitor": "node scripts/agent-tools/ci-monitor.mjs",

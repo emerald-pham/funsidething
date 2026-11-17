@@ -194,6 +194,44 @@ test('qualification readiness requires live host ownership for both native ports
   await assertQualificationSetupRejected(t, conflict, { expectedError: /already owned by another active or parked worktree/ });
 });
 
+// Invariant 6 (PR #2413 N7): readiness counts only the active entries that
+// belong to this worktree and hold resources. An entry at this path recorded
+// with another worktree identity is an earlier worktree's, and an entry prune
+// left without resources owns nothing here; a legacy entry, recorded before
+// identities, still counts by its path.
+test("qualification readiness counts only this worktree's own active entries that hold resources", async (t) => {
+  const fixture = await createQualificationFixture(t);
+  const gitDir = path.join(fixture.repo, '.git');
+  const metadata = await stat(gitDir, { bigint: true });
+  const identity = { gitDir, device: String(metadata.dev), inode: String(metadata.ino) };
+  const ports = [`loopback:127.0.0.1:${fixture.deliveryPort}`, `loopback:127.0.0.1:${fixture.smokePort}`];
+  await writeFile(fixture.ledger, JSON.stringify({ version: 1, scope: 'codex-wide', entries: [
+    { id: 'own', status: 'active', worktree: fixture.repo, worktreeIdentity: identity, resources: ports },
+    { id: 'earlier-worktree', status: 'active', worktree: fixture.repo, worktreeIdentity: { ...identity, inode: `${identity.inode}0` }, resources: ['loopback:127.0.0.1:51633'] },
+    { id: 'pruned-legacy', status: 'active', worktree: fixture.repo, resources: [] },
+  ] }));
+  const result = invokeRecorder({
+    repo: fixture.repo,
+    evidence: fixture.evidence,
+    purpose: 'green',
+    command: node,
+    args: ['-e', "require('node:fs').writeFileSync(process.env.CHAIN_QUALIFICATION_READINESS_SENTINEL, 'launched')"],
+    extraOptions: ['--qualification-readiness', '--summary'],
+    env: fixture.env,
+  });
+  const summary = summaryFrom(result);
+  assert.deepEqual(summary.evidence.errors ?? [], [], 'only the worktree\'s own entry with resources counts');
+  assert.equal(result.status, 0);
+  assert.equal(await readFile(fixture.sentinel, 'utf8'), 'launched');
+
+  await writeFile(fixture.ledger, JSON.stringify({ version: 1, scope: 'codex-wide', entries: [
+    { id: 'own', status: 'active', worktree: fixture.repo, worktreeIdentity: identity, resources: ports },
+    { id: 'legacy-owner', status: 'active', worktree: fixture.repo, resources: ['loopback:127.0.0.1:51634'] },
+  ] }));
+  await assertQualificationSetupRejected(t, { ...fixture, sentinel: path.join(fixture.root, 'second-launch') },
+    { expectedError: /exactly one active host coordination entry for this worktree; found 2/ });
+});
+
 test('qualification readiness rejects dirty candidates and unusable evidence destinations before launch', async (t) => {
   const dirty = await createQualificationFixture(t);
   await writeFile(path.join(dirty.repo, 'untracked-test.js'), 'export const dirty = true;\n');

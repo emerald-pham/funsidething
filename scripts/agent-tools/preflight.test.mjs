@@ -37,6 +37,8 @@ async function createAppFixture(t, suffix) {
     'scripts/test-first-gate.mjs',
     // The shared helpers serve the shell with computed identities (#2380).
     'scripts/shell-fingerprints.mjs', 'sw.js',
+    // The shared helpers read a prepared worktree's ports through it (#2364).
+    'scripts/agent-tools/worktree-ports.mjs',
   ];
   for (const file of shellPaths(readFileSync(path.join(repositoryRoot, 'sw.js'), 'utf8'))) if (!fixtureFiles.includes(file)) fixtureFiles.push(file);
   for (const relative of fixtureFiles) {
