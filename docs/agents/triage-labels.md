@@ -10,4 +10,6 @@
 | ready-for-human | state | ready-for-human |
 | wontfix | state | wontfix |
 
+An issue's category is `bug` or `enhancement`. Other labels, such as `documentation` and `accessibility`, are topic labels and don't count toward it.
+
 Use the mapped label when an engineering skill refers to a canonical role. ready-for-agent describes a fully specified bounded task; it is not evidence that an unverified concern is a confirmed bug.

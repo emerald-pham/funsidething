@@ -45,6 +45,7 @@ Reply with:
 - the full SHA of the head you reviewed, and the verdict;
 - each blocking finding, one line each;
 - a one-sentence receipt summary;
+- the focused tests you ran, each name exact and unabbreviated;
 - specialist only: the Memory scope as compact JSON, which the receipt uses as
   is, with every test name exact and unabbreviated:
   `{"memory":{"affected":…,"rationale":"…","tests":[…]},"cloud":…,"sync":…}`.

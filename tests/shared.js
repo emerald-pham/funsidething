@@ -12,6 +12,13 @@ import { spawnSync } from "node:child_process";
 import { execFile } from "node:child_process";
 import { createServer } from "node:http";
 import { servedShellReader } from "../scripts/shell-fingerprints.mjs";
+import { applyPreparedPorts } from "../scripts/agent-tools/worktree-ports.mjs";
+
+// `npm run test:group` and `node --test` in a worktree prepared by
+// worktree-ready get its ports the way the test-run recorder hands them over,
+// since a subagent shell keeps no port variables between commands (#2364). The
+// run's working directory names the worktree, as the recorder's --repo does.
+applyPreparedPorts(process.env, process.cwd());
 
 // Shared fixtures and helpers for the per-area test files. They moved here
 // unchanged from tests.js (#2213), in their original order.

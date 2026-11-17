@@ -11,15 +11,17 @@
 // every problem is reported on stderr and the command still exits 0.
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  PORT_VARIABLES, loopbackPort, loopbackResource, preparedPortsText, removePreparedPorts, writePreparedPorts,
+} from './worktree-ports.mjs';
 
 const coordinationClient = fileURLToPath(new URL('./coordination.mjs', import.meta.url));
 const PORT_RANGE = { first: 42100, last: 42999 };
 const CLAIM_ATTEMPTS = 20;
 const REGISTERED_BY = 'worktree-ready';
-const PORTS_FILE = 'chain-worktree-ports.env';
 
 function git(cwd, ...args) {
   return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -29,12 +31,12 @@ function warn(message) {
   console.error(`worktree-ready: ${message}`);
 }
 
-function checkout(cwd) {
+function worktreeLayout(cwd) {
   const root = realpathSync(git(cwd, 'rev-parse', '--show-toplevel'));
   const gitDir = realpathSync(resolve(root, git(root, 'rev-parse', '--git-dir')));
   const commonDir = realpathSync(resolve(root, git(root, 'rev-parse', '--git-common-dir')));
   const mainCheckout = realpathSync(git(root, 'worktree', 'list', '--porcelain').split('\n')[0].replace(/^worktree /, ''));
-  return { root, portsFile: join(gitDir, PORTS_FILE), isMain: gitDir === commonDir, mainCheckout };
+  return { root, gitDir, isMain: gitDir === commonDir, mainCheckout };
 }
 
 // The worktree gets a real node_modules of its own. A link to the main install
@@ -81,10 +83,7 @@ function usableLedger(root) {
 }
 
 function loopbackPorts(entry) {
-  return (entry?.resources ?? []).flatMap((resource) => {
-    const port = /^loopback:127\.0\.0\.1:(\d+)$/.exec(String(resource).toLowerCase())?.[1];
-    return port ? [Number(port)] : [];
-  });
+  return (entry?.resources ?? []).map(loopbackPort).filter((port) => port !== undefined);
 }
 
 function portIsFree(port) {
@@ -113,7 +112,7 @@ function choosePair(state) {
 }
 
 function resources(pair) {
-  return pair.flatMap((port) => ['--resources', `loopback:127.0.0.1:${port}`]);
+  return pair.flatMap((port) => ['--resources', loopbackResource(port)]);
 }
 
 function claimPorts(root, ledger) {
@@ -144,7 +143,7 @@ function prepare() {
     console.log('worktree-ready: CI run; nothing to prepare.');
     return;
   }
-  const where = checkout(process.cwd());
+  const where = worktreeLayout(process.cwd());
   if (where.isMain) {
     console.log('worktree-ready: main checkout; it keeps its own dependencies and claims no ports.');
     return;
@@ -153,7 +152,7 @@ function prepare() {
   try {
     preparePorts(where);
   } catch (error) {
-    rmSync(where.portsFile, { force: true });
+    removePreparedPorts(where.gitDir);
     warn(`skipped ports: ${error instanceof Error ? error.message : String(error)}.`);
   }
   console.log(`worktree-ready: ${prepareDependencies(where)}`);
@@ -170,10 +169,10 @@ function preparePorts(where) {
     else ports = claimed.ports;
   }
   if (ports) {
-    writeFileSync(where.portsFile, `export CHAIN_NATIVE_PORT=${ports[0]}\nexport CHAIN_NATIVE_SMOKE_PORT=${ports[1]}\n`);
-    console.log(`worktree-ready: ports: CHAIN_NATIVE_PORT=${ports[0]} CHAIN_NATIVE_SMOKE_PORT=${ports[1]}`);
+    writePreparedPorts(where.gitDir, ports);
+    console.log(`worktree-ready: ports: ${PORT_VARIABLES.map((name, index) => `${name}=${ports[index]}`).join(' ')}`);
   } else {
-    rmSync(where.portsFile, { force: true });
+    removePreparedPorts(where.gitDir);
   }
 }
 
@@ -189,15 +188,15 @@ function pruneRemoved(root) {
 }
 
 function prune() {
-  const { root } = checkout(process.cwd());
+  const { root } = worktreeLayout(process.cwd());
   const ledger = usableLedger(root);
   if (ledger.reason) warn(`skipped prune: ${ledger.reason}. Nothing was written to any ledger.`);
   else pruneRemoved(root);
 }
 
 function printEnvironment() {
-  const { portsFile } = checkout(process.cwd());
-  if (existsSync(portsFile)) process.stdout.write(readFileSync(portsFile, 'utf8'));
+  const prepared = preparedPortsText(worktreeLayout(process.cwd()).gitDir);
+  if (prepared) process.stdout.write(prepared);
   else warn('no ports prepared for this worktree; run prepare first.');
 }
 

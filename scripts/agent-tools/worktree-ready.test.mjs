@@ -199,6 +199,34 @@ test('a test command run through the recorder in a prepared worktree gets its po
   }
 });
 
+// `npm run test:group` and `node --test` don't go through the recorder, and a
+// subagent shell has no port variables, so the suite's shared setup reads the
+// prepared ports itself under the recorder's rule (#2364, spec a1).
+test('a plain test run in a prepared worktree gets its ports from the suite setup, unless the shell set its own or CI is true', () => {
+  const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-suite-');
+  try {
+    const agent = addWorktree(main, join(fixture, 'agent-suite'));
+    assert.equal(run(['prepare'], agent, { ledger, npm }).status, 0);
+    const claimed = loopbackPorts(ownerOf(ledger, agent)[0]);
+    const suiteSetup = new URL('../../tests/shared.js', import.meta.url).href;
+    const plainRun = (environment) => {
+      const env = { ...process.env, CI: '', CHAIN_NATIVE_PORT: '', CHAIN_NATIVE_SMOKE_PORT: '', ...environment };
+      delete env.NODE_TEST_CONTEXT;
+      return spawnSync(process.execPath, ['--input-type=module', '-e',
+        `await import(${JSON.stringify(suiteSetup)}); console.log(\`ports \${process.env.CHAIN_NATIVE_PORT} \${process.env.CHAIN_NATIVE_SMOKE_PORT}\`);`],
+      { cwd: agent, encoding: 'utf8', env });
+    };
+    const prepared = plainRun({});
+    assert.equal(prepared.status, 0, prepared.stderr);
+    assert.match(prepared.stdout, new RegExp(`^ports ${claimed[0]} ${claimed[1]}$`, 'm'), 'the suite sees the claimed ports');
+    assert.match(plainRun({ CHAIN_NATIVE_PORT: '47081', CHAIN_NATIVE_SMOKE_PORT: '47082' }).stdout, /^ports 47081 47082$/m,
+      'ports the shell set explicitly win');
+    assert.match(plainRun({ CI: 'true' }).stdout, /^ports {2}$/m, 'CI never reads prepared ports');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
 // Claude Code removes an unchanged subagent worktree itself and runs no
 // WorktreeRemove hook for it, and the coordinator removes the rest directly.
 // So claims are freed by sweeping entries whose worktree is gone (#2368).
@@ -242,6 +270,22 @@ test("prune frees the entries and ports of removed worktrees and leaves live, pa
     assert.equal(unconfigured.status, 0, unconfigured.stderr);
     assert.match(unconfigured.stderr, /skipped prune/i);
     assert.equal(readFileSync(ledger, 'utf8'), before, 'with no configured ledger nothing is written');
+
+    const missing = join(fixture, 'missing', 'host-ledger.json');
+    const other = join(fixture, 'other-ledger.json');
+    writeFileSync(other, before);
+    git(main, 'worktree', 'remove', '--force', join(fixture, 'agent-next'));
+    for (const { name, configured, environment } of [
+      { name: 'missing', configured: missing },
+      { name: 'conflicting', configured: ledger, environment: { DOW_EMULATOR_COORDINATION_FILE: other } },
+    ]) {
+      const skipped = run(['prune'], main, { ledger: configured, npm, environment });
+      assert.equal(skipped.status, 0, `${name}: ${skipped.stderr}`);
+      assert.match(skipped.stderr, /skipped prune/i, `${name}: says it skipped the prune`);
+    }
+    assert.equal(existsSync(join(fixture, 'missing')), false, 'no ledger, lock or directory is created where the ledger is missing');
+    assert.equal(readFileSync(ledger, 'utf8'), before, 'a conflicting configuration writes nothing to the configured ledger');
+    assert.equal(readFileSync(other, 'utf8'), before, 'nor to the conflicting one');
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }
