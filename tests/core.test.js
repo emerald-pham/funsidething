@@ -3966,8 +3966,9 @@ test('RISK sync responsiveness guidance: mounted Help and the changelog say answ
  assert.match(rapid,/^No\. You can keep answering while the board saves on this device and syncs\./,'the answer says what the person sees: '+rapid);
  assert.match(rapid,/after a short pause, or at least every 20 seconds or so/);
  assert.match(rapid,/A single Yes or Done with nothing else syncing goes to the cloud at once/);
- const current=shim.document.getElementById('appChangelogCurrent').innerHTML.split('</ul>')[0];
- assert.match(current,/<h3>November 16, 2026<\/h3>/);
+ // Read by its date, as the other release notes are: a later release puts its own heading first.
+ const current=shim.document.getElementById('appChangelogCurrent').innerHTML.split('<h3>November 16, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.ok(current,'the changelog has a November 16, 2026 section');
  const items=current.split('<li>').slice(1);
  assert.ok(items.some(item=>/answering several tasks in a row no longer slows the app down/.test(item)&&!/20 seconds/.test(item)),'the slowdown fix has its own bullet');
  assert.ok(items.some(item=>/after a short pause, or at least every 20 seconds or so/.test(item)),'the cloud timing has its own bullet');
@@ -41907,6 +41908,16 @@ test('RISK debug log link #2309: counting backups loads no backup rows, so a col
  const report=await debugLogLinkReport2309(app);
  assert.equal(report.savedData.backups.count.value,device.expectedBackups,'the count is the real number of stored backups');
  assert.deepEqual(reads,[],'no backup row is loaded to count them');
+});
+
+test('Changelog #2420: one bullet says Yes No and Cant are back inside the scanner box and scroll with the page',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ const notes=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ const release=notes.split('<h3>November 17, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ const bullets=release.split('<li>').slice(1).filter(item=>/scanner box/.test(item));
+ assert.equal(bullets.length,1,'one bullet covers the move: '+release);
+ assert.match(bullets[0],/Yes, No and Can’t are back inside the scanner box, under the question, instead of pinned to the bottom of the screen/);
+ assert.match(bullets[0],/scroll with the page and move a little with each task’s title length/);
 });
 
 test('Help answers how the steady scanner, backup list, Debug log link and rank column now behave',async t=>{

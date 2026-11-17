@@ -23675,6 +23675,7 @@
       "tests/core.test.js:-assert.deepEqual(failures,[]);",
       "tests/core.test.js:-assert.deepEqual(hidden,[],`${label}: ${hidden.length} of ${onThePage} focus stops are behind the pinned row`);",
       "tests/core.test.js:-assert.equal(ended.fixedDescendants,0,`${engineName}: nothing stays pinned without a candidate`);",
+      "tests/core.test.js:-assert.match(current,/<h3>November 16, 2026<\\/h3>/);",
       "tests/core.test.js:-assert.match(ended.text,/End of the list/,`${engineName}: the scan ended honestly: ${ended.text.slice(0,80)}`);",
       "tests/core.test.js:-assert.ok(Math.abs(after-place)<=3,`${label}: a restored position stays: ${place} became ${after}`);",
       "tests/core.test.js:-assert.ok(Math.abs(now[act].top-home[act].top)<=1&&Math.abs(now[act].left-home[act].left)<=1,`${engineName} answer ${answered}: ${act} stayed where it first appeared (chain ${now.chain}): started at ${Math.round(home[act].left)},${Math.round(home[act].top)} and is now at ${Math.round(now[act].left)},${Math.round(now[act].top)}`);",
@@ -23724,6 +23725,7 @@
       "tests/core.test.js:-const clear=await page.evaluate(()=>({bottom:document.querySelector('[data-act=\"yes\"]').getBoundingClientRect().bottom,height:innerHeight}));",
       "tests/core.test.js:-const clear=page=>page.evaluate(()=>{const t=document.querySelector('.card.cand .title')?.getBoundingClientRect(),row=document.querySelector('.decide')?.getBoundingClientRect();return t&&row?{bottom:t.bottom,top:t.top,rowTop:row.top,clear:t.bottom<=row.top&&t.top>=0}:null;});",
       "tests/core.test.js:-const covered=await opened.page.evaluate(()=>{scrollTo(0,0);const t=document.querySelector('.card.cand .title').getBoundingClientRect(),row=document.querySelector('.decide').getBoundingClientRect();return t.bottom>row.top+24;});",
+      "tests/core.test.js:-const current=shim.document.getElementById('appChangelogCurrent').innerHTML.split('</ul>')[0];",
       "tests/core.test.js:-const el=document.activeElement,row=document.querySelector('.decide');",
       "tests/core.test.js:-const ended=await page.evaluate(()=>({text:document.getElementById('scan').textContent,fixedDescendants:[...document.querySelectorAll('#scan *')].filter(e=>getComputedStyle(e).position==='fixed').length,padding:parseFloat(getComputedStyle(document.querySelector('.wrap')).paddingBottom)}));",
       "tests/core.test.js:-const failures=[],safeBottom=34;",
@@ -23790,7 +23792,7 @@
       "tests/core.test.js:-}catch(error){failures.push(`${engineName}: ${error.message.split('\\n')[0]}`);}finally{await context.close();await browser.close();}",
       "tests/core.test.js:-}catch(error){failures.push(error.message);}finally{await context.close();}"
     ],
-    "reason": "#2420 reverses the placement part of #2312: Yes, No and Can't (with Postpone, Run WOOP while it exists, and the finish row) sit inside the scanner box under the question again and scroll with the page; nothing is pinned to the bottom of the screen, and the pinned row's page padding, raised toast, scroll padding, height tracking, focus correction and title-reveal scroll go. The spec accepts that the choices move a little with the title's length and asks for no auto-scroll. The #2312 browser contracts that asserted the pinned placement (same position on screen across answers, on screen without scrolling, clear of the iPhone home bar, toast above the row, footer and floating header clear of the row, row lined up with the panels with rounded ends, a press on a control partly under the row, a reveal scroll after an answer, Start or Resume, Tab stops clear of the row) are replaced by the in-box contracts below; tests that tapped a choice at its first-seen spot now read where the choice is after scrolling it on screen; the Help assertions follow the rewritten FAQ; two #221 subtests are renamed from the pinned row to the finish row.",
+    "reason": "#2420 reverses the placement part of #2312: Yes, No and Can't (with Postpone, Run WOOP while it exists, and the finish row) sit inside the scanner box under the question again and scroll with the page; nothing is pinned to the bottom of the screen, and the pinned row's page padding, raised toast, scroll padding, height tracking, focus correction and title-reveal scroll go. The spec accepts that the choices move a little with the title's length and asks for no auto-scroll. The #2312 browser contracts that asserted the pinned placement (same position on screen across answers, on screen without scrolling, clear of the iPhone home bar, toast above the row, footer and floating header clear of the row, row lined up with the panels with rounded ends, a press on a control partly under the row, a reveal scroll after an answer, Start or Resume, Tab stops clear of the row) are replaced by the in-box contracts below; tests that tapped a choice at its first-seen spot now read where the choice is after scrolling it on screen; the Help assertions follow the rewritten FAQ; two #221 subtests are renamed from the pinned row to the finish row. The #2408 sync responsiveness changelog test read the first changelog section as November 16; the new November 17 heading this change adds goes first, so it now reads the November 16 section by its date, as the other release-note tests do.",
     "previousBehavior": "Since #2312 the decision row was position:fixed at the bottom of the screen with its lines stacked upward, tracked its own height into --pinned-decide-height for the page's bottom padding, the toast and scroll-padding-bottom, scrolled the page after an answer, Start, Resume or opening to reveal a title it covered, and scrolled focus out from under itself. Tests asserted the choices never moved on screen and stayed on screen without scrolling.",
     "intendedBehavior": "The decision row is an ordinary flex row inside #scan below the question (min-height 44px buttons kept), so it scrolls with the page and can move a little between candidates of different title lengths. The page keeps its ordinary 60px bottom room, the toast sits at its ordinary place, scroll-padding-bottom is auto, and nothing scrolls the page after an answer, Start, Resume, Undo or a context change. Tests assert the choices sit inside the scanner box below the question and move exactly with the page, every choice can be scrolled fully on screen unclipped and uncovered at 44px or more, and every Tab stop is in view.",
     "preservedCoverage": [
@@ -23799,7 +23801,8 @@
       "The press guard, clock-skew and Postpone/Done double-tap contracts keep every assertion; only where a press lands is read after the choices are scrolled on screen, and the later press goes where No now is.",
       "Undo and a context change still leave the page and their own control where they were; a restored scroll position still survives a reload; a stable layout still keeps Yes in place between same-length titles.",
       "The y, n and c keys, the held-key and Edit E shortcut contracts and the dot trail contracts are untouched; the #221 Return-as-candidate pause still covers done adding for now and the list toggle.",
-      "The Help test still checks the scanner, dot trail, Run WOOP, second-tap, rank column, Settings backup and Debug log answers."
+      "The Help test still checks the scanner, dot trail, Run WOOP, second-tap, rank column, Settings backup and Debug log answers.",
+      "The sync responsiveness changelog test keeps every bullet assertion on the November 16, 2026 section and still requires that section to exist."
     ],
     "replacementTests": [
       "RISK steady scanner browser: Yes No and Cant sit inside the scanner box below the question and scroll with the page through a long run of real taps with varied titles in Chromium and WebKit",
@@ -23808,6 +23811,7 @@
       "RISK steady scanner browser: an answer leaves the page where it is with the next title above the choices on short screens, and a stable layout does not move between later answers in Chromium and WebKit",
       "RISK steady scanner browser: opening Start and Resume leave the page where it is and a restored scroll position stays in Chromium and WebKit",
       "RISK steady scanner browser: an answer Undo and a context change leave the page where it is in Chromium and WebKit",
+      "Changelog #2420: one bullet says Yes No and Cant are back inside the scanner box and scroll with the page",
       "RISK steady scanner browser: every Tab stop including the choices is in view at phone short-landscape and desktop sizes in Chromium and WebKit"
     ],
     "redEvidence": {
