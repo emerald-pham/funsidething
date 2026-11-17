@@ -1425,13 +1425,17 @@ async function worktreeGone(entry) {
   return current?.inode !== recorded.inode || current?.device !== recorded.device;
 }
 
-// A removed worktree's ports go back to the pool at once. Its entry completes
-// only once the outcome is settled (PR #2413 B1, N3):
-// - landed when finish's proof holds for the branch tip and that tip has work
-//   beyond the registration commit. The registration commit itself may be in
-//   main while the agent's work, on another branch, never got there.
-// - discarded when the branch is gone or has nothing beyond that commit. A
-//   detached entry is a reviewer's, which makes no work commits.
+// A removed worktree's ports go back to the pool at once. When prune first
+// finds the worktree gone, it records its branch's tip as `removal.branchSha`
+// and from then on judges only that commit: a branch name reset for a retry, or
+// deleted after its work merged, decided a pending entry's outcome later
+// (PR #2413 B2). The entry completes only once the outcome is settled (B1, N3):
+// - landed when the commit is strictly beyond the start commit and finish's
+//   proof holds for it. The start commit itself may be in main while the
+//   agent's work, on another branch, never got there.
+// - discarded when the entry is detached, a reviewer's that makes no work
+//   commits; when its branch was already gone; or when the commit is not
+//   strictly beyond the start commit.
 // Otherwise the work may still land: the entry stays active and a later prune
 // decides. Returns whether the entry changed.
 async function settleRemovedEntry(entry, now, readMain) {
@@ -1446,23 +1450,32 @@ async function settleRemovedEntry(entry, now, readMain) {
     changed = true;
   }
   const detached = entry.detachedHead === true;
-  const branchSha = detached
-    ? text(entry.startBranchSha).toLowerCase() || undefined
-    : await runGit(['rev-parse', '--verify', '--quiet', `refs/heads/${text(entry.branchName)}^{commit}`]).catch(() => undefined);
   const start = text(entry.startBranchSha).toLowerCase();
+  let commit = detached ? start || undefined : text(objectRecord(entry.removal).branchSha).toLowerCase() || undefined;
+  if (!detached && !commit) {
+    try {
+      commit = await branchTip(entry.branchName);
+    } catch {
+      return changed; // Git could not tell; a later prune records it.
+    }
+    if (commit) {
+      entry.removal = { observedAt: now, branchSha: commit };
+      changed = true;
+    }
+  }
   const main = await readMain();
   let release = {
-    ...(branchSha && !detached ? { branchName: entry.branchName } : {}),
-    branchSha,
+    ...(commit && !detached ? { branchName: entry.branchName } : {}),
+    branchSha: commit,
     mainSha: main?.mainSha ?? (await readMainRef(process.cwd()).catch(() => undefined))?.sha,
   };
   let outcome;
   let releaseEvidence;
-  if (detached || !branchSha) outcome = 'discarded';
+  if (detached || !commit) outcome = 'discarded';
   else if (/^[0-9a-f]{40}$/.test(start)) {
     let beyondStart;
     try {
-      beyondStart = branchSha !== start && (await gitIsAncestor(start, branchSha, process.cwd()));
+      beyondStart = commit !== start && (await gitIsAncestor(start, commit, process.cwd()));
     } catch {
       return changed; // Git could not tell; a later prune decides.
     }
@@ -1470,7 +1483,7 @@ async function settleRemovedEntry(entry, now, readMain) {
     if (!beyondStart) outcome = 'discarded';
     else if (main) {
       try {
-        release = await releaseStateAt(release.branchName, branchSha, main, process.cwd());
+        release = await releaseStateAt(release.branchName, commit, main, process.cwd());
         releaseEvidence = await proveChainScannerLanding(entry, release, 'chain-scanner', now);
         outcome = 'landed';
       } catch {
@@ -1479,9 +1492,19 @@ async function settleRemovedEntry(entry, now, readMain) {
     }
   }
   if (!outcome) return changed;
-  if (outcome === 'discarded') entry.discard = { reason: 'Worktree removed before finish.', branchSha };
+  if (outcome === 'discarded') entry.discard = { reason: 'Worktree removed before finish.', branchSha: commit };
   completeEntry(entry, { outcome, release, now, result: 'Worktree directory no longer exists.', releaseEvidence });
   return true;
+}
+
+// The branch's tip, or undefined when the branch no longer exists.
+async function branchTip(branchName) {
+  try {
+    return (await runGit(['rev-parse', '--verify', '--quiet', `refs/heads/${text(branchName)}^{commit}`])).toLowerCase();
+  } catch (error) {
+    if (error?.code === 1) return undefined;
+    throw error;
+  }
 }
 
 function parseOptions(args) {

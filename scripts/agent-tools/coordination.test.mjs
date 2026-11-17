@@ -2057,6 +2057,107 @@ test("own moves an entry to the checkout's new branch, or to history without its
   }
 });
 
+// Prune's fixture: a project whose main holds the release adapter, with an origin.
+function createPruneFixture(prefix) {
+  const fixture = realpathSync(mkdtempSync(join(tmpdir(), prefix)));
+  const ledgerPath = join(fixture, 'host-ledger.json');
+  const project = createProject(join(fixture, 'chain-scanner'), 'work/unused');
+  git(project, 'checkout', '--quiet', 'main');
+  mkdirSync(join(project, 'scripts'), { recursive: true });
+  copyFileSync(releaseEvidenceEntrypoint, join(project, 'scripts/release-evidence.mjs'));
+  git(project, 'add', 'scripts/release-evidence.mjs');
+  git(project, 'commit', '--quiet', '-m', 'install fixture release adapter');
+  const baseSha = git(project, 'rev-parse', 'HEAD');
+  addOrigin(project, fixture);
+  const register = (worktree, port) => {
+    const began = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', `Prune fixture ${worktree}`,
+      '--registered-by', 'worktree-ready', '--resources', `loopback:127.0.0.1:${port}`], worktree);
+    assert.equal(began.status, 0, began.stderr);
+    return JSON.parse(began.stdout).id;
+  };
+  const prune = (now) => {
+    const pruned = command(['prune', '--file', ledgerPath, '--registered-by', 'worktree-ready', '--now', now], project);
+    assert.equal(pruned.status, 0, pruned.stderr);
+    return new Map(JSON.parse(readFileSync(ledgerPath, 'utf8')).entries.map((entry) => [entry.id, entry]));
+  };
+  // Merges the branch through an integration branch whose candidate has a receipt, then lands it on main.
+  const land = (branch) => {
+    git(project, 'checkout', '--quiet', '-B', 'integration/fixture', 'main');
+    git(project, 'merge', '--quiet', '--no-ff', '-m', `Merge ${branch} into integration`, branch);
+    const candidateSha = commitDocsNote(project, `review-fix-${branch.replaceAll('/', '-')}.md`, `Review fix for ${branch}.`);
+    recordDocsOnlyReceipt(project, fixture, candidateSha, git(project, 'rev-parse', 'main'), branch.replaceAll('/', '-'));
+    landIntegrationOnMain(project);
+    return candidateSha;
+  };
+  const active = () => JSON.parse(readFileSync(ledgerPath, 'utf8')).entries.filter((entry) => entry.status === 'active');
+  return { fixture, ledgerPath, project, baseSha, register, prune, land, active };
+}
+
+// Invariant 3 (PR #2413 B2, probe R2): an entry whose work may still land stays
+// open, and each later prune read its branch name again. A retry reset that
+// name for other work, and when that work landed, prune recorded the first
+// attempt landed though its own work never reached main. Prune now records the
+// tip when it first finds the worktree gone and judges only that commit.
+test("prune settles a removed worktree's entry on the tip it recorded when it first found the worktree gone, not on its branch name reset and reused for other work that lands", () => {
+  const { fixture, project, register, prune, land, active } = createPruneFixture('chain-coordination-prune-reused-');
+  try {
+    const attempt = join(fixture, 'attempt');
+    git(project, 'worktree', 'add', '--quiet', '-b', 'ticket/r2', attempt, 'main');
+    const firstId = register(attempt, 47181);
+    const droppedSha = commitDocsNote(attempt, 'first-attempt.md', 'First attempt, later dropped.');
+    git(project, 'worktree', 'remove', '--force', attempt);
+    const waiting = prune('2026-11-16T12:00:00.000Z').get(firstId);
+    assert.deepEqual([waiting.status, waiting.resources], ['active', []], 'unmerged work keeps its entry open without ports');
+
+    const retry = join(fixture, 'retry');
+    git(project, 'worktree', 'add', '--quiet', '-B', 'ticket/r2', retry, 'main');
+    const retryId = register(retry, 47182);
+    const retrySha = commitDocsNote(retry, 'second-attempt.md', 'Second attempt on the same branch name.');
+    git(project, 'worktree', 'remove', '--force', retry);
+    const candidateSha = land('ticket/r2');
+
+    const entries = prune('2026-11-16T13:00:00.000Z');
+    const first = entries.get(firstId);
+    assert.equal(first.status, 'active', 'the first attempt is not recorded as landed');
+    assert.equal(first.outcome, undefined);
+    assert.equal(first.releaseEvidence, undefined, 'no receipt is cited for work that never reached main');
+    assert.deepEqual(waiting.removal, { observedAt: '2026-11-16T12:00:00.000Z', branchSha: droppedSha }, 'the tip is recorded when prune first finds the worktree gone');
+    assert.deepEqual(first.removal, waiting.removal, 'and kept');
+    assert.equal(spawnSync('git', ['merge-base', '--is-ancestor', droppedSha, 'main'], { cwd: project }).status, 1, 'the dropped work is not in main');
+    const second = entries.get(retryId);
+    assert.deepEqual([second.status, second.outcome, second.finalBranchSha], ['complete', 'landed', retrySha], 'the retry lands its own work');
+    assert.equal(second.releaseEvidence.candidate.commitSha, candidateSha);
+    assert.deepEqual(active().map((entry) => [entry.id, entry.resources]), [[firstId, []]], 'one active entry is left, with no port claims');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+// Invariant 3 (PR #2413 B2, probe R3): the branch of a removed worktree's work
+// was deleted after the work merged, before the prune that could tell, and
+// prune recorded the merged work as discarded.
+test('prune records landed for work whose branch was deleted after it merged, from the tip it recorded before the deletion', () => {
+  const { fixture, project, register, prune, land, active } = createPruneFixture('chain-coordination-prune-deleted-');
+  try {
+    const agent = join(fixture, 'agent');
+    git(project, 'worktree', 'add', '--quiet', '-b', 'ticket/r3', agent, 'main');
+    const id = register(agent, 47191);
+    const workSha = commitDocsNote(agent, 'work.md', 'Work that lands.');
+    git(project, 'worktree', 'remove', '--force', agent);
+    assert.equal(prune('2026-11-16T12:00:00.000Z').get(id).status, 'active', 'unmerged work keeps its entry open');
+    const candidateSha = land('ticket/r3');
+    git(project, 'branch', '--quiet', '-D', 'ticket/r3');
+
+    const landed = prune('2026-11-16T13:00:00.000Z').get(id);
+    assert.deepEqual([landed.status, landed.outcome, landed.finalBranchName, landed.finalBranchSha], ['complete', 'landed', 'ticket/r3', workSha]);
+    assert.equal(landed.releaseEvidence.candidate.commitSha, candidateSha);
+    assert.deepEqual(landed.resources, []);
+    assert.equal(active().length, 0, 'no active entry or port claim is left');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
 // Invariant 5: prune records discarded only when the outcome is settled: the
 // entry is detached, its branch was gone when prune first found the worktree
 // gone, or the commit prune judges is not strictly beyond the start commit.
