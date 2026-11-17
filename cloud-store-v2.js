@@ -74,7 +74,7 @@
         typeof unchangedSince.generationId==="string"&&unchangedSince.generationId&&
         manifest.rev===unchangedSince.rev&&manifest.activeGeneration===unchangedSince.generationId)
         return {unchanged:true,rev:manifest.rev,generationId:manifest.activeGeneration,updatedAt:manifest.updatedAt,
-          serverUpdatedAt:manifest.serverUpdatedAt,schemaVersion:SCHEMA_VERSION};
+          serverUpdatedAt:manifest.serverUpdatedAt,schemaVersion:SCHEMA_VERSION,includedSeq:includedSeqOf(manifest)};
       for(let attempt=0;attempt<3;attempt++){
         const generationId=manifest.activeGeneration;
         if(typeof generationId!=="string"||!Number.isSafeInteger(manifest.rev)||manifest.rev<1)
@@ -100,7 +100,7 @@
             manifest=latest;continue;
           }
           return {payload,rev:manifest.rev,updatedAt:manifest.updatedAt,
-            serverUpdatedAt:manifest.serverUpdatedAt,schemaVersion:SCHEMA_VERSION,generationId,hash:header.hash};
+            serverUpdatedAt:manifest.serverUpdatedAt,schemaVersion:SCHEMA_VERSION,generationId,hash:header.hash,includedSeq:includedSeqOf(manifest)};
         }catch(error){
           if(!current(stillCurrent)) return {cancelled:true};
           // A failed network/auth read says nothing about snapshot integrity.
@@ -121,7 +121,10 @@
       return {error:true,code:"manifest-changed"};
     }
 
-    async function push(uid,payload,updatedAt,baseRev,{generationId=randomId(crypto),stillCurrent}={}){
+    // #2417: includedSeq, when the caller gives one, is the sequence number up
+    // to which this board includes the account's change records; the root
+    // names it, so the records it covers can go (removeIncludedChangeRecords).
+    async function push(uid,payload,updatedAt,baseRev,{generationId=randomId(crypto),stillCurrent,includedSeq}={}){
       if(!uid||!Number.isSafeInteger(baseRev)||baseRev<0) return {error:true,code:"invalid-revision"};
       let encoded;
       try{encoded=await root.ChainStorageV2.encodeSnapshot(payload,{targetBytes});}
@@ -155,7 +158,8 @@
         const sealed=["sealed","published"].includes(existing.state) ? existing : await adapter.sealGeneration(uid,generationId,header);
         if(!sealed||!["sealed","published"].includes(sealed.state)) return {error:true,code:"seal-failed",generationId};
         if(!current(stillCurrent)) return {cancelled:true,generationId};
-        const result=await adapter.publishGeneration(uid,generationId,{baseRev,updatedAt,hash:encoded.hash,expectedHeader:header,stillCurrent,decisionCapability:needsDecisionCapability(payload)?1:undefined});
+        const result=await adapter.publishGeneration(uid,generationId,{baseRev,updatedAt,hash:encoded.hash,expectedHeader:header,stillCurrent,decisionCapability:needsDecisionCapability(payload)?1:undefined,
+          ...(Number.isSafeInteger(includedSeq)&&includedSeq>=0?{includedSeq}:{})});
         if(!current(stillCurrent)) return {cancelled:true,generationId};
         // #2354: the copy's ID and hash let the caller recognise this exact
         // published copy on a later pull without downloading it.
@@ -187,8 +191,50 @@
       return {ok:true,removed};
     }
 
-    return {pull,push,collectGarbage};
+    // #2417: change records. A record is {id, parts}: parts is the text of
+    // the board parts one change touched. appendChangeRecord has the adapter
+    // give it the account's next sequence number in one transaction with the
+    // account's counter; asking again with the same id returns the number it
+    // already has, so an uncertain send can be repeated. changeRecordsAfter
+    // lists the well-formed records above a full copy's includedSeq by
+    // sequence. removeIncludedChangeRecords has the adapter delete the records
+    // at or below the includedSeq the active root names; firestore.rules
+    // refuse any other. Without the adapter's support records are unsupported.
+    async function appendChangeRecord(uid,{id,parts}={},{stillCurrent}={}){
+      if(!uid)return {error:true,code:"missing-account"};
+      if(typeof id!=="string"||!RECORD_ID.test(id)||typeof parts!=="string"||!parts||parts.length>MAX_RECORD_CHARS)return {error:true,code:"invalid-record"};
+      if(typeof adapter.appendChangeRecord!=="function")return {unsupported:true};
+      const result=await adapter.appendChangeRecord(uid,{id,parts},{stillCurrent});
+      if(!current(stillCurrent))return {cancelled:true};
+      if(result?.ok&&(!Number.isSafeInteger(result.seq)||result.seq<1||!Number.isSafeInteger(result.rev)||result.rev<0))
+        return {error:true,code:"invalid-record-reply"};
+      return result;
+    }
+    async function removeIncludedChangeRecords(uid,includedSeq,records){
+      if(!uid||!Number.isSafeInteger(includedSeq)||includedSeq<1||typeof adapter.deleteChangeRecords!=="function")return {ok:true,removed:[]};
+      const ids=changeRecordsAfter(records).filter(row=>row.seq<=includedSeq).map(row=>row.id);
+      if(ids.length)await adapter.deleteChangeRecords(uid,ids);
+      return {ok:true,removed:ids};
+    }
+
+    return {pull,push,collectGarbage,appendChangeRecord,removeIncludedChangeRecords};
   }
 
-  root.ChainCloudV2={SCHEMA_VERSION,createCloudStore};
+  // #2417: the root's includedSeq, or 0 when it names none: an older app's
+  // root, which lists no records.
+  function includedSeqOf(manifest){
+    return Number.isSafeInteger(manifest?.includedSeq)&&manifest.includedSeq>=0?manifest.includedSeq:0;
+  }
+  const RECORD_ID=/^[A-Za-z0-9_-]{1,128}$/,MAX_RECORD_CHARS=256*1024;
+  function changeRecordsAfter(records,includedSeq=0){
+    const floor=Number.isSafeInteger(includedSeq)&&includedSeq>=0?includedSeq:0,seen=new Set(),rows=[];
+    for(const row of Array.isArray(records)?records:[]){
+      if(!row||typeof row.id!=="string"||!RECORD_ID.test(row.id)||!Number.isSafeInteger(row.seq)||row.seq<=floor||
+        typeof row.parts!=="string"||row.parts.length>MAX_RECORD_CHARS||seen.has(row.seq))continue;
+      seen.add(row.seq);rows.push({id:row.id,seq:row.seq,parts:row.parts});
+    }
+    return rows.sort((a,b)=>a.seq-b.seq);
+  }
+
+  root.ChainCloudV2={SCHEMA_VERSION,createCloudStore,includedSeqOf,changeRecordsAfter,MAX_RECORD_CHARS};
 })(globalThis);

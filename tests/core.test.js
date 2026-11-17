@@ -29885,6 +29885,53 @@ test('Firestore rules: v2 chunks are owner-only, immutable, sealed before publis
  }finally{await env.cleanup();}
 });
 
+// #2417: change records (users/{uid}/changeRecords) and their counter
+// (users/{uid}/changeLog/head), as the rules allow them. Each check names what
+// it refuses; a refused request is permission-denied, anything else fails it.
+test('Firestore rules: change records are owner-only, append-only and immutable, numbered one by one by the counter, and removable only once the active full copy includes them', {skip:!process.env.FIRESTORE_EMULATOR_HOST}, async()=>{
+ const {initializeTestEnvironment}=await import('@firebase/rules-unit-testing');
+ const {doc,getDoc,getDocs,collection,setDoc,updateDoc,deleteDoc,writeBatch,serverTimestamp}=await import('firebase/firestore');
+ const env=await initializeTestEnvironment({projectId:'demo-change-records-2417',firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}});
+ const allowed=async promise=>{try{await promise;return true;}catch(error){if(!/permission-denied|PERMISSION_DENIED/i.test(String(error?.code||error?.message)))throw error;return false;}};
+ try{
+  const alice=env.authenticatedContext('alice').firestore(),bob=env.authenticatedContext('bob').firestore(),guest=env.unauthenticatedContext().firestore();
+  const head=db=>doc(db,'users/alice/changeLog/head'),record=(db,id)=>doc(db,'users/alice/changeRecords/'+id);
+  const row=seq=>({v:1,seq,parts:'{"v":1,"before":{},"after":{}}',createdAt:serverTimestamp()});
+  const append=(db,id,seq,{headSeq=seq,lastId=id}={})=>{const batch=writeBatch(db);batch.set(head(db),{seq:headSeq,lastId});batch.set(record(db,id),row(seq));return batch.commit();};
+  assert.equal(await allowed(append(alice,'r1',1)),true,'the owner appends the first record with the counter naming it');
+  assert.equal(await allowed(append(alice,'r2',2)),true,'and the next, numbered one more');
+  assert.equal(await allowed(append(alice,'r4',4)),false,'a number skipped is refused');
+  assert.equal(await allowed(append(alice,'r2b',2)),false,'a number taken again is refused');
+  assert.equal(await allowed(append(alice,'r3',3,{lastId:'other'})),false,'a record the counter does not name is refused');
+  assert.equal(await allowed(setDoc(record(alice,'r3'),row(3))),false,'a record without the counter moving is refused');
+  assert.equal(await allowed(setDoc(head(alice),{seq:3,lastId:'r3'})),false,'the counter moving without its record is refused');
+  assert.equal(await allowed(updateDoc(record(alice,'r1'),{parts:'changed'})),false,'a record is never rewritten');
+  assert.equal(await allowed(setDoc(record(alice,'r1'),row(1))),false,'nor written again');
+  assert.equal(await allowed(setDoc(head(alice),{seq:1,lastId:'r1'})),false,'the counter never goes back');
+  assert.equal(await allowed(deleteDoc(head(alice))),false,'nor is deleted');
+  assert.equal(await allowed(getDoc(record(alice,'r1'))),true,'the owner reads a record');
+  assert.equal(await allowed(getDocs(collection(alice,'users/alice/changeRecords'))),true,'and lists them');
+  assert.equal(await allowed(getDoc(record(bob,'r1'))),false,'another account cannot read a record');
+  assert.equal(await allowed(getDocs(collection(bob,'users/alice/changeRecords'))),false,'nor list them');
+  assert.equal(await allowed(getDoc(head(guest))),false,'a guest cannot read the counter');
+  assert.equal(await allowed(getDoc(record(guest,'r1'))),false,'nor a record');
+  assert.equal(await allowed(append(bob,'rb',3)),false,'another account cannot append');
+  assert.equal(await allowed(deleteDoc(record(alice,'r1'))),false,'with no full copy, no record can go');
+  await env.withSecurityRulesDisabled(async context=>{
+   for(const id of ['g1','g2'])await setDoc(doc(context.firestore(),'users/alice/generations/'+id),{schemaVersion:2,state:'sealed'});
+  });
+  const root=doc(alice,'users/alice'),manifest=(rev,active,previous,extra={})=>({schemaVersion:2,rev,activeGeneration:active,previousGeneration:previous,updatedAt:rev,serverUpdatedAt:serverTimestamp(),...extra});
+  assert.equal(await allowed(setDoc(root,manifest(1,'g1',null,{includedSeq:3}))),false,'a full copy cannot name records past the counter');
+  assert.equal(await allowed(setDoc(root,manifest(1,'g1',null,{includedSeq:'1'}))),false,'or name them other than by number');
+  assert.equal(await allowed(setDoc(root,manifest(1,'g1',null,{includedSeq:1}))),true,'a full copy names the records it includes');
+  assert.equal(await allowed(deleteDoc(record(alice,'r2'))),false,'a record the active copy does not include stays');
+  assert.equal(await allowed(deleteDoc(record(bob,'r1'))),false,'another account cannot delete one it includes');
+  assert.equal(await allowed(deleteDoc(record(alice,'r1'))),true,'the owner deletes a record the active copy includes');
+  assert.equal(await allowed(setDoc(root,manifest(2,'g2','g1'))),true,'an older app’s full copy, which names none, still publishes');
+  assert.equal(await allowed(deleteDoc(record(alice,'r2'))),false,'and after it no record can go');
+ }finally{await env.cleanup();}
+});
+
 test('RISK SCALABLE LOCAL BOARD: a multi-megabyte legacy board migrates without rewriting source bytes and survives edit Undo and offline reload',async()=>{
  const {indexedDB}=await import('fake-indexeddb');
  const dbName='chain-scanner-app-large-'+Date.now()+'-'+Math.random();
@@ -30365,6 +30412,57 @@ test('RISK CLOUD V2 STARTUP: a transient chunk read automatically recovers to sy
  assert.equal(attempts,2,'a transient chunk failure must enter the existing bounded retry path');
  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');assert.equal(pushes,0);
  assert.equal(ctx.state.tasks[0].id,'shared');assert.equal(adapter.roots.get('owner').rev,1);
+});
+
+// #2417: change records across app versions and both deployment orders, on
+// the emulator with each version's real backend and rules. An older version
+// ignores records and keeps syncing by full copies; its full copy names none,
+// so a newer version reapplies every record it keeps, and the record stays in
+// the cloud. Rules that know no records refuse them, and a newer version then
+// syncs by full copies alone, showing no error.
+test('RISK BACKWARD COMPATIBILITY: change records keep the supported floor and the release base syncing by full copies in both deployment orders, an older full copy never drops a record, and rules without records fall back with no error',{skip:!process.env.FIRESTORE_EMULATOR_HOST},async()=>{
+ const {readReleasedClient,assertRoundTrip,SUPPORTED_RELEASE}=await import('../scripts/backward-compatibility.mjs');
+ const {initializeTestEnvironment}=await import('@firebase/rules-unit-testing');
+ const F=await import('firebase/firestore');
+ const base=process.env.COMPATIBILITY_BASE_SHA||spawnSync('git',['rev-parse','origin/main'],{cwd:__dirname,encoding:'utf8'}).stdout.trim();
+ const candidate={...decisionCandidate146(),rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')};
+ const board=label=>JSON.stringify({tasks:[{id:'kept',title:'Kept '+label,done:false}],future:{keep:'unknown data'}});
+ const parts='{"v":1,"before":{},"after":{}}';
+ let index=0;
+ for(const sha of [...new Set([SUPPORTED_RELEASE,base])]){
+  const released=readReleasedClient(__dirname,sha);
+  for(const direction of ['old-client/new-rules','new-client/old-rules']){
+   const label=sha.slice(0,7)+' '+direction,handles=[];
+   const env=await initializeTestEnvironment({projectId:'demo-change-records-compat-'+(index++),firestore:{rules:direction==='old-client/new-rules'?candidate.rules:released.rules}});
+   try{
+    const next=await decisionBackend146(candidate,env.authenticatedContext('owner').firestore(),F),old=await decisionBackend146(released,env.authenticatedContext('owner').firestore(),F);
+    handles.push(next,old);
+    await assertRoundTrip(next.CS,board('newer'),0,label+': the newer version publishes');
+    const appended=await next.CS.appendChangeRecord({id:'answer-'+index,parts});
+    if(direction==='new-client/old-rules'){
+     assert.equal(appended.unsupported,true,label+': rules without records refuse them');
+     assert.notEqual(next.CS.status,'error',label+': and the newer version shows no error');
+     await assertRoundTrip(next.CS,board('newer again'),1,label+': it goes on syncing by full copies');
+     await assertRoundTrip(old.CS,board('older'),2,label+': and so does the older version');
+     assert.equal((await next.CS.pull()).payload,board('older'),label+': the newer version reads the older one’s copy');
+     continue;
+    }
+    assert.equal(appended.ok,true,label+': the newer version sends a record');
+    assert.equal(appended.seq,1,label+': numbered by the cloud');
+    // The older version reads and publishes full copies as before.
+    assert.equal((await old.CS.pull()).payload,board('newer'),label+': the older version reads the newer copy');
+    await assertRoundTrip(old.CS,board('older'),1,label+': and publishes its own full copy');
+    const root=(await env.withSecurityRulesDisabled(context=>F.getDoc(F.doc(context.firestore(),'users/owner')))).data();
+    assert.equal(root.includedSeq,undefined,label+': its root names no records');
+    for(let wait=0;!(next.CS.heardChangeRecords()||[]).some(row=>row.seq===1)&&wait<200;wait++)await new Promise(resolve=>setTimeout(resolve,10));
+    const read=await next.CS.pull();
+    assert.equal(read.payload,board('older'),label+': the newer version reads the older copy');
+    assert.deepEqual(read.changeRecords?.records?.map(row=>row.seq),[1],label+': and reapplies the record that copy leaves out');
+    const kept=await env.withSecurityRulesDisabled(context=>F.getDoc(F.doc(context.firestore(),'users/owner/changeRecords/answer-'+index)));
+    assert.equal(kept.exists(),true,label+': the record stays in the cloud');
+   }finally{for(const handle of handles)await handle.drain();await env.cleanup();}
+  }
+ }
 });
 
 test('RISK BACKWARD COMPATIBILITY: released clients and candidate interoperate across both rule versions',{skip:!process.env.FIRESTORE_EMULATOR_HOST},async()=>{
