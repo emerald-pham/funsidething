@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { createHash } from 'node:crypto';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+import { recordReleaseEvidence } from '../release-evidence.mjs';
 
 // Every case runs against a temporary repository, its worktrees and an
 // explicit fixture ledger. Nothing here may reach the live host ledger.
@@ -79,6 +81,78 @@ function ownerOf(ledger, worktree) {
   return JSON.parse(readFileSync(ledger, 'utf8')).entries.filter((entry) => entry.worktree === worktree && entry.status === 'active');
 }
 
+function activeEntries(ledger) {
+  return JSON.parse(readFileSync(ledger, 'utf8')).entries.filter((entry) => entry.status === 'active');
+}
+
+function commitFile(cwd, name, body) {
+  mkdirSync(dirname(join(cwd, name)), { recursive: true });
+  writeFileSync(join(cwd, name), `${body}\n`);
+  git(cwd, 'add', name);
+  git(cwd, 'commit', '--quiet', '-m', body);
+  return git(cwd, 'rev-parse', 'HEAD');
+}
+
+const coordinationClient = fileURLToPath(new URL('./coordination.mjs', import.meta.url));
+
+function coordination(args, cwd, ledger) {
+  return spawnSync(process.execPath, [coordinationClient, ...args], {
+    cwd, encoding: 'utf8', env: { ...process.env, CODEX_COORDINATION_FILE: ledger, DOW_EMULATOR_COORDINATION_FILE: '' },
+  });
+}
+
+// Prune's landed proof needs the release adapter in the checkout it runs from,
+// an origin whose main matches, and a receipt for the merged candidate.
+function addReleaseFixture(fixture, main) {
+  mkdirSync(join(main, 'scripts'), { recursive: true });
+  copyFileSync(fileURLToPath(new URL('../release-evidence.mjs', import.meta.url)), join(main, 'scripts', 'release-evidence.mjs'));
+  git(main, 'add', 'scripts');
+  git(main, 'commit', '--quiet', '-m', 'install the release adapter');
+  git(fixture, 'init', '--bare', '--quiet', join(fixture, 'origin.git'));
+  git(main, 'remote', 'add', 'origin', join(fixture, 'origin.git'));
+  git(main, 'push', '--quiet', '-u', 'origin', 'main');
+  return git(main, 'rev-parse', 'HEAD');
+}
+
+function recordReceipt(main, fixture, candidateSha, baseSha) {
+  const evidencePath = join(fixture, `owner-review-${candidateSha}.md`);
+  const summary = 'Owner reviewed the full exact documentation candidate in this fixture.';
+  writeFileSync(evidencePath, `${summary}\n`);
+  recordReleaseEvidence(main, {
+    schemaVersion: 2,
+    candidate: { commitSha: candidateSha, treeSha: git(main, 'rev-parse', `${candidateSha}^{tree}`), baseSha },
+    ownerReview: {
+      task: 'owner-review-fixture', outcome: 'approved', reviewedSha: candidateSha, completedAt: '2026-11-16T11:00:00.000Z', summary,
+      scope: { fullDiff: true, rationale: 'This fixture candidate only changes non-policy documentation notes.' },
+      evidencePath, evidenceSha256: createHash('sha256').update(`${summary}\n`).digest('hex'),
+    },
+  });
+}
+
+// Merges the integration branch into main and pushes it, as a release lands.
+function landIntegration(main, integration) {
+  git(main, 'checkout', '--quiet', 'main');
+  git(main, 'merge', '--quiet', '--no-ff', '-m', `Merge ${integration}`, integration);
+  git(main, 'push', '--quiet', 'origin', 'main');
+  git(main, 'fetch', '--quiet', 'origin');
+}
+
+// The recorder's opt-in qualification gate, run in a prepared worktree with no
+// port variables in the shell, as an agent runs it.
+function qualificationReadiness(worktree, ledger, evidenceRoot) {
+  const recorder = fileURLToPath(new URL('./record-run.mjs', import.meta.url));
+  const env = {
+    ...process.env, CI: '', CODEX_COORDINATION_FILE: ledger, DOW_EMULATOR_COORDINATION_FILE: '', CHAIN_NATIVE_PORT: '', CHAIN_NATIVE_SMOKE_PORT: '',
+    CHAIN_NATIVE_CANDIDATE_SHA: git(worktree, 'rev-parse', 'HEAD'), CHAIN_NATIVE_CANDIDATE_TREE: git(worktree, 'rev-parse', 'HEAD^{tree}'),
+    CHAIN_NATIVE_OUTPUT: join(evidenceRoot, 'native-output'),
+  };
+  delete env.NODE_TEST_CONTEXT;
+  const result = spawnSync(process.execPath, [recorder, '--repo', worktree, '--evidence-dir', join(evidenceRoot, 'readiness-evidence'),
+    '--purpose', 'green', '--qualification-readiness', '--summary', '--', process.execPath, '-e', '0'], { cwd: worktree, encoding: 'utf8', env });
+  const summary = JSON.parse(result.stdout.trim().split('\n').pop() || '{}');
+  return { status: result.status, errors: (summary.evidence?.errors ?? []).map((error) => error.message) };
+}
+
 test("prepare gives a new worktree its own dependencies and two exported ports, and a reviewer's detached worktree gets different ones", () => {
   const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-');
   try {
@@ -140,7 +214,8 @@ test('prepare claims ports from a host-sized ledger and reuses ports the worktre
 
 // Claude Code starts an agent on its own worktree branch, and the agent then
 // works on its ticket branch. An entry left on the first branch let prune judge
-// the wrong commit (PR #2413 B1).
+// the wrong commit (PR #2413 B1). The move restarts the start at HEAD
+// (invariant 2), so a commit made before prepare ran again is not work.
 test('prepare after a switch to a branch that holds the registration commit moves the same entry and ports to that branch', () => {
   const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-switch-');
   try {
@@ -159,8 +234,160 @@ test('prepare after a switch to a branch that holds the registration commit move
     assert.equal(owners.length, 1, 'no second entry is registered');
     assert.equal(owners[0].id, first.id, 'the same entry is kept');
     assert.equal(owners[0].branchName, 'ticket/1-switch', 'the entry now records the work branch');
-    assert.equal(owners[0].startBranchSha, first.startBranchSha, 'the registration commit is kept');
+    assert.equal(owners[0].startBranchSha, git(agent, 'rev-parse', 'HEAD'), "the start restarts at the checkout's HEAD");
+    assert.equal(owners[0].rebinds.at(-1).previousStartBranchSha, first.startBranchSha, 'the registration commit is kept in rebinds');
     assert.deepEqual(loopbackPorts(owners[0]), loopbackPorts(first), 'the worktree keeps its ports');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+// PR #2413 round 3: prune never records landed. Inferring it from branch state
+// after a worktree was gone kept leaving false-landed paths: a branch name reset
+// and reused for other work (probe R2, and W1 when no prune ran in between), a
+// branch deleted after its merge (R3), a work branch cut from a newer integration
+// head (R8) or fast-forwarded to it (W2). A removed worktree is abandoned work:
+// prune records its entry discarded at once, at its branch's tip then, and frees
+// its ports. Work that merged is finished as landed before its worktree goes.
+test("prune records a removed worktree's entry as discarded and frees its ports, even when its work landed, whatever happened to its branch", () => {
+  const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-discarded-');
+  try {
+    const startSha = addReleaseFixture(fixture, main);
+    git(main, 'checkout', '--quiet', '-b', 'integration/x');
+    git(main, 'checkout', '--quiet', '-b', 'ticket/first');
+    commitFile(main, 'docs/first.md', 'First-wave task.');
+    git(main, 'checkout', '--quiet', 'integration/x');
+    git(main, 'merge', '--quiet', '--no-ff', '-m', 'Merge the first wave', 'ticket/first');
+    const integrationHead = git(main, 'rev-parse', 'HEAD');
+    git(main, 'checkout', '--quiet', 'main');
+    const prepared = (name, branch, at) => {
+      const path = join(fixture, name);
+      git(main, 'worktree', 'add', '--quiet', '-B', branch, path, at);
+      const result = run(['prepare'], path, { ledger, npm });
+      assert.equal(result.status, 0, result.stderr);
+      return { path, id: ownerOf(ledger, path)[0].id };
+    };
+    const remove = ({ path }) => git(main, 'worktree', 'remove', '--force', path);
+    const prune = () => assert.equal(run(['prune'], main, { ledger, npm }).status, 0);
+    const tips = {};
+
+    // Its work merges while the worktree lives; the worktree is then removed with no finish.
+    const merged = prepared('merged', 'ticket/merged', startSha);
+    tips.merged = commitFile(merged.path, 'docs/merged.md', 'Work that lands.');
+    // R3: removed and pruned before its work merges, then its branch is deleted.
+    const deleted = prepared('deleted', 'ticket/deleted', startSha);
+    tips.deleted = commitFile(deleted.path, 'docs/deleted.md', 'Work that lands after its worktree is gone.');
+    remove(deleted);
+    prune();
+    // R2: dropped and pruned, then a retry resets the branch name for work that lands.
+    const dropped = prepared('dropped', 'ticket/reused', startSha);
+    tips.dropped = commitFile(dropped.path, 'docs/dropped.md', 'First attempt, dropped.');
+    remove(dropped);
+    prune();
+    const retry = prepared('retry', 'ticket/reused', startSha);
+    tips.retry = commitFile(retry.path, 'docs/retry.md', 'Retry that lands.');
+    // W1: removed with no prune before a retry resets its branch name to the
+    // integration head; the retry's prepare is the first prune to find it gone.
+    const abandoned = prepared('abandoned', 'ticket/reset', startSha);
+    commitFile(abandoned.path, 'docs/abandoned.md', 'First attempt, abandoned.');
+    remove(abandoned);
+    const reset = prepared('reset', 'ticket/reset', 'integration/x');
+    tips.abandoned = integrationHead;
+    tips.reset = commitFile(reset.path, 'docs/reset.md', 'Work on the reset branch name.');
+    // R8: prepared at the agent's start, then moved to a work branch cut from the integration head.
+    const moved = (name) => {
+      const agent = prepared(name, `worktree-agent-${name}`, startSha);
+      git(agent.path, 'checkout', '--quiet', '-b', `ticket/${name}`, 'integration/x');
+      assert.equal(run(['prepare'], agent.path, { ledger, npm }).status, 0);
+      return agent;
+    };
+    const idle = moved('idle');
+    tips.idle = integrationHead;
+    const working = moved('working');
+    tips.working = commitFile(working.path, 'docs/working.md', 'Own work beyond the integration head.');
+    // W2: fast-forwarded to the integration head and prepared again, committing nothing.
+    const forwarded = prepared('forwarded', 'ticket/forwarded', startSha);
+    git(forwarded.path, 'merge', '--quiet', '--ff-only', 'integration/x');
+    assert.equal(run(['prepare'], forwarded.path, { ledger, npm }).status, 0);
+    tips.forwarded = integrationHead;
+
+    git(main, 'checkout', '--quiet', 'integration/x');
+    for (const branch of ['ticket/merged', 'ticket/deleted', 'ticket/reused', 'ticket/reset', 'ticket/working']) {
+      git(main, 'merge', '--quiet', '--no-ff', '-m', `Merge ${branch}`, branch);
+    }
+    const candidateSha = commitFile(main, 'docs/fix.md', 'Integration fix.');
+    recordReceipt(main, fixture, candidateSha, startSha);
+    landIntegration(main, 'integration/x');
+    git(main, 'branch', '--quiet', '-D', 'ticket/deleted');
+    for (const agent of [merged, retry, reset, idle, working, forwarded]) remove(agent);
+    prune();
+
+    const agents = { merged, deleted, dropped, retry, abandoned, reset, idle, working, forwarded };
+    const entries = new Map(JSON.parse(readFileSync(ledger, 'utf8')).entries.map((entry) => [entry.id, entry]));
+    const outcome = ({ id }) => {
+      const entry = entries.get(id);
+      return { status: entry.status, outcome: entry.outcome, finalBranchSha: entry.finalBranchSha, ports: entry.resources.length, cites: entry.releaseEvidence?.candidate?.commitSha };
+    };
+    assert.deepEqual(
+      Object.fromEntries(Object.entries(agents).map(([name, agent]) => [name, outcome(agent)])),
+      Object.fromEntries(Object.keys(agents).map((name) => [name, { status: 'complete', outcome: 'discarded', finalBranchSha: tips[name], ports: 0, cites: undefined }])),
+      'every removed worktree is discarded at its tip when prune found it gone, its ports freed',
+    );
+    for (const name of ['merged', 'deleted', 'retry', 'reset', 'working', 'idle', 'forwarded']) {
+      assert.equal(spawnSync('git', ['merge-base', '--is-ancestor', tips[name], 'main'], { cwd: main }).status, 0, `${name}: that tip is in main`);
+    }
+    for (const name of ['idle', 'working']) {
+      assert.equal(entries.get(agents[name].id).startBranchSha, integrationHead, `${name}: the second prepare moved the start to the work branch's HEAD`);
+    }
+    assert.equal(activeEntries(ledger).length, 0, 'no entry is left active, so no port is claimed');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+// Invariant 1, one live worktree has one active entry (PR #2413 B3 and R2-B1,
+// probes R4 and R2-B1): an entry recorded with this checkout's worktree identity
+// is its own whatever the checkout's history. Taking it for an earlier
+// worktree's when the checkout lacked its start commit registered a second entry
+// with two more ports, and qualification readiness there refused.
+test("prepare after a reset or a switch to history without the registration commit keeps the worktree's one entry and its ports, and qualification readiness passes", () => {
+  const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-history-');
+  try {
+    git(main, 'checkout', '--quiet', '-b', 'side');
+    commitFile(main, 'side.md', 'A commit main lacks.');
+    git(main, 'checkout', '--quiet', 'main');
+    const cases = [
+      // R4: the work branch is reset below the commit it was registered at.
+      { name: 'reset', branch: 'ticket/4-reset', after: 'ticket/4-reset', leave: (agent) => git(agent, 'reset', '--quiet', '--hard', 'HEAD~1') },
+      // R2-B1: prepared on Claude Code's branch, then a work branch cut from main.
+      { name: 'switch', branch: 'worktree-agent-switch', after: 'ticket/1-switch', leave: (agent) => git(agent, 'checkout', '--quiet', '-b', 'ticket/1-switch', 'main') },
+    ];
+    for (const { name, branch, after, leave } of cases) {
+      const agent = join(fixture, `agent-${name}`);
+      git(main, 'worktree', 'add', '--quiet', '-b', branch, agent, 'side');
+      assert.equal(run(['prepare'], agent, { ledger, npm }).status, 0);
+      const [first] = ownerOf(ledger, agent);
+      leave(agent);
+      assert.equal(spawnSync('git', ['merge-base', '--is-ancestor', first.startBranchSha, 'HEAD'], { cwd: agent }).status, 1,
+        `${name}: the checkout no longer holds the registration commit`);
+
+      const again = run(['prepare'], agent, { ledger, npm });
+      assert.equal(again.status, 0, again.stderr);
+      const owners = ownerOf(ledger, agent);
+      assert.equal(owners.length, 1, `${name}: the live worktree keeps one active entry`);
+      assert.equal(owners[0].id, first.id, `${name}: it is the same entry`);
+      assert.equal(owners[0].branchName, after, `${name}: on the checkout's branch`);
+      assert.deepEqual(loopbackPorts(owners[0]), loopbackPorts(first), `${name}: with the same two ports`);
+      const duplicate = coordination(['begin', '--work-type', 'tooling', '--intent', `Duplicate ${name}`], agent, ledger);
+      assert.notEqual(duplicate.status, 0, `${name}: begin registers no second entry for the worktree`);
+      assert.match(duplicate.stderr, /already exists for the same Git worktree/);
+      const readiness = qualificationReadiness(agent, ledger, join(fixture, `evidence-${name}`));
+      assert.deepEqual(readiness.errors, [], `${name}: qualification readiness finds the worktree's one entry`);
+      assert.equal(readiness.status, 0);
+    }
+    const active = activeEntries(ledger);
+    assert.equal(active.length, 2, 'one active entry per live worktree');
+    assert.equal(new Set(active.flatMap(loopbackPorts)).size, 4, 'two ports each, and no more');
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }
@@ -189,6 +416,39 @@ test("prepare in a new worktree at a removed worktree's path registers its own e
     assert.equal(previous.status, 'complete', 'the earlier worktree had no work, so its entry is finished');
     assert.equal(previous.outcome, 'discarded');
     assert.equal(previous.finalBranchName, 'agent/agent-reused', 'it keeps its own branch');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+// Invariant 6 (PR #2413 N7): an earlier worktree's entry can stay active at a
+// reused path, such as one registered by hand, which prune never touches.
+// Qualification readiness counted the active entries at a path, so a new
+// worktree there refused ("found 2").
+test("qualification readiness in a new worktree at a reused path counts only that worktree's entry, not an earlier worktree's still-active one", () => {
+  const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-readiness-');
+  try {
+    const path = join(fixture, 'agent-reused');
+    git(main, 'worktree', 'add', '--quiet', '-b', 'ticket/earlier', path);
+    const earlierPorts = ['loopback:127.0.0.1:42997', 'loopback:127.0.0.1:42998'];
+    const began = coordination(['begin', '--work-type', 'tooling', '--intent', 'Registered by hand',
+      '--resources', earlierPorts[0], '--resources', earlierPorts[1]], path, ledger);
+    assert.equal(began.status, 0, began.stderr);
+    const earlier = JSON.parse(began.stdout);
+    git(main, 'worktree', 'remove', '--force', path);
+    git(main, 'worktree', 'add', '--quiet', '-b', 'ticket/later', path, 'main');
+    assert.equal(run(['prepare'], path, { ledger, npm }).status, 0);
+
+    const owners = ownerOf(ledger, path);
+    assert.equal(owners.length, 2, "prune leaves the earlier worktree's hand-registered entry active");
+    const kept = owners.find((entry) => entry.id === earlier.id);
+    const later = owners.find((entry) => entry.id !== earlier.id);
+    assert.deepEqual(kept.resources, earlierPorts, 'with its two ports');
+    assert.equal(loopbackPorts(later).length, 2, 'the new worktree holds two other ports');
+    assert.equal(new Set(activeEntries(ledger).flatMap(loopbackPorts)).size, 4, 'four port claims in all');
+    const readiness = qualificationReadiness(path, ledger, join(fixture, 'evidence'));
+    assert.deepEqual(readiness.errors, [], "readiness counts only the new worktree's entry");
+    assert.equal(readiness.status, 0);
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }

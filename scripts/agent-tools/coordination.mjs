@@ -861,11 +861,14 @@ async function worktreeIdentity(cwd) {
 }
 
 // An entry at this path was left by an earlier worktree when its recorded Git
-// directory differs from this checkout's or this checkout lacks its start
-// commit. Adopting it took over the old branch and start commit (PR #2413 B1).
+// directory differs from this checkout's. Adopting it took over the old branch
+// and start commit (PR #2413 B1). An entry with this checkout's Git directory is
+// its own whatever the checkout's history: judging it by the start commit gave a
+// live worktree a second entry after a reset or switch (PR #2413 B3). Only a
+// legacy entry, recorded before identities, falls back to the start commit.
 async function leftByEarlierWorktree(entry, identity, headSha, cwd) {
   const recorded = objectRecord(entry.worktreeIdentity);
-  if (recorded.inode !== undefined && (recorded.inode !== identity?.inode || recorded.device !== identity?.device)) return true;
+  if (recorded.inode !== undefined) return recorded.inode !== identity?.inode || recorded.device !== identity?.device;
   const start = text(entry.startBranchSha).toLowerCase();
   return /^[0-9a-f]{40}$/.test(start) && !(await gitIsAncestor(start, headSha, cwd).catch(() => false));
 }
@@ -1323,11 +1326,14 @@ async function claim(filePath, options) {
 }
 
 // Prints this worktree's own active or parked entry, or null; an entry an
-// earlier worktree left at this path is never its own. After a switch to
-// another branch, which holds the registration commit since the entry is its
-// own, an active entry moves to that branch: Claude Code starts an agent on its
-// own worktree branch before the agent switches to its work branch, and an
-// entry left behind let prune judge the wrong commit (PR #2413 B1).
+// earlier worktree left at this path is never its own. When the checkout is on
+// another branch, or no longer holds the start commit, an active entry moves to
+// the checkout's branch: Claude Code starts an agent on its own worktree branch
+// before the agent switches to its work branch, and an entry left behind judged
+// the wrong commit (PR #2413 B1). The move restarts the start at HEAD, so
+// commits the branch already had are never the agent's work; keeping the old
+// start counted a newer integration head's merges as work (PR #2413 B1
+// residual, N8). Each move is kept in `rebinds` with the previous start.
 async function own(filePath, options) {
   const worktreeRoot = await realpath(await runGit(['rev-parse', '--show-toplevel']));
   const [identity, headSha, branchName] = await Promise.all([
@@ -1342,13 +1348,19 @@ async function own(filePath, options) {
       if (!ownsCoordination(candidate) || candidate.worktree !== worktreeRoot) continue;
       if (!(await leftByEarlierWorktree(candidate, identity, headSha, worktreeRoot))) entry = candidate;
     }
-    if (entry?.status !== 'active' || branchName === 'HEAD' || (entry.detachedHead !== true && entry.branchName === branchName)) return entry ?? null;
+    if (entry?.status !== 'active' || branchName === 'HEAD') return entry ?? null;
+    const start = text(entry.startBranchSha).toLowerCase();
+    const moved = entry.detachedHead === true || entry.branchName !== branchName;
+    const holdsStart = /^[0-9a-f]{40}$/.test(start) && (await gitIsAncestor(start, headSha, worktreeRoot).catch(() => false));
+    if (!moved && holdsStart) return entry;
     await readGitStartState(worktreeRoot, persistedBaseRef(entry)); // refuses a protected base branch
     entry.rebinds = [...(entry.rebinds ?? []), {
       reboundAt: isoNow(options.now), from: entry.detachedHead === true ? 'detached' : entry.branchName, to: branchName,
+      previousStartBranchSha: entry.startBranchSha,
     }];
     delete entry.detachedHead;
     entry.branchName = branchName;
+    entry.startBranchSha = headSha;
     await writeState(filePath, state);
     return entry;
   });
@@ -1378,9 +1390,9 @@ async function releaseClaim(filePath, options) {
 }
 
 // Frees the resources of this repository's active entries that the named setup
-// tool registered and whose worktree is gone, and completes those whose outcome
-// is settled. A worktree is gone when its directory no longer exists or now
-// holds a different Git worktree. Claude Code removes subagent worktrees without
+// tool registered and whose worktree is gone, and completes each as discarded.
+// A worktree is gone when its directory no longer exists or now holds a
+// different Git worktree. Claude Code removes subagent worktrees without
 // running a removal hook, so their entries could otherwise never be finished
 // (#2364, #2368). Parked, hand-registered and other repositories' entries are
 // never touched: missing paths do not waive their ownership.
@@ -1391,13 +1403,13 @@ async function prune(filePath, options) {
   return withCoordinationLock(filePath, async () => {
     const state = await readState(filePath, { pruneReservations: false });
     const now = isoNow(options.now);
-    let main;
     const pruned = [];
     for (const entry of state.entries) {
       if (entry.status !== 'active' || entry.registeredBy !== registeredBy || entry.repositoryIdentity !== repositoryIdentity) continue;
       if (typeof entry.worktree !== 'string' || !isAbsolute(entry.worktree)) continue;
       if (!(await worktreeGone(entry))) continue;
-      if (await settleRemovedEntry(entry, now, () => main ??= readChainScannerMainState().catch(() => undefined))) pruned.push(entry);
+      await discardRemovedEntry(entry, now);
+      pruned.push(entry);
     }
     if (pruned.length) await writeState(filePath, state);
     return pruned;
@@ -1413,17 +1425,15 @@ async function worktreeGone(entry) {
   return current?.inode !== recorded.inode || current?.device !== recorded.device;
 }
 
-// A removed worktree's ports go back to the pool at once. Its entry completes
-// only once the outcome is settled (PR #2413 B1, N3):
-// - landed when finish's proof holds for the branch tip and that tip has work
-//   beyond the registration commit. The registration commit itself may be in
-//   main while the agent's work, on another branch, never got there.
-// - discarded when the branch is gone or has nothing beyond that commit. A
-//   detached entry is a reviewer's, which makes no work commits.
-// Otherwise the work may still land: the entry stays active and a later prune
-// decides. Returns whether the entry changed.
-async function settleRemovedEntry(entry, now, readMain) {
-  let changed = false;
+// A removed worktree is abandoned work: its claims and resources go back to the
+// pool, and its entry completes at once as discarded, at its branch's tip then
+// when the branch still exists, or at a detached entry's recorded commit.
+// Prune never records landed. Judging landed from branch state after the
+// worktree was gone kept recording work that never reached main, through a
+// branch name reset for a retry or a work branch cut from a newer integration
+// head (PR #2413 B1, B2, R8). Work that merged is finished as landed in its live
+// worktree before removal.
+async function discardRemovedEntry(entry, now) {
   if ([entry.scopes, entry.claims, entry.resources].some((values) => values?.length)) {
     entry.claimReleases = [...(entry.claimReleases ?? []), {
       releasedAt: now, scopes: entry.scopes ?? [], claims: entry.claims ?? [], resources: entry.resources ?? [],
@@ -1431,39 +1441,18 @@ async function settleRemovedEntry(entry, now, readMain) {
     entry.scopes = [];
     entry.claims = [];
     entry.resources = [];
-    changed = true;
   }
   const detached = entry.detachedHead === true;
   const branchSha = detached
     ? text(entry.startBranchSha).toLowerCase() || undefined
     : await runGit(['rev-parse', '--verify', '--quiet', `refs/heads/${text(entry.branchName)}^{commit}`]).catch(() => undefined);
-  const start = text(entry.startBranchSha).toLowerCase();
-  const ancestor = (older, newer) => gitIsAncestor(older, newer, process.cwd()).catch(() => false);
-  const main = await readMain();
-  let release = {
+  const release = {
     ...(branchSha && !detached ? { branchName: entry.branchName } : {}),
     branchSha,
-    mainSha: main?.mainSha ?? (await readMainRef(process.cwd()).catch(() => undefined))?.sha,
+    mainSha: (await readMainRef(process.cwd()).catch(() => undefined))?.sha,
   };
-  let outcome;
-  let releaseEvidence;
-  if (detached || !branchSha) outcome = 'discarded';
-  else if (/^[0-9a-f]{40}$/.test(start)) {
-    if (branchSha === start || (await ancestor(branchSha, start))) outcome = 'discarded';
-    else if (main && (await ancestor(start, branchSha))) {
-      try {
-        release = await releaseStateAt(release.branchName, branchSha, main, process.cwd());
-        releaseEvidence = await proveChainScannerLanding(entry, release, 'chain-scanner', now);
-        outcome = 'landed';
-      } catch {
-        releaseEvidence = undefined;
-      }
-    }
-  }
-  if (!outcome) return changed;
-  if (outcome === 'discarded') entry.discard = { reason: 'Worktree removed before finish.', branchSha };
-  completeEntry(entry, { outcome, release, now, result: 'Worktree directory no longer exists.', releaseEvidence });
-  return true;
+  entry.discard = { reason: 'Worktree removed before finish.', branchSha };
+  completeEntry(entry, { outcome: 'discarded', release, now, result: 'Worktree directory no longer exists.' });
 }
 
 function parseOptions(args) {

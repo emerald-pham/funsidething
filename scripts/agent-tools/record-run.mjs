@@ -200,6 +200,25 @@ function requirePort(environment, name) {
   return Number(value);
 }
 
+// The worktree identity coordination.mjs records on an entry: the device and
+// inode of the checkout's own Git directory. Undefined when Git cannot say.
+async function worktreeIdentity(worktree) {
+  const gitDir = await runGit(worktree, ['rev-parse', '--absolute-git-dir']);
+  if (gitDir.code !== 0) return undefined;
+  const metadata = await stat(gitDir.stdout.toString('utf8').trim(), { bigint: true }).catch(() => undefined);
+  return metadata && { device: String(metadata.dev), inode: String(metadata.ino) };
+}
+
+// An active entry at this path counts as this worktree's only when it holds
+// resources and, if it records a worktree identity, that identity is this
+// checkout's. Prune leaves an earlier worktree's unsettled entry active at a
+// reused path, holding nothing (PR #2413 N7); legacy entries count by path.
+function ownsWorktree(entry, identity) {
+  const recorded = entry.worktreeIdentity !== null && typeof entry.worktreeIdentity === 'object' ? entry.worktreeIdentity : {};
+  if (recorded.inode !== undefined && (recorded.inode !== identity?.inode || recorded.device !== identity?.device)) return false;
+  return Array.isArray(entry.resources) && entry.resources.length > 0;
+}
+
 async function validateHostPortOwnership(environment, worktree, deliveryPort, smokePort) {
   const filePath = configuredCoordinationPath(environment);
   let state;
@@ -212,9 +231,10 @@ async function validateHostPortOwnership(environment, worktree, deliveryPort, sm
     throw new Error(`Live host coordination ledger at ${filePath} is not a valid codex-wide v1 ledger.`);
   }
   const activeEntries = state.entries.filter((entry) => entry && ['active', 'parked'].includes(entry.status));
+  const identity = await worktreeIdentity(worktree);
   const activeWorktreeEntries = [];
   for (const entry of activeEntries) {
-    if (entry.status === 'active' && entry.worktree && await canonicalWorktreePath(entry.worktree) === worktree) {
+    if (entry.status === 'active' && entry.worktree && await canonicalWorktreePath(entry.worktree) === worktree && ownsWorktree(entry, identity)) {
       activeWorktreeEntries.push(entry);
     }
   }

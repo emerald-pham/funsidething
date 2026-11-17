@@ -37,8 +37,7 @@ your full spec.
 - Commit with messages referencing (#<N>).
 - Merge `origin/<base branch>` into your branch if it moved, then push your
   branch. No PR, no merge into the base or main, no release.
-- Leave your ledger entry open: after the merge to main,
-  `finish --outcome landed` or the prune after your worktree's removal closes it.
+- Leave your ledger entry open; the coordinator finishes it after the merge.
 - Report: branch and head SHA; each acceptance criterion, done or not and
   where; RED and GREEN record paths; groups run; rationale entries; decisions,
   each with its reason.

@@ -1799,10 +1799,13 @@ test('Chain Scanner landed finish through an integration branch refuses unmerged
   }
 });
 
-// Prune finishes the entries of worktrees Claude Code removed without a finish.
-// It writes only the outcomes other ledger clients know: landed when #2412's
-// check proves it, otherwise discarded with a reason (#2364 spec a2 and c).
-test("prune records a removed worktree's merged work as landed through its candidate's receipt and other removed work as discarded", () => {
+// Prune finishes the entries of worktrees Claude Code removed without a finish
+// (#2364 spec a2 and c). A removed worktree is abandoned work, so prune records
+// its entry discarded at once, with the fields finish writes, even when its work
+// merged and a receipt reviewed it: inferring landed from branch state after the
+// worktree was gone kept leaving false-landed paths (PR #2413 round 3). Work that
+// merged is finished as landed from its live worktree before removal.
+test("prune records each removed worktree's entry as discarded at once with the fields finish writes, merged work included, and frees its ports", () => {
   const fixture = realpathSync(mkdtempSync(join(tmpdir(), 'chain-coordination-prune-outcomes-')));
   try {
     const ledgerPath = join(fixture, 'host-ledger.json');
@@ -1834,7 +1837,7 @@ test("prune records a removed worktree's merged work as landed through its candi
     git(project, 'checkout', '--quiet', '-b', 'integration/fixture', 'main');
     git(project, 'merge', '--quiet', '--no-ff', '-m', 'Merge task into integration', 'work/landed-task');
     const candidateSha = commitDocsNote(project, 'review-fix.md', 'Review fix on the integration branch.');
-    const candidateReceipt = recordDocsOnlyReceipt(project, fixture, candidateSha, integrationBaseSha, 'integration');
+    recordDocsOnlyReceipt(project, fixture, candidateSha, integrationBaseSha, 'integration');
     const reviewer = join(fixture, 'reviewer');
     git(project, 'worktree', 'add', '--quiet', '--detach', reviewer, candidateSha);
     const reviewerId = register(reviewer, 47124);
@@ -1846,115 +1849,34 @@ test("prune records a removed worktree's merged work as landed through its candi
     const pruned = command(['prune', '--file', ledgerPath, '--registered-by', 'worktree-ready', '--now', now], project);
     assert.equal(pruned.status, 0, pruned.stderr);
     const entries = new Map(JSON.parse(readFileSync(ledgerPath, 'utf8')).entries.map((entry) => [entry.id, entry]));
-    for (const entry of entries.values()) {
-      assert.deepEqual(entry.resources, [], `${entry.worktree} releases its port`);
-      if (entry.id === unmerged.id) continue;
-      assert.equal(entry.status, 'complete', `${entry.worktree} is finished`);
-      assert.ok(['landed', 'discarded'].includes(entry.outcome), `${entry.worktree} records an outcome other ledger clients know, not ${entry.outcome}`);
-      assert.equal(entry.completedAt, now, 'prune completes on the coordination clock');
-    }
-
-    const task = entries.get(landed.id);
-    assert.equal(task.outcome, 'landed', 'merged work whose candidate has a receipt is recorded as landed');
-    assert.equal(task.finalBranchName, 'work/landed-task');
-    assert.equal(task.finalBranchSha, taskSha);
-    assert.equal(task.mainSha, mainSha);
-    assert.equal(task.originMainSha, mainSha);
-    assert.equal(task.releaseEvidence.candidate.commitSha, candidateSha, 'the landed record names the candidate whose receipt reviewed it');
-    assert.equal(task.releaseEvidence.receiptSha256, candidateReceipt.receipt.receiptSha256);
-
-    // Reviewers make no work commits, so prune never lands a detached entry (PR #2413 B1).
-    const review = entries.get(reviewerId);
-    assert.equal(review.outcome, 'discarded', "a detached reviewer's entry is never recorded as landed by prune");
-    assert.equal(review.finalBranchSha, candidateSha, 'at the exact commit it recorded');
-    assert.equal(review.releaseEvidence, undefined);
-
-    // Its branch still holds work main has not received, which may yet land (PR #2413 N3).
-    const stray = entries.get(unmerged.id);
-    assert.equal(stray.status, 'active', 'unmerged work keeps its entry open');
-    assert.equal(stray.outcome, undefined);
-    assert.equal(git(project, 'rev-parse', 'work/unmerged-task'), unmergedSha);
-    assert.equal(stray.releaseEvidence, undefined);
-
-    const gone = entries.get(deleted.id);
-    assert.equal(gone.outcome, 'discarded', 'a removed worktree whose branch is gone cannot prove a landing');
-    assert.match(gone.discard.reason, /worktree removed before finish/i);
-    assert.equal(gone.finalBranchSha, undefined, 'no tip is invented for a deleted branch');
-    assert.equal(gone.mainSha, mainSha);
-  } finally {
-    rmSync(fixture, { recursive: true, force: true });
-  }
-});
-
-// PR #2413 B1: the entry was registered on Claude Code's worktree branch, the
-// agent worked on another branch, and that work was dropped. A later merged
-// candidate contains the registration commit, which proves nothing about the work.
-test('prune records landed only for work beyond the registration commit, never for a registration commit or a branch moved back', () => {
-  const fixture = realpathSync(mkdtempSync(join(tmpdir(), 'chain-coordination-prune-registration-')));
-  try {
-    const ledgerPath = join(fixture, 'host-ledger.json');
-    const project = createProject(join(fixture, 'chain-scanner'), 'work/unused');
-    git(project, 'checkout', '--quiet', 'main');
-    mkdirSync(join(project, 'scripts'), { recursive: true });
-    copyFileSync(releaseEvidenceEntrypoint, join(project, 'scripts/release-evidence.mjs'));
-    git(project, 'add', 'scripts/release-evidence.mjs');
-    git(project, 'commit', '--quiet', '-m', 'install fixture release adapter');
-    const baseSha = git(project, 'rev-parse', 'HEAD');
-    addOrigin(project, fixture);
-    git(project, 'checkout', '--quiet', '-b', 'integration/fixture');
-    const firstWaveSha = commitDocsNote(project, 'first-wave.md', 'First-wave task merged into integration.');
-    const register = (worktree, port) => {
-      const began = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', `Prune fixture ${worktree}`,
-        '--registered-by', 'worktree-ready', '--resources', `loopback:127.0.0.1:${port}`], worktree);
-      assert.equal(began.status, 0, began.stderr);
-      return JSON.parse(began.stdout).id;
+    const record = (id) => {
+      const entry = entries.get(id);
+      return {
+        status: entry.status, outcome: entry.outcome, completedAt: entry.completedAt, reason: entry.discard?.reason,
+        finalBranchName: entry.finalBranchName, finalBranchSha: entry.finalBranchSha, mainSha: entry.mainSha, pushed: entry.pushed,
+        cites: entry.releaseEvidence?.candidate?.commitSha, resources: entry.resources,
+      };
     };
-
-    const agent = join(fixture, 'agent-z');
-    git(project, 'worktree', 'add', '--quiet', '-b', 'worktree-agent-z', agent, firstWaveSha);
-    const agentId = register(agent, 47131);
-    git(agent, 'checkout', '--quiet', '-b', 'ticket/z');
-    const droppedSha = commitDocsNote(agent, 'dropped.md', 'Second-wave work that is later dropped.');
-
-    // S7: an entry registered at a later commit whose branch is moved back to an older landed one.
-    const movedBack = join(fixture, 'moved-back');
-    git(project, 'worktree', 'add', '--quiet', '-b', 'work/moved-back', movedBack, firstWaveSha);
-    const laterSha = commitDocsNote(movedBack, 'later.md', 'Registered after this commit.');
-    const movedBackId = register(movedBack, 47132);
-    git(movedBack, 'reset', '--quiet', '--hard', firstWaveSha);
-
-    git(project, 'checkout', '--quiet', 'integration/fixture');
-    const candidateSha = commitDocsNote(project, 'review-fix.md', 'Integration fix.');
-    recordDocsOnlyReceipt(project, fixture, candidateSha, baseSha, 'integration');
-    git(project, 'checkout', '--quiet', 'main');
-    git(project, 'merge', '--quiet', '--no-ff', '-m', 'Merge integration into main', 'integration/fixture');
-    advanceOriginMain(project);
-    for (const worktree of [agent, movedBack]) git(project, 'worktree', 'remove', '--force', worktree);
-
-    const pruned = command(['prune', '--file', ledgerPath, '--registered-by', 'worktree-ready', '--now', '2026-11-16T12:00:00.000Z'], project);
-    assert.equal(pruned.status, 0, pruned.stderr);
-    const entries = new Map(JSON.parse(readFileSync(ledgerPath, 'utf8')).entries.map((entry) => [entry.id, entry]));
-    assert.equal(git(project, 'branch', '--list', '--contains', droppedSha, 'main'), '', 'the dropped work is not in main');
-
-    const registration = entries.get(agentId);
-    assert.equal(registration.outcome, 'discarded', 'a branch still at its registration commit has no work to land');
-    assert.equal(registration.finalBranchSha, firstWaveSha);
-    assert.equal(registration.releaseEvidence, undefined, 'no receipt is cited for work that never reached main');
-
-    const moved = entries.get(movedBackId);
-    assert.equal(moved.outcome, 'discarded', 'a branch moved back behind its registration commit has nothing beyond it');
-    assert.equal(moved.finalBranchSha, firstWaveSha);
-    assert.notEqual(moved.finalBranchSha, laterSha);
-    assert.equal(moved.releaseEvidence, undefined);
+    const discarded = {
+      status: 'complete', outcome: 'discarded', completedAt: now, reason: 'Worktree removed before finish.',
+      mainSha, pushed: false, cites: undefined, resources: [],
+    };
+    assert.deepEqual(record(landed.id), { ...discarded, finalBranchName: 'work/landed-task', finalBranchSha: taskSha },
+      'merged work whose candidate has a receipt is discarded too: its worktree was removed before finish');
+    assert.deepEqual(record(unmerged.id), { ...discarded, finalBranchName: 'work/unmerged-task', finalBranchSha: unmergedSha }, 'unmerged work, at its tip then');
+    assert.deepEqual(record(deleted.id), { ...discarded, finalBranchName: undefined, finalBranchSha: undefined }, 'no tip is invented for a deleted branch');
+    assert.deepEqual(record(reviewerId), { ...discarded, finalBranchName: undefined, finalBranchSha: candidateSha }, "a reviewer's detached entry, at the exact commit it recorded");
+    assert.equal(JSON.parse(readFileSync(ledgerPath, 'utf8')).entries.filter((entry) => entry.status === 'active').length, 0,
+      'no entry is left active, so no port is claimed');
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }
 });
 
-// PR #2413 N3: a worktree removed before its branch merged still has work that
-// may land. Prune frees its ports at once but keeps the entry open until it can
-// tell the outcome, so the prune after the merge records it as landed.
-test('prune frees a removed worktree with unmerged work at once and records it landed after the merge', () => {
+// PR #2413 N3 and round 3: prune frees a removed worktree's port at once, which
+// another worktree can then claim, and settles its entry at once as discarded.
+// No entry is left pending, so a later merge of its work reopens nothing.
+test("prune frees a removed worktree's port at once and records it discarded, and a later merge of its work changes nothing", () => {
   const fixture = realpathSync(mkdtempSync(join(tmpdir(), 'chain-coordination-prune-pending-')));
   try {
     const ledgerPath = join(fixture, 'host-ledger.json');
@@ -1981,29 +1903,74 @@ test('prune frees a removed worktree with unmerged work at once and records it l
       return JSON.parse(readFileSync(ledgerPath, 'utf8')).entries.find((entry) => entry.id === id);
     };
 
-    const waiting = prune('2026-11-16T12:00:00.000Z');
-    assert.equal(waiting.status, 'active', 'unmerged work keeps its entry open');
-    assert.equal(waiting.outcome, undefined, 'no outcome is recorded before the work lands or is dropped');
-    assert.deepEqual(waiting.resources, [], 'its port is freed at once');
-    assert.deepEqual(waiting.claimReleases.map((release) => release.resources), [[port]]);
+    const settled = prune('2026-11-16T12:00:00.000Z');
+    assert.deepEqual([settled.status, settled.outcome, settled.finalBranchSha, settled.completedAt], ['complete', 'discarded', taskSha, '2026-11-16T12:00:00.000Z'],
+      'the entry is settled at once as discarded, at its tip then');
+    assert.deepEqual(settled.resources, [], 'its port is freed at once');
+    assert.deepEqual(settled.claimReleases.map((release) => release.resources), [[port]]);
     const other = join(fixture, 'agent-other');
     git(project, 'worktree', 'add', '--quiet', '-b', 'work/other', other, 'main');
     const reuse = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Reuse the freed port', '--resources', port], other);
     assert.equal(reuse.status, 0, `the freed port can be claimed again: ${reuse.stderr}`);
-    assert.equal(prune('2026-11-16T12:30:00.000Z').claimReleases.length, 1, 'a later prune before the merge releases nothing twice');
 
     git(project, 'checkout', '--quiet', '-b', 'integration/fixture', 'main');
     git(project, 'merge', '--quiet', '--no-ff', '-m', 'Merge task into integration', 'work/pending');
     const candidateSha = commitDocsNote(project, 'review-fix.md', 'Review fix on the integration branch.');
     recordDocsOnlyReceipt(project, fixture, candidateSha, baseSha, 'integration');
     landIntegrationOnMain(project);
+    assert.equal(spawnSync('git', ['merge-base', '--is-ancestor', taskSha, 'main'], { cwd: project }).status, 0, 'its work has landed');
 
-    const landed = prune('2026-11-16T13:00:00.000Z');
-    assert.equal(landed.status, 'complete');
-    assert.equal(landed.outcome, 'landed', 'the prune after the merge records the work as landed');
-    assert.equal(landed.finalBranchSha, taskSha);
-    assert.equal(landed.releaseEvidence.candidate.commitSha, candidateSha);
-    assert.equal(landed.completedAt, '2026-11-16T13:00:00.000Z');
+    assert.deepEqual(prune('2026-11-16T13:00:00.000Z'), settled, 'the prune after the merge changes nothing');
+    const active = JSON.parse(readFileSync(ledgerPath, 'utf8')).entries.filter((entry) => entry.status === 'active');
+    assert.deepEqual(active.map((entry) => [entry.id, entry.resources]), [[JSON.parse(reuse.stdout).id, [port]]], 'one active entry, the one that claimed the freed port');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+// Invariant 2 (PR #2413 B1 residual and N8, probe R8): an entry that own moved
+// to a new branch kept its old start commit, so commits the new branch already
+// had, such as an integration head's first wave, counted as the agent's work.
+// Own now restarts the start at the checkout's HEAD, as it does when the
+// checkout no longer holds the start commit, and keeps the previous one.
+test("own moves an entry to the checkout's new branch, or to history without its start commit, with the start restarted at HEAD and the previous start kept in rebinds", () => {
+  const fixture = realpathSync(mkdtempSync(join(tmpdir(), 'chain-coordination-own-restart-')));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'chain-scanner'), 'integration/x');
+    const firstWaveSha = commitDocsNote(project, 'first-wave.md', 'First-wave task merged into integration.');
+    git(project, 'checkout', '--quiet', 'main');
+    const mainSha = git(project, 'rev-parse', 'HEAD');
+    const agent = join(fixture, 'agent');
+    git(project, 'worktree', 'add', '--quiet', '-b', 'worktree-agent-own', agent, 'main');
+    const port = 'loopback:127.0.0.1:47161';
+    const began = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Own restart fixture',
+      '--registered-by', 'worktree-ready', '--resources', port], agent);
+    assert.equal(began.status, 0, began.stderr);
+    const { id } = JSON.parse(began.stdout);
+    const own = (now) => {
+      const owned = command(['own', '--file', ledgerPath, '--now', now], agent);
+      assert.equal(owned.status, 0, owned.stderr);
+      return JSON.parse(owned.stdout);
+    };
+
+    git(agent, 'checkout', '--quiet', '-b', 'ticket/own', 'integration/x');
+    const moved = own('2026-11-16T12:00:00.000Z');
+    assert.equal(moved.id, id);
+    assert.equal(moved.branchName, 'ticket/own');
+    assert.equal(moved.startBranchSha, firstWaveSha, "the start restarts at the checkout's HEAD, so the branch's base is never work");
+    assert.deepEqual(moved.rebinds, [{ reboundAt: '2026-11-16T12:00:00.000Z', from: 'worktree-agent-own', to: 'ticket/own', previousStartBranchSha: mainSha }]);
+
+    git(agent, 'reset', '--quiet', '--hard', 'main');
+    const rewritten = own('2026-11-16T12:30:00.000Z');
+    assert.equal(rewritten.branchName, 'ticket/own');
+    assert.equal(rewritten.startBranchSha, mainSha, 'a checkout without the start commit restarts it at HEAD too');
+    assert.deepEqual(rewritten.rebinds.at(-1), { reboundAt: '2026-11-16T12:30:00.000Z', from: 'ticket/own', to: 'ticket/own', previousStartBranchSha: firstWaveSha });
+
+    const unchanged = own('2026-11-16T13:00:00.000Z');
+    assert.deepEqual(unchanged, rewritten, 'nothing moves while the checkout stays on its branch and start');
+    const active = JSON.parse(readFileSync(ledgerPath, 'utf8')).entries.filter((entry) => entry.status === 'active');
+    assert.deepEqual(active.map((entry) => [entry.id, entry.resources]), [[id, [port]]], 'one active entry, holding its one port');
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }
