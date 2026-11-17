@@ -204,10 +204,14 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
    they move a little with the title's length. They keep #2312's tap height. */
 .decide{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
 .decide>.btn{min-height:44px}
-.decide-finish{display:flex;align-items:center;gap:8px;margin-left:auto;min-width:0;flex:1 1 290px;justify-content:flex-end}
-/* The finish row's button shares the choices' line above 560px, so it takes their
-   tap height too and the two never stand side by side at different heights. */
+.decide-finish{display:flex;align-items:center;gap:8px;margin-left:auto;min-width:0;flex:1 1 100%;justify-content:flex-end}
+/* The finish row keeps its own line under the choices at every width, as it did
+   in the released build: sharing their line squeezed the rank chip onto two lines
+   and the list toggle to 20px (#2422 review B2). Its button keeps the choices'
+   44px tap height, and the chip and toggle never shrink. */
 .decide-finish .btn{white-space:nowrap;min-height:44px}
+.decide-finish .topkchip{white-space:nowrap}
+.decide-finish .iconbtn{flex:none}
 .decide-finish .sparkbox{margin-left:auto;min-width:0;flex:0 1 auto}
 .decide-finish .spark{width:clamp(56px,12vw,84px);max-width:84px;height:20px}
 .keyhint{font-size:10px;opacity:.7;font-weight:500;margin-left:5px}

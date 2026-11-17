@@ -23340,12 +23340,11 @@ test('RISK steady scanner browser: every choice stays reachable unclipped and in
       assert.equal(c.clipped,false,`${label}: ${act} shows its whole label`);
       assert.ok(c.height>=44,`${label}: ${act} is ${Math.round(c.height)} px tall, too small to tap`);
      }
-     // Two buttons on one line of the row stand at one height: a 38px "done adding
-     // for now" beside the 44px choices read as a defect (#2422 review B1).
+     // "done adding for now" has the choices' 44px tap height (#2422 review B1,
+     // checked with the choices above) and its own line under them (review B2).
      const doneAdding=shot.controls['start-working'],yes=shot.controls.yes;
      assert.ok(doneAdding,`${label}: done adding for now is offered while dots are on the chain`);
-     const middle=c=>(c.top+c.bottom)/2-c.scan.top;
-     if(Math.abs(middle(doneAdding)-middle(yes))<=yes.height/2)assert.ok(Math.abs(doneAdding.height-yes.height)<=1,`${label}: done adding for now shares the choices' line at ${Math.round(doneAdding.height)} px beside ${Math.round(yes.height)} px`);
+     assert.ok(doneAdding.top-doneAdding.scan.top>=yes.bottom-yes.scan.top-0.5,`${label}: done adding for now sits on its own line under the choices: it starts ${Math.round(doneAdding.top-doneAdding.scan.top)} px into the box, Yes ends at ${Math.round(yes.bottom-yes.scan.top)} px`);
      assert.ok(shot.overflow<=0,`${label}: no sideways page overflow: ${shot.overflow}`);
      assert.equal(shot.titleText,('Steady task 2 '+STEADY_SCANNER_FILLER).trim(),`${label}: the candidate title is shown in full`);
      assert.equal(shot.titleClipped,false,`${label}: the candidate title is not cut off`);
@@ -23360,6 +23359,59 @@ test('RISK steady scanner browser: every choice stays reachable unclipped and in
      assert.equal(await page.locator('.card.cand .due-overdue').count(),0,`${label}: the next candidate is not overdue`);
      assert.deepEqual(errors,[],`${label}: no page errors`);
     }catch(error){failures.push(error.message);}finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+// #2422 review B2: when the finish row shared the choices' line at a tight width,
+// the rank chip broke at its hyphen and the list toggle squeezed to about 20px.
+// As in the released build, the finish row always takes its own line under the
+// choices, inside the scanner box, and neither the chip nor the toggle shrinks.
+// Web fonts change every width here, so each width runs with them allowed and
+// blocked (fallback fonts made it happen at every desktop width with Postpone).
+test('RISK steady scanner browser: the finish row sits on its own line under the choices with its rank chip on one line and the list toggle at full size at every width with and without web fonts and Postpone in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[],origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin,fontHosts=['fonts.googleapis.com','fonts.gstatic.com'];
+ const read=page=>page.evaluate(()=>{
+  const box=el=>{const r=el.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height};};
+  const finish=document.querySelector('.decide-finish'),chip=finish?.querySelector('.topkchip'),toggle=finish?.querySelector('[data-act="toggle-list"]');
+  if(!finish||!chip||!toggle)return null;
+  const range=document.createRange();range.selectNodeContents(chip);
+  const lines=new Set([...range.getClientRects()].filter(r=>r.width>0).map(r=>Math.round(r.top))).size;
+  const choices=['yes','no','cant','postpone'].map(act=>document.querySelector(`.decide>[data-act="${act}"]`)).filter(Boolean).map(box);
+  return {finish:box(finish),scan:box(document.getElementById('scan')),choices,chipLines:lines,chipText:chip.textContent,toggle:box(toggle),
+   fonts:[...document.fonts].filter(face=>face.status==='loaded').length,overflow:document.documentElement.scrollWidth-innerWidth};
+ });
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const fonts of ['web fonts','fonts blocked'])for(const showPostpone of [false,true])for(const width of [600,640,700,768,900,1024,1280]){
+    const label=`${engineName} ${width}px ${fonts}${showPostpone?' with Postpone':''}`;
+    const context=await browser.newContext({viewport:{width,height:900},deviceScaleFactor:2,serviceWorkers:'block',reducedMotion:'reduce'});
+    try{
+     await context.route('**/*',route=>{const url=new URL(route.request().url());return url.origin===origin||fonts==='web fonts'&&fontHosts.includes(url.hostname)?route.continue():route.abort();});
+     await context.addInitScript(board=>{
+      Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+      localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+      if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+     },steadyScannerBoard({tasks:24,showPostpone,over:{chain:['steady-0','steady-1'],candidateId:'steady-2'}}));
+     const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+     await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]')&&!!document.querySelector('.decide-finish .topkchip'),null,{timeout:60000});
+     await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(120);
+     const seen=await read(page);
+     assert.ok(seen,`${label}: the finish row shows done adding for now, the rank chip and the list toggle`);
+     if(fonts==='fonts blocked')assert.equal(seen.fonts,0,`${label}: positive control: no web font loaded`);
+     else assert.ok(seen.fonts>0,`${label}: positive control: the web fonts loaded, which needs the network`);
+     assert.equal(seen.chipLines,1,`${label}: the rank chip "${seen.chipText}" stays on one line`);
+     assert.ok(Math.abs(seen.toggle.width-30)<=0.5&&Math.abs(seen.toggle.height-30)<=0.5,`${label}: the list toggle keeps its 30 x 30 size: ${seen.toggle.width} x ${seen.toggle.height}`);
+     const lowest=Math.max(...seen.choices.map(c=>c.bottom));
+     assert.ok(seen.finish.top>=lowest-0.5,`${label}: the finish row starts on its own line under the choices: it starts at ${Math.round(seen.finish.top)}, the choices end at ${Math.round(lowest)}`);
+     assert.ok(seen.finish.left>=seen.scan.left&&seen.finish.right<=seen.scan.right&&seen.finish.bottom<=seen.scan.bottom,`${label}: the finish row sits inside the scanner box`);
+     assert.ok(seen.overflow<=0,`${label}: no sideways page overflow: ${seen.overflow}`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(error.message.split('\n')[0]);}finally{await context.close();}
    }
   }finally{await browser.close();}
  }
