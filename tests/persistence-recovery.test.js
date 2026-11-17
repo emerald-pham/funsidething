@@ -34,6 +34,7 @@ import { capturedGenerationAcceptedApp2198, syncStatus2200, CAPTURED_RESULT_BUDG
   exactPaddedBoard, CAPTURED_UNREADABLE_GENERATION } from "./shared.js";
 import { chainPills, chainPillIds, returnDotFromScan } from "./shared.js";
 import { markupButtons } from "./shared.js";
+import { commitSetting } from "./shared.js"; // #2422: Settings toggles in the older and current apps
 import { benchmarkEdit } from "./shared.js";
 import { woopFields2421, woopBoard2421, woopSnapshot2421 } from "./shared.js"; // #2421 saved WOOP data
 
@@ -16934,6 +16935,103 @@ test('RISK removed WOOP data: Export and Download backup carry every WOOP field 
  ctx.closeModal();
  const {file}=await downloadedRecoveryFile2254(device);
  assert.equal(woopSnapshot2421(file.currentBoard),expected,'Download backup keeps them');
+});
+
+// #2422 specialist review: the app this one replaces and this one, signed in to
+// the same account, each opened at one moment so an overdue date stays overdue.
+const olderWoopSource2422=(()=>{
+ let source=null;
+ return ()=>{
+  if(!source){const shown=spawnSync('git',['show','df2f95cb21cea958723e336a39da90bb5bc8ea95:index.html'],{cwd:__dirname,encoding:'utf8',maxBuffer:16*1024*1024});assert.equal(shown.status,0,shown.stderr);source=extractAppScript(shown.stdout);}
+  return source;
+ };
+})();
+const WOOP_SYNC_AT_2422=Date.parse('2026-11-16T15:00:00Z');
+async function syncedVersion2422(t,h,board,name,{older=false,seed=2422}={}){
+ const raw=JSON.stringify(board),{IDBFactory}=await import('fake-indexeddb');
+ const app=await openApp(t,{appSource:'Date.now=()=>'+WOOP_SYNC_AT_2422+';\n'+(older?olderWoopSource2422():appSrc),seed,indexedDBProvider:new IDBFactory(),
+  deviceDbName:'woop-2422-'+name+'-'+Math.random(),seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:()=>h.factory()});
+ app.ctx.window.CLOUD_PUSH_DELAY_MS=20;
+ t.after(()=>{app.ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',app.ctx);});
+ await app.ctx.cloudPull();await app.settled({synced:true,within:10000});
+ return app;
+}
+const turnOnLastTaskWoop2422=older=>{older.ctx.openSettings();commitSetting(older.shim,'stLastTaskWoop',true);older.ctx.closeModal();};
+
+// P2: the older version's Run WOOP dots the overdue task and pauses into work
+// mode, its walkthrough saves a plan, and its Settings turns Last task WOOP on.
+// This version reads those decision rows, replays them to the same board, works
+// on, and the older version reads this version's copy with all of it intact.
+test('RISK removed WOOP data: an older version’s Run WOOP Dot, walkthrough plan and Last task WOOP toggle reach this version through the cloud, replay coherently, settle and come back intact',async t=>{
+ const day=new Date(WOOP_SYNC_AT_2422-86400000),yesterday=day.getFullYear()+'-'+String(day.getMonth()+1).padStart(2,'0')+'-'+String(day.getDate()).padStart(2,'0');
+ const initial=syncState({tasks:[{...syncTask('bench','Private benchmark'),mu:30,createdAt:1},{...syncTask('od','Private overdue'),due:yesterday,mu:20,createdAt:2},
+  {...syncTask('x','Private other'),mu:10,createdAt:3}],syncRev:5,syncAccount:'e@example.com',syncDirty:false});
+ const h=makeSyncHarness({remote:initial,rev:5,delayMs:2});
+ const older=await syncedVersion2422(t,h,initial,'older',{older:true});
+ older.ctx.onAction('start-scan',{dataset:{}});older.ctx.state.candidateId='od';older.ctx.renderScan();
+ const runWoop=markupButtons(older.shim.document.getElementById('scan').innerHTML).find(button=>button.dataset.act==='run-woop');
+ assert.ok(runWoop,'positive control: the older version offers Run WOOP on the overdue candidate');
+ older.ctx.onAction('run-woop',{dataset:runWoop.dataset});
+ for(const answer of ['Older outcome','Older obstacle','If older, then act']){
+  older.shim.document.getElementById('woopAnswer').value=answer;
+  const session=vm.runInContext('woopDraft',older.ctx);
+  older.ctx.onAction('woop-next',{dataset:{session:session.id,step:String(session.step)}});
+ }
+ turnOnLastTaskWoop2422(older);
+ await older.settled({synced:true,within:10000});
+ const olderChain=[...older.ctx.state.chain],olderPlan=JSON.stringify(older.ctx.state.tasks.find(task=>task.id==='od').woopPlan),olderCloud=h.remoteState();
+ assert.deepEqual([olderChain.includes('od'),older.ctx.state.mode,older.ctx.state.settings.lastTaskWoop],[true,'work',true],'positive control: the older version dotted, paused into work mode and saved the setting');
+ assert.match(olderPlan,/If older, then act/,'positive control: the older walkthrough saved its plan');
+ assert.deepEqual([olderCloud.mode,olderCloud.settings.lastTaskWoop],['work',true],'positive control: and pushed them');
+
+ const current=await syncedVersion2422(t,h,initial,'current'),{ctx}=current;
+ assert.deepEqual([...ctx.state.chain],olderChain,'this version shows the older version’s chain');
+ assert.equal(ctx.state.mode,'work','and its work mode');
+ assert.equal(ctx.state.settings.lastTaskWoop,true,'and keeps its Last task WOOP value');
+ assert.equal(woopFields2421(ctx.state.tasks.find(task=>task.id==='od')),woopFields2421(olderCloud.tasks.find(task=>task.id==='od')),'and every WOOP field of the older plan');
+ const replayed=JSON.parse(JSON.stringify(ctx.state));
+ assert.equal(ctx.decisionReplayReady(replayed),true,'this version can replay the older rows');
+ ctx.projectDecisionEvents(replayed,null,{refreshRanks:false});
+ const facts=board=>JSON.parse(JSON.stringify({chain:board.chain,mode:board.mode,considered:board.considered||{},cantAt:board.cantAt||{},workedAt:board.workedAt||{},passId:board.passId??null,lastTaskWoop:board.settings?.lastTaskWoop}));
+ assert.deepEqual(facts(replayed),facts(ctx.state),'replaying the older Run WOOP and setting rows gives the same board');
+ assert.equal(ctx.decisionProjectionIssue(JSON.parse(JSON.stringify(ctx.state))),null,'the coherence check finds nothing');
+ assert.equal(ctx.decisionEvidenceIssue(ctx.state,'e@example.com'),null,'and the decision evidence is coherent');
+
+ ctx.renderScan();ctx.onAction('continue-scan',{});await current.settled({synced:true,within:10000});
+ const yes=markupButtons(current.shim.document.getElementById('scan').innerHTML).find(button=>button.dataset.act==='yes');
+ if(yes){ctx.onAction('yes',{dataset:yes.dataset});await current.settled({synced:true,within:10000});}
+ const pushed=h.remoteState();
+ assert.ok(pushed.decisionEvents.length>olderCloud.decisionEvents.length,'positive control: this version pushed new decisions');
+ assert.equal(pushed.settings.lastTaskWoop,true,'its copy keeps Last task WOOP on');
+ assert.equal(woopFields2421(pushed.tasks.find(task=>task.id==='od')),woopFields2421(olderCloud.tasks.find(task=>task.id==='od')),'and every WOOP field of the plan');
+
+ await older.ctx.cloudPull();await older.settled({synced:true,within:10000});
+ assert.equal(older.ctx.state.settings.lastTaskWoop,true,'the older version still has Last task WOOP on');
+ assert.equal(JSON.stringify(older.ctx.state.tasks.find(task=>task.id==='od').woopPlan),olderPlan,'and its plan');
+ assert.deepEqual([...older.ctx.state.chain],[...ctx.state.chain],'and this version’s chain');
+ assert.equal(older.ctx.state.mode,ctx.state.mode,'and mode');
+});
+
+// P4: the older version turns Last task WOOP on while this version, which read
+// the same revision, changes another synced setting. This version's push
+// conflicts and merges, both settings survive everywhere and sync settles.
+test('RISK removed WOOP data: an older version’s Last task WOOP toggle and this version’s concurrent change to another synced setting both survive the conflict and sync settles',async t=>{
+ const initial=syncState({tasks:[{...syncTask('a','Private task'),woopPlan:null}],syncRev:5,syncAccount:'e@example.com',syncDirty:false});
+ const h=makeSyncHarness({remote:initial,rev:5,delayMs:2});
+ const current=await syncedVersion2422(t,h,initial,'current',{seed:2425}),older=await syncedVersion2422(t,h,initial,'older',{older:true,seed:2425});
+ assert.equal(h.doc.rev,5,'precondition: both read revision 5');
+ turnOnLastTaskWoop2422(older);
+ await older.settled({synced:true,within:10000});
+ assert.equal(h.remoteState().settings.lastTaskWoop,true,'positive control: the older version pushed Last task WOOP on');
+ current.ctx.openSettings();commitSetting(current.shim,'stHorizon',90);current.ctx.closeModal();
+ await current.settled({synced:true,within:15000});
+ const cloud=h.remoteState();
+ assert.equal(cloud.settings.horizonMin,90,'this version’s setting reached the cloud');
+ assert.equal(cloud.settings.lastTaskWoop,true,'the older version’s Last task WOOP survived the merge');
+ assert.equal(current.ctx.state.settings.lastTaskWoop,true,'and this version holds it');
+ assert.equal(current.ctx.decisionEvidenceIssue(current.ctx.state,'e@example.com'),null,'and its decision evidence is coherent');
+ await older.ctx.cloudPull();await older.settled({synced:true,within:10000});
+ assert.deepEqual([older.ctx.state.settings.lastTaskWoop,older.ctx.state.settings.horizonMin],[true,90],'the older version reads both');
 });
 
 // #2422 review N2: Last task WOOP is no longer shown, but older versions still
