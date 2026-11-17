@@ -30452,14 +30452,14 @@ test('RISK BACKWARD COMPATIBILITY: change records keep the supported floor and t
     // The older version reads and publishes full copies as before.
     assert.equal((await old.CS.pull()).payload,board('newer'),label+': the older version reads the newer copy');
     await assertRoundTrip(old.CS,board('older'),1,label+': and publishes its own full copy');
-    const root=(await env.withSecurityRulesDisabled(context=>F.getDoc(F.doc(context.firestore(),'users/owner')))).data();
+    let root=null;await env.withSecurityRulesDisabled(async context=>{root=(await F.getDoc(F.doc(context.firestore(),'users/owner'))).data();});
     assert.equal(root.includedSeq,undefined,label+': its root names no records');
     for(let wait=0;!(next.CS.heardChangeRecords()||[]).some(row=>row.seq===1)&&wait<200;wait++)await new Promise(resolve=>setTimeout(resolve,10));
     const read=await next.CS.pull();
     assert.equal(read.payload,board('older'),label+': the newer version reads the older copy');
-    assert.deepEqual(read.changeRecords?.records?.map(row=>row.seq),[1],label+': and reapplies the record that copy leaves out');
-    const kept=await env.withSecurityRulesDisabled(context=>F.getDoc(F.doc(context.firestore(),'users/owner/changeRecords/answer-'+index)));
-    assert.equal(kept.exists(),true,label+': the record stays in the cloud');
+    assert.deepEqual(Array.from(read.changeRecords?.records??[],row=>row.seq),[1],label+': and reapplies the record that copy leaves out');
+    let kept=false;await env.withSecurityRulesDisabled(async context=>{kept=(await F.getDoc(F.doc(context.firestore(),'users/owner/changeRecords/answer-'+index))).exists();});
+    assert.equal(kept,true,label+': the record stays in the cloud');
    }finally{for(const handle of handles)await handle.drain();await env.cleanup();}
   }
  }
