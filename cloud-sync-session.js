@@ -57,10 +57,11 @@
   const text=value=>typeof value==="string"&&value?value:null;
   // #2417: what the cloud holds is its active full copy plus the change
   // records it keeps (GLOSSARY: Change record). through is the sequence
-  // number up to which the known copy includes them (0: only the full copy).
-  const NOTHING_KNOWN=Object.freeze({payload:null,account:null,revision:null,through:null});
+  // number up to which the known copy includes them; a copy that includes
+  // none (only the full copy) carries no through, as before records.
+  const NOTHING_KNOWN=Object.freeze({payload:null,account:null,revision:null});
   const knownCopy=(payload,account,revision,through=0)=>Object.freeze({payload:typeof payload==="string"?payload:null,account,
-    revision:Number.isSafeInteger(revision)?revision:null,through:Number.isSafeInteger(through)&&through>=0?through:0});
+    revision:Number.isSafeInteger(revision)?revision:null,...(Number.isSafeInteger(through)&&through>0?{through}:{})});
 
   // The closed list of sync work (#2378), so a misspelt kind throws instead of
   // going uncounted. Steps that run: a cloud read, a cloud write, a device save

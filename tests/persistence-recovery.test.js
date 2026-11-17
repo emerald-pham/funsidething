@@ -17107,6 +17107,9 @@ test('RISK change records: a decision conflict between two devices resolves on a
    await syncSettled(laptop.ctx,{within:30000});
   }else{
    await settledTogether([phone,tablet],[],{within:120000});
+   // Settled alone can leave an answer waiting to go up after a conflict;
+   // the oracle reads the cloud once neither device has anything unsent.
+   for(const device of [phone,tablet])await syncSettled(device.ctx,{within:60000,synced:true});
    laptop.ctx.window.dispatchEvent({type:'cloudboardchange',detail:{user:'e@example.com',rev:laptop.backend.docs.get('users/owner').rev}});
    await syncSettled(laptop.ctx,{within:60000});
    assert.equal(decisionsAbout2417(laptop.ctx.state,[candidate]).length,2,'full copies: positive control: the laptop holds both answers');
