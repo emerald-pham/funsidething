@@ -37459,7 +37459,7 @@ test('Removed WOOP: Help has no Run WOOP or Last task WOOP answer',async()=>{
 test('Removed WOOP: no other Help answer mentions WOOP',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=helpWithoutChangelog2421(shim.document.getElementById('modalRoot').innerHTML);
  assert.match(help,/Which settings save immediately\?/,'precondition: the settings answer is there');
- assert.match(help,/stay at the bottom of the screen\?<\/dt>/,'precondition: the bottom-row answer is there');
+ assert.match(help,/Where are Yes, No and Can.t\?<\/dt>/,'precondition: the answer about where the choices sit is there');
  assert.doesNotMatch(help,/WOOP/);
 });
 test('Removed WOOP: the changelog has one bullet saying WOOP was removed and saved plans stay in backups and exports',()=>{
