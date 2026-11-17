@@ -15358,12 +15358,6 @@ test('RISK started pass sync: benchmark Done after No — work the chain and Con
  assert.equal(device.status().text,'☁ synced','and syncs: '+device.status().title);
 });
 
-// Run WOOP on an overdue candidate dots it and switches to work mode, so the
-// person works the plan. The same unrecorded switch as benchmark Done (D4).
-// The overdue task is added before Start, so it is not the Start dot (oldest
-// first), and adding no task after Start keeps clear of the separate hold an
-// added task causes at the next answer.
-
 // #2376 contract for every routed control: on the same board, the direct path
 // (no decision history yet) and the replay (history that replays) give the
 // same chain, mode, marks and candidate, and still agree after the next Yes.
