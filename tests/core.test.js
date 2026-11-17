@@ -23376,10 +23376,14 @@ test('RISK steady scanner browser: a double tap or a repeated key answers only t
   try{
    for(const input of ['two touch taps 60 ms apart','two touch taps 120 ms apart','mouse double click','two key presses']){
     const label=`${engineName} ${input}`,touch=input.includes('touch');
-    const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard({tasks:12}),{width:390,height:844,touch});
+    // Titles of one length keep No in place from one candidate to the next, so a
+    // second tap lands on the next candidate's No (#2422 review N1).
+    const board=steadyScannerBoard({tasks:12,taskOver:i=>({title:'Same length title number '+String(i).padStart(2,'0')}),over:{chain:['steady-0','steady-1'],candidateId:'steady-2'}});
+    const {page,context,errors}=await steadyScannerPage(browser,board,{width:390,height:844,touch});
     try{
      await page.waitForSelector('[data-act="no"]',{timeout:15000});await page.waitForTimeout(400);
      const first=await steadyScannerControls(page),at=steadyScannerCenter(first.no);
+     await page.evaluate(()=>{window.steadyPresses=[];document.addEventListener('click',event=>steadyPresses.push({act:event.target.closest?.('[data-act]')?.dataset.act,candidate:state.candidateId}),true);});
      if(input==='mouse double click')await page.mouse.click(at.x,at.y,{clickCount:2,delay:15});
      else if(input==='two key presses'){await page.keyboard.press('n');await page.waitForTimeout(40);await page.keyboard.press('n');}
      else{await page.touchscreen.tap(at.x,at.y);await page.waitForTimeout(input.includes('120')?120:60);await page.touchscreen.tap(at.x,at.y);}
@@ -23387,6 +23391,12 @@ test('RISK steady scanner browser: a double tap or a repeated key answers only t
      await page.waitForTimeout(40);
      const seen=await page.evaluate(()=>({answered:Object.keys(state.considered),candidate:state.candidateId}));
      assert.deepEqual(seen.answered,[first.candidate],`${label}: only the task on screen was answered: ${seen.answered}`);
+     if(input!=='two key presses'){
+      const presses=await page.evaluate(()=>steadyPresses);
+      assert.equal(presses.length,2,`${label}: both presses reached the page: ${JSON.stringify(presses)}`);
+      assert.deepEqual(presses.map(press=>press.act),['no','no'],`${label}: the second press landed on No, a guarded scanner button: ${JSON.stringify(presses)}`);
+      assert.equal(presses[1].candidate,seen.candidate,`${label}: the second press landed on the next candidate's No: ${JSON.stringify(presses)}`);
+     }
      await page.waitForTimeout(400);
      // The next title can be longer, which moves No (#2420), so the later press goes where No is now.
      const later=steadyScannerCenter((await steadyScannerControls(page)).no);
