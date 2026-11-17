@@ -37609,7 +37609,7 @@ async function finalDot2421(task={}){
 const dislodges2421=task=>(task.ratingHistory||[]).filter(row=>row.kind==='dislodge').length;
 test('Removed WOOP: the sole remaining dot after two Dislodges offers no WOOP while paused, with Last task WOOP saved on',async()=>{
  const {ctx,task,scan}=await finalDot2421();
- for(let i=0;i<2;i++){ctx.state.chain=[task.id];ctx.state.mode='work';ctx.dislodge();}
+ for(let i=0;i<2;i++){ctx.state.chain=[task.id];ctx.state.mode='work';ctx.dislodge();await answersCaughtUp(ctx);}
  ctx.state.chain=[task.id];ctx.state.mode='work';ctx.renderScan();
  assert.equal(dislodges2421(task),2,'precondition: two recorded Dislodges');
  assert.match(scan(),/class="card bench"[^]*Private final task/,'precondition: the task is the sole dot');
@@ -37638,6 +37638,30 @@ test('Removed WOOP: a final dot with a saved plan in an unrecognized format show
  assert.equal(task.woopPlan.v,99,'precondition: the future-format plan is saved on the task');
  assert.match(scan(),/class="card bench"[^]*Private final task/,'precondition: the task is the sole dot');
  assert.doesNotMatch(scan(),/WOOP|unrecognized format|future plan 2421/);
+});
+// The changelog opens Help and keeps its history, earlier WOOP releases included.
+const helpWithoutChangelog2421=help=>{
+ const rest=help.replace(/<details class="help-faq" data-help-changelog>[^]*?Show original apology<\/button><\/p><\/details>/,'');
+ assert.notEqual(rest,help,'precondition: Help opens with its changelog');return rest;
+};
+test('Removed WOOP: Help has no Run WOOP or Last task WOOP answer',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/<h3>Scanning and recurrence<\/h3>/,'precondition: Help shows its scanning answers');
+ assert.doesNotMatch(help,/Can I run WOOP on an overdue task\?/);
+ assert.doesNotMatch(help,/What is Last task WOOP\?/);
+});
+test('Removed WOOP: no other Help answer mentions WOOP',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=helpWithoutChangelog2421(shim.document.getElementById('modalRoot').innerHTML);
+ assert.match(help,/Which settings save immediately\?/,'precondition: the settings answer is there');
+ assert.match(help,/stay at the bottom of the screen\?<\/dt>/,'precondition: the bottom-row answer is there');
+ assert.doesNotMatch(help,/WOOP/);
+});
+test('Removed WOOP: the changelog has one bullet saying WOOP was removed and saved plans stay in backups and exports',()=>{
+ const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1];
+ assert.ok(current,'precondition: the current changelog renders');
+ const items=[...current.matchAll(/<li>([\s\S]*?)<\/li>/g)].map(match=>match[1]).filter(item=>/WOOP/.test(item)&&/removed/i.test(item));
+ assert.equal(items.length,1,'exactly one bullet says WOOP was removed');
+ for(const promise of [/Run WOOP/,/Last task WOOP/,/saved plans?/i,/backups/,/exports/])assert.match(items[0],promise);
 });
 test('RISK overdue scanner layout: enlarged candidate title chips and decision footer wrap without clipping choices',async()=>{
  const {ctx,shim}=await loadApp({seed:971});const b=ctx.addTask('Benchmark'),t=ctx.addTask('A readable overdue task title',false,[],{due:ctx.todayISO(-1)});ctx.dotTask(b.id);ctx.state.mode='scan';ctx.state.candidateId=t.id;ctx.renderScan();
