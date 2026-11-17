@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
@@ -77,6 +77,42 @@ function exportedPorts(stdout) {
 
 function ownerOf(ledger, worktree) {
   return JSON.parse(readFileSync(ledger, 'utf8')).entries.filter((entry) => entry.worktree === worktree && entry.status === 'active');
+}
+
+function activeEntries(ledger) {
+  return JSON.parse(readFileSync(ledger, 'utf8')).entries.filter((entry) => entry.status === 'active');
+}
+
+function commitFile(cwd, name, body) {
+  mkdirSync(dirname(join(cwd, name)), { recursive: true });
+  writeFileSync(join(cwd, name), `${body}\n`);
+  git(cwd, 'add', name);
+  git(cwd, 'commit', '--quiet', '-m', body);
+  return git(cwd, 'rev-parse', 'HEAD');
+}
+
+const coordinationClient = fileURLToPath(new URL('./coordination.mjs', import.meta.url));
+
+function coordination(args, cwd, ledger) {
+  return spawnSync(process.execPath, [coordinationClient, ...args], {
+    cwd, encoding: 'utf8', env: { ...process.env, CODEX_COORDINATION_FILE: ledger, DOW_EMULATOR_COORDINATION_FILE: '' },
+  });
+}
+
+// The recorder's opt-in qualification gate, run in a prepared worktree with no
+// port variables in the shell, as an agent runs it.
+function qualificationReadiness(worktree, ledger, evidenceRoot) {
+  const recorder = fileURLToPath(new URL('./record-run.mjs', import.meta.url));
+  const env = {
+    ...process.env, CI: '', CODEX_COORDINATION_FILE: ledger, DOW_EMULATOR_COORDINATION_FILE: '', CHAIN_NATIVE_PORT: '', CHAIN_NATIVE_SMOKE_PORT: '',
+    CHAIN_NATIVE_CANDIDATE_SHA: git(worktree, 'rev-parse', 'HEAD'), CHAIN_NATIVE_CANDIDATE_TREE: git(worktree, 'rev-parse', 'HEAD^{tree}'),
+    CHAIN_NATIVE_OUTPUT: join(evidenceRoot, 'native-output'),
+  };
+  delete env.NODE_TEST_CONTEXT;
+  const result = spawnSync(process.execPath, [recorder, '--repo', worktree, '--evidence-dir', join(evidenceRoot, 'readiness-evidence'),
+    '--purpose', 'green', '--qualification-readiness', '--summary', '--', process.execPath, '-e', '0'], { cwd: worktree, encoding: 'utf8', env });
+  const summary = JSON.parse(result.stdout.trim().split('\n').pop() || '{}');
+  return { status: result.status, errors: (summary.evidence?.errors ?? []).map((error) => error.message) };
 }
 
 test("prepare gives a new worktree its own dependencies and two exported ports, and a reviewer's detached worktree gets different ones", () => {
@@ -161,6 +197,54 @@ test('prepare after a switch to a branch that holds the registration commit move
     assert.equal(owners[0].branchName, 'ticket/1-switch', 'the entry now records the work branch');
     assert.equal(owners[0].startBranchSha, first.startBranchSha, 'the registration commit is kept');
     assert.deepEqual(loopbackPorts(owners[0]), loopbackPorts(first), 'the worktree keeps its ports');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+// Invariant 1, one live worktree has one active entry (PR #2413 B3 and R2-B1,
+// probes R4 and R2-B1): an entry recorded with this checkout's worktree identity
+// is its own whatever the checkout's history. Taking it for an earlier
+// worktree's when the checkout lacked its start commit registered a second entry
+// with two more ports, and qualification readiness there refused.
+test("prepare after a reset or a switch to history without the registration commit keeps the worktree's one entry and its ports, and qualification readiness passes", () => {
+  const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-history-');
+  try {
+    git(main, 'checkout', '--quiet', '-b', 'side');
+    commitFile(main, 'side.md', 'A commit main lacks.');
+    git(main, 'checkout', '--quiet', 'main');
+    const cases = [
+      // R4: the work branch is reset below the commit it was registered at.
+      { name: 'reset', branch: 'ticket/4-reset', after: 'ticket/4-reset', leave: (agent) => git(agent, 'reset', '--quiet', '--hard', 'HEAD~1') },
+      // R2-B1: prepared on Claude Code's branch, then a work branch cut from main.
+      { name: 'switch', branch: 'worktree-agent-switch', after: 'ticket/1-switch', leave: (agent) => git(agent, 'checkout', '--quiet', '-b', 'ticket/1-switch', 'main') },
+    ];
+    for (const { name, branch, after, leave } of cases) {
+      const agent = join(fixture, `agent-${name}`);
+      git(main, 'worktree', 'add', '--quiet', '-b', branch, agent, 'side');
+      assert.equal(run(['prepare'], agent, { ledger, npm }).status, 0);
+      const [first] = ownerOf(ledger, agent);
+      leave(agent);
+      assert.equal(spawnSync('git', ['merge-base', '--is-ancestor', first.startBranchSha, 'HEAD'], { cwd: agent }).status, 1,
+        `${name}: the checkout no longer holds the registration commit`);
+
+      const again = run(['prepare'], agent, { ledger, npm });
+      assert.equal(again.status, 0, again.stderr);
+      const owners = ownerOf(ledger, agent);
+      assert.equal(owners.length, 1, `${name}: the live worktree keeps one active entry`);
+      assert.equal(owners[0].id, first.id, `${name}: it is the same entry`);
+      assert.equal(owners[0].branchName, after, `${name}: on the checkout's branch`);
+      assert.deepEqual(loopbackPorts(owners[0]), loopbackPorts(first), `${name}: with the same two ports`);
+      const duplicate = coordination(['begin', '--work-type', 'tooling', '--intent', `Duplicate ${name}`], agent, ledger);
+      assert.notEqual(duplicate.status, 0, `${name}: begin registers no second entry for the worktree`);
+      assert.match(duplicate.stderr, /already exists for the same Git worktree/);
+      const readiness = qualificationReadiness(agent, ledger, join(fixture, `evidence-${name}`));
+      assert.deepEqual(readiness.errors, [], `${name}: qualification readiness finds the worktree's one entry`);
+      assert.equal(readiness.status, 0);
+    }
+    const active = activeEntries(ledger);
+    assert.equal(active.length, 2, 'one active entry per live worktree');
+    assert.equal(new Set(active.flatMap(loopbackPorts)).size, 4, 'two ports each, and no more');
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }

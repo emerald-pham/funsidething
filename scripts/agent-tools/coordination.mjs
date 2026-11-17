@@ -861,11 +861,14 @@ async function worktreeIdentity(cwd) {
 }
 
 // An entry at this path was left by an earlier worktree when its recorded Git
-// directory differs from this checkout's or this checkout lacks its start
-// commit. Adopting it took over the old branch and start commit (PR #2413 B1).
+// directory differs from this checkout's. Adopting it took over the old branch
+// and start commit (PR #2413 B1). An entry with this checkout's Git directory is
+// its own whatever the checkout's history: judging it by the start commit gave a
+// live worktree a second entry after a reset or switch (PR #2413 B3). Only a
+// legacy entry, recorded before identities, falls back to the start commit.
 async function leftByEarlierWorktree(entry, identity, headSha, cwd) {
   const recorded = objectRecord(entry.worktreeIdentity);
-  if (recorded.inode !== undefined && (recorded.inode !== identity?.inode || recorded.device !== identity?.device)) return true;
+  if (recorded.inode !== undefined) return recorded.inode !== identity?.inode || recorded.device !== identity?.device;
   const start = text(entry.startBranchSha).toLowerCase();
   return /^[0-9a-f]{40}$/.test(start) && !(await gitIsAncestor(start, headSha, cwd).catch(() => false));
 }
