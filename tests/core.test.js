@@ -16,7 +16,7 @@ import {
   replaceIndependentServerPayload263,
   APOLOGY_NOTICE_ID, ORIGINAL_APOLOGY, channelReleaseEnvelope, LEGACY_COMPLETION_RELEASE,
   legacyCompletionSource173, closeLegacyApp173, upgradedLegacyApp173, releasedExpiryStartSource173,
-  scopedUndoClients, woopFixture, woopStep, woopDislodgeTwice, ratingHistoryCopy, ratingHistoryTask,
+  scopedUndoClients, woopFixture, olderWoopPlan2421, olderWoopWrite2421, ratingHistoryCopy, ratingHistoryTask,
   ratingHistoryFixture, __dirname, html, lzStringSrc, sceneTimeline, livingSky, livingLocation,
   landscapeLuminance, manifestHrefFromHtml, serviceWorkerSource, appShellContract,
   serviceWorkerHarness, slice, loadEngine, readConst, extractAppScript, appSrc, makeFakeElement,
@@ -48,7 +48,7 @@ import {
   privateVisibleBackupRows, privateClickBackupDelete, privateAssertBackupSurvives, PRIVATE_EXPIRY_NOW,
   PRIVATE_EXPIRY_OLD, privateLegacyExpiryFixture, privateExpiryLegacyRows, privateExpirySave,
   privateExpiryAssertCurrentBoard, mountPrivateEditInterval, installPrivateDateValueDescriptors,
-  chanceWeatherPaint, sharedSkywriterConsumer, overdueWoopFixture, overdueWoopControl,
+  chanceWeatherPaint, sharedSkywriterConsumer,
   pedestrianReservationPolicy, pedestrianDaytimeSpawnPolicy, assertPedestrianReservationBound,
   pedestrianFrameSelection, pedestrianPresentationConsumer, heldDecisionFixture188, heldDecisionApp188,
   settleRecovery188, recoveryReleasedArtifacts188, settleRecoveryOperations188,
@@ -58,6 +58,7 @@ import { openApp } from "./shared.js"; // #2378 app driver
 import { rewriteGenerationFixture } from "./shared.js";
 import { coldRelaunch2198 } from "./shared.js";
 import { appFixtureScope } from "./shared.js";
+import { woopFields2421, woopBoard2421, woopSnapshot2421 } from "./shared.js"; // #2421 saved WOOP data
 import { backupRowsWithText } from "./shared.js";
 import { releaseKnownCloudCopy2377 } from "./shared.js";
 import { answersCaughtUp } from "./shared.js"; // #2407: History and ranks catch up after an answer shows
@@ -3966,8 +3967,9 @@ test('RISK sync responsiveness guidance: mounted Help and the changelog say answ
  assert.match(rapid,/^No\. You can keep answering while the board saves on this device and syncs\./,'the answer says what the person sees: '+rapid);
  assert.match(rapid,/after a short pause, or at least every 20 seconds or so/);
  assert.match(rapid,/A single Yes or Done with nothing else syncing goes to the cloud at once/);
- const current=shim.document.getElementById('appChangelogCurrent').innerHTML.split('</ul>')[0];
- assert.match(current,/<h3>November 16, 2026<\/h3>/);
+ // Read by its date, as the other release notes are: a later release puts its own heading first.
+ const current=shim.document.getElementById('appChangelogCurrent').innerHTML.split('<h3>November 16, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.ok(current,'the changelog has a November 16, 2026 section');
  const items=current.split('<li>').slice(1);
  assert.ok(items.some(item=>/answering several tasks in a row no longer slows the app down/.test(item)&&!/20 seconds/.test(item)),'the slowdown fix has its own bullet');
  assert.ok(items.some(item=>/after a short pause, or at least every 20 seconds or so/.test(item)),'the cloud timing has its own bullet');
@@ -5884,47 +5886,6 @@ test('RISK scoped Undo: replacement recovery failure and an account race retain 
  assert.equal(JSON.stringify(target.ctx.state),prior,'an account change during recovery cannot authorize the captured replacement');assert.equal(vm.runInContext('undoStack.length',target.ctx),depth);
  target.ctx.window.CloudSync.user='destination@example.com';assert.equal(await target.ctx.onAction('undo',{}),true,'retry retains the original local replacement frame');
 });
-test('RISK Last task WOOP: mounted preference and final paused boundary use unique recorded dislodgements',async()=>{
- const app=await woopFixture(),{ctx,shim,task}=app;
- assert.equal(ctx.state.settings.lastTaskWoop,false,'new boards default off');
- for(const value of [undefined,null,'true',1,{},[]])assert.equal(ctx.normalizeSettings({lastTaskWoop:value}).lastTaskWoop,false);
- ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Last task WOOP/);
- const field=shim.document.getElementById('stLastTaskWoop');field.id='stLastTaskWoop';field.checked=true;field.matches=()=>false;
- shim.document.dispatchEvent({type:'change',target:field});assert.equal(ctx.state.settings.lastTaskWoop,true);ctx.closeModal();
- for(let count=0;count<3;count++){
-  ctx.state.chain=[task.id];ctx.state.mode='work';ctx.renderScan();
-  assert.equal(shim.document.getElementById('scan').innerHTML.includes('Walk Thru WOOP for Final Task'),count===2);
-  if(count<2)ctx.dislodge();
- }
- const history=JSON.parse(JSON.stringify(task.ratingHistory));task.ratingHistory.push(...history);ctx.renderScan();assert.equal(ctx.taskDislodgeCount(task),2,'sync duplicates do not inflate actions');
- const other=ctx.addTask('Private other');ctx.state.chain=[other.id,task.id];ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Walk Thru WOOP/);
- ctx.state.chain=[task.id];ctx.state.mode='scan';ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Walk Thru WOOP/);
- ctx.state.mode='work';ctx.state.interventionActive=true;ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Walk Thru WOOP/,'an active scan intervention is not the paused scanner');ctx.state.interventionActive=false;
- ctx.state.mode='work';ctx.state.settings.lastTaskWoop=false;ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Walk Thru WOOP/);
-});
-test('RISK Last task WOOP: walkthrough saves escaped outcome obstacle plan to bound task and revisits deletes reloads',async()=>{
- const app=await woopFixture(),{ctx,shim,task}=app;woopDislodgeTwice(app);const twin=ctx.addTask(task.title);
- ctx.onAction('woop-start',{dataset:{benchmark:task.id}});assert.match(shim.document.getElementById('modalRoot').innerHTML,/best outcome/i);
- woopStep(app,'<Best outcome>');assert.match(shim.document.getElementById('modalRoot').innerHTML,/obstacle/i);
- woopStep(app,'Private obstacle');assert.match(shim.document.getElementById('modalRoot').innerHTML,/if.*then/i);
- woopStep(app,'If blocked, then take one small step.');await ctx.persist();
- assert.equal(task.woopPlan.outcome,'<Best outcome>');assert.equal(task.woopPlan.obstacle,'Private obstacle');assert.equal(task.woopPlan.plan,'If blocked, then take one small step.');assert.equal(twin.woopPlan,undefined);
- ctx.renderScan();let markup=shim.document.getElementById('scan').innerHTML;assert.match(markup,/&lt;Best outcome&gt;/);assert.match(markup,/Delete WOOP plan/);assert.doesNotMatch(markup,/Walk Thru WOOP/);
- const saved=shim.localStorage.getItem(SYNC_STORE_KEY),reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:saved}});assert.equal(reloaded.ctx.state.tasks.find(t=>t.id===task.id).woopPlan.plan,task.woopPlan.plan);
- ctx.state.settings.lastTaskWoop=false;ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Best outcome|WOOP plan/);assert.ok(task.woopPlan);
- ctx.state.settings.lastTaskWoop=true;ctx.state.chain=[twin.id];ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Best outcome/);
- ctx.state.chain=[task.id];ctx.onAction('woop-delete',{dataset:{benchmark:task.id,plan:task.woopPlan.id}});assert.equal(task.woopPlan,null,'null is a durable deletion tombstone');await ctx.persist();ctx.renderScan();assert.match(shim.document.getElementById('scan').innerHTML,/Walk Thru WOOP/);
- const deleted=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(deleted.ctx.state.tasks.find(t=>t.id===task.id).woopPlan,null);
-});
-test('RISK Last task WOOP: cancel empty repeated stale interrupted and peer-plan actions never mutate replacement tasks',async()=>{
- const app=await woopFixture(),{ctx,task,shim}=app;woopDislodgeTwice(app);
- ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,' ');assert.equal(vm.runInContext('woopDraft.step',ctx),0);ctx.closeModal();assert.equal(task.woopPlan,undefined);
- ctx.onAction('woop-start',{dataset:{benchmark:task.id}});const old=vm.runInContext('({session:woopDraft.id,step:String(woopDraft.step)})',ctx);woopStep(app,'Outcome');ctx.onAction('woop-next',{dataset:old});assert.equal(vm.runInContext('woopDraft.step',ctx),1);
- woopStep(app,'Obstacle');const peer={v:1,id:'peer',outcome:'Peer outcome',obstacle:'Peer obstacle',plan:'If peer, then act'};task.woopPlan=peer;woopStep(app,'If local, then act');assert.equal(task.woopPlan.id,'peer');
- ctx.onAction('woop-delete',{dataset:{benchmark:task.id,plan:'old-plan'}});assert.equal(task.woopPlan.id,'peer');
- task.woopPlan=null;ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,'Outcome');woopStep(app,'Obstacle');const replacement=ctx.addTask('Replacement');ctx.state.chain=[replacement.id];woopStep(app,'If replaced, then act');assert.equal(task.woopPlan,null);assert.equal(replacement.woopPlan,undefined);
- ctx.state.chain=[task.id];ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,'Outcome');woopStep(app,'Obstacle');ctx.state.settings.lastTaskWoop=false;woopStep(app,'If off, then act');assert.equal(task.woopPlan,null);
-});
 test('RISK Last task WOOP: atomic stale-tab rebase preserves newer fields peer plans and deletion tombstones',async()=>{
  const {ctx,task}=await woopFixture();const base=JSON.parse(ctx.cloudPayload()),local=JSON.parse(JSON.stringify(base)),peer=JSON.parse(JSON.stringify(base));
  const plan={v:1,id:'local',outcome:'Outcome',obstacle:'Obstacle',plan:'If obstacle, then action'};local.tasks[0].woopPlan=plan;peer.tasks[0].title='Newer title';ctx.rebaseTaskEditorFields(peer,local,base);assert.equal(peer.tasks[0].title,'Newer title');assert.equal(peer.tasks[0].woopPlan.id,'local');
@@ -5933,44 +5894,37 @@ test('RISK Last task WOOP: atomic stale-tab rebase preserves newer fields peer p
  const released=JSON.parse(JSON.stringify(base));ctx.mergeUndeletedTasks(released,local);assert.equal(released.tasks[0].woopPlan.id,'local','old-client omission preserves unknown task plan');
 });
 test('RISK Last task WOOP: causal plan evidence defeats old-client-carried plans and deliberate Undo records successor',async()=>{
- const app=await woopFixture(),{ctx,task}=app;woopDislodgeTwice(app);
- ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,'Outcome');woopStep(app,'Obstacle');woopStep(app,'If obstacle, then act');await ctx.persist();
+ const app=await woopFixture(),{ctx,task}=app;
+ olderWoopWrite2421(ctx,task,olderWoopPlan2421('Outcome','Obstacle','If obstacle, then act'));await ctx.persist();
  const old=JSON.parse(ctx.cloudPayload()),first=task.woopPlan.id;
- ctx.onAction('woop-delete',{dataset:{benchmark:task.id,plan:first}});await ctx.persist();const latest=JSON.parse(ctx.cloudPayload());
+ olderWoopWrite2421(ctx,task,null);await ctx.persist();const latest=JSON.parse(ctx.cloudPayload());
  ctx.mergeUndeletedTasks(old,latest);assert.equal(old.tasks[0].woopPlan,null,'newer old shell carrying stale defined plan cannot defeat deletion');
  ctx.undo();await ctx.persist();assert.equal(ctx.state.tasks.find(t=>t.id===task.id).woopPlan.outcome,'Outcome','deliberate Undo creates a successor to deletion');
  const restored=JSON.parse(ctx.cloudPayload());ctx.mergeUndeletedTasks(latest,restored);assert.equal(latest.tasks[0].woopPlan.outcome,'Outcome');
 });
 test('RISK Last task WOOP: real stale-tab saves preserve newer title plan and deletion plus offline reload',async()=>{
- const app=await woopFixture();woopDislodgeTwice(app);await app.ctx.persist();const raw=app.shim.localStorage.getItem(SYNC_STORE_KEY),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const app=await woopFixture();await app.ctx.persist();const raw=app.shim.localStorage.getItem(SYNC_STORE_KEY),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
  const a=await loadApp({sharedStorage:storage}),b=await loadApp({sharedStorage:storage}),id=app.task.id;
- a.ctx.onAction('woop-start',{dataset:{benchmark:id}});woopStep(a,'Local outcome');woopStep(a,'Local obstacle');
  b.ctx.state.tasks.find(t=>t.id===id).title='Newer peer title';b.ctx.commit();await b.ctx.persist();
- woopStep(a,'If blocked, then start small');await a.ctx.persist();let saved=JSON.parse(storage.getItem(SYNC_STORE_KEY)),task=saved.tasks.find(t=>t.id===id);
+ olderWoopWrite2421(a.ctx,a.ctx.state.tasks.find(t=>t.id===id),olderWoopPlan2421('Local outcome','Local obstacle','If blocked, then start small'));await a.ctx.persist();let saved=JSON.parse(storage.getItem(SYNC_STORE_KEY)),task=saved.tasks.find(t=>t.id===id);
  assert.equal(task.title,'Newer peer title');assert.equal(task.woopPlan.outcome,'Local outcome');
  const stale=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(saved)}}),current=await loadApp({sharedStorage:storage});
- current.ctx.onAction('woop-delete',{dataset:{benchmark:id,plan:task.woopPlan.id}});await current.ctx.persist();
+ olderWoopWrite2421(current.ctx,current.ctx.state.tasks.find(t=>t.id===id),null);await current.ctx.persist();
  const latest=JSON.parse(storage.getItem(SYNC_STORE_KEY));stale.ctx.mergeUndeletedTasks(stale.ctx.state,latest);assert.equal(stale.ctx.state.tasks.find(t=>t.id===id).woopPlan,null);
  const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(latest)}});assert.equal(reload.ctx.state.tasks.find(t=>t.id===id).woopPlan,null);assert.equal(reload.ctx.state.tasks.find(t=>t.id===id).title,'Newer peer title');
 });
 test('RISK Last task WOOP: cloud offline failed pull reconnect completion and Undo retain task-owned causal plan',async()=>{
- const app=await woopFixture();woopDislodgeTwice(app);const h=makeSyncHarness({remote:null,rev:0}),id=app.task.id;
+ const app=await woopFixture();const h=makeSyncHarness({remote:null,rev:0}),id=app.task.id;
  app.ctx.window.CloudSync=h.factory();await app.ctx.cloudPull();await app.ctx.cloudPushNow();await syncSettle(60);const base=JSON.parse(JSON.stringify(app.ctx.state));
  const a=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory}),b=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory});
  await syncSettle(40);await a.ctx.cloudPull();await b.ctx.cloudPull();
- h.failPull=true;a.ctx.state.mode='work';a.ctx.state.chain=[id];a.ctx.onAction('woop-start',{dataset:{benchmark:id}});woopStep(a,'Offline outcome');woopStep(a,'Offline obstacle');woopStep(a,'If offline, then take a small step');await a.ctx.persist();
+ h.failPull=true;olderWoopWrite2421(a.ctx,a.ctx.state.tasks.find(t=>t.id===id),olderWoopPlan2421('Offline outcome','Offline obstacle','If offline, then take a small step'));await a.ctx.persist();
  const offlineRaw=a.shim.localStorage.getItem(SYNC_STORE_KEY),offline=await loadApp({seedStorage:{[SYNC_STORE_KEY]:offlineRaw}});assert.equal(offline.ctx.state.tasks.find(t=>t.id===id).woopPlan.outcome,'Offline outcome');
  h.failPull=false;await a.ctx.cloudPull();await a.ctx.cloudPushNow();await syncSettle(60);await b.ctx.cloudPull();
  assert.equal(h.remoteState().tasks.find(t=>t.id===id).woopPlan.outcome,'Offline outcome');assert.equal(b.ctx.state.tasks.find(t=>t.id===id).woopPlan.outcome,'Offline outcome');
  const task=b.ctx.state.tasks.find(t=>t.id===id),ops=JSON.stringify(task.woopPlanOps);task.evergreen=true;task.evergreenResetAtDay=false;b.ctx.state.chain=[id];b.ctx.pushUndo();b.ctx.completeTask(task);await b.ctx.persist();await b.ctx.cloudPushNow();await syncSettle(40);await a.ctx.cloudPull();
  assert.ok(a.ctx.state.tasks.find(t=>t.id===id).lastDoneAt);assert.equal(a.ctx.state.tasks.find(t=>t.id===id).woopPlan.outcome,'Offline outcome');assert.equal(JSON.stringify(a.ctx.state.tasks.find(t=>t.id===id).woopPlanOps),ops,'automatic adoption mints no plan operations');
  b.ctx.undo();await b.ctx.persist();assert.equal(b.ctx.state.tasks.find(t=>t.id===id).woopPlan.outcome,'Offline outcome');
-});
-test('RISK Last task WOOP: unsupported data survives reload and replacement and interrupted board ownership blocks save',async()=>{
- const app=await woopFixture(),{ctx,task,shim}=app;woopDislodgeTwice(app);
- const unknown={v:99,payload:{private:'future plan'}};task.woopPlan=unknown;await ctx.persist();const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.deepEqual(JSON.parse(JSON.stringify(reload.ctx.state.tasks.find(t=>t.id===task.id).woopPlan)),unknown);
- ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Walk Thru WOOP|Delete WOOP plan/);ctx.onAction('woop-start',{dataset:{benchmark:task.id}});assert.equal(vm.runInContext('woopDraft',ctx),null);
- delete task.woopPlan;ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,'Outcome');woopStep(app,'Obstacle');ctx.replaceState(JSON.parse(ctx.cloudPayload()));woopStep(app,'If replaced, then act');assert.equal(ctx.state.tasks.find(t=>t.id===task.id).woopPlan,undefined,'same-account same-ID replacement invalidates draft');
 });
 test('RISK carrying recovery: rejected actual phone sequence requires strikes opposed swing and a coherent flight arc',async()=>{
  const {readMotionBuild,createMotionProbe}=await import('../scripts/motion-review-harness.mjs'),build=readMotionBuild(__dirname,'WORKTREE');
@@ -10697,11 +10651,11 @@ test("RISK committed settings: every remaining Settings field saves when committ
   const app = await loadApp({ seed: 2303 }), { ctx, shim } = app;
   ctx.openSettings();
   const committed = { stHorizon: 90, stCantMin: 12, stWorkedHrs: 20, stThresh: 30, stSamples: 400, stPostponeHours: 2.5,
-    stEverHours: 3, stEverUnit: "days", stEverReset: false, stShowPostpone: true, stLastTaskWoop: true, stFloatingHeader: true,
+    stEverHours: 3, stEverUnit: "days", stEverReset: false, stShowPostpone: true, stFloatingHeader: true,
     stPatternedIndicators: true, stDateFormat: "ymd", stListMetric: "chance", stScanMode: "chance", stChainStartsWith: "mostLikely" };
   for (const [id, value] of Object.entries(committed)) commitSetting(shim, id, value);
   const expected = { horizonMin: 90, cantMin: 12, workedHours: 20, thresholdPct: 30, samples: 400, postponeHours: 2.5, evergreenHours: 72,
-    evergreenResetAtDay: false, showPostpone: true, lastTaskWoop: true, floatingHeader: true, patternedIndicators: true,
+    evergreenResetAtDay: false, showPostpone: true, floatingHeader: true, patternedIndicators: true,
     dateFormat: "ymd", listMetric: "chance", scanMode: "chance", chainStartsWith: "mostLikely" };
   const pick = settings => Object.fromEntries(Object.keys(expected).map(key => [key, settings[key]]));
   assert.deepEqual(pick(ctx.state.settings), expected, "each committed field saved without a Save settings button");
@@ -13325,8 +13279,8 @@ const tapControl221 = (shim, control) => shim.document.dispatchEvent({ type: "cl
 const settledBoard221 = () => new Promise(resolve => setTimeout(resolve, 240));   // longer than the pause, as a person reading takes
 test("UI #221: for a moment after Return as candidate closes the editor, a press does nothing wherever it lands, and a moment later it works, Undo included", async t => {
   const uncovered = [
-    ["done adding for now in the pinned row", ({ panel }) => panel.find(control => control.dataset.act === "start-working")],
-    ["the list toggle in the pinned row", ({ panel }) => panel.find(control => control.dataset.act === "toggle-list")],
+    ["done adding for now in the finish row", ({ panel }) => panel.find(control => control.dataset.act === "start-working")],
+    ["the list toggle in the finish row", ({ panel }) => panel.find(control => control.dataset.act === "toggle-list")],
     ["a pill in the chain", ({ panel, first }) => panel.find(control => control.classList.contains("crumb") && control.dataset.id === first.id)],
     ["Done on the benchmark card", ({ panel }) => panel.find(control => control.dataset.act === "bench-done")],
     ["Edit on the candidate card", ({ panel, ctx }) => panel.find(control => control.dataset.act === "edit" && control.dataset.id === ctx.state.candidateId)],
@@ -23199,10 +23153,10 @@ test('Scanner browser: secondary actions dim during scanning and brighten for fo
  }finally{await browser.close();}
 });
 
-// #2312 (spec #2308 slice 4): Yes, No and Can't stay under the thumb. This journey
-// runs at phone size in Chromium and WebKit with real touch taps. Every answer
-// after the first taps the spot Yes, No and Can't first appeared at, across
-// titles from a few words to a full paragraph and a chain that keeps growing.
+// #2312 (spec #2308 slice 4) built this journey; #2420 moved Yes, No and Can't
+// back inside the scanner box. It runs at phone and tablet size in Chromium and
+// WebKit with real touch taps, across titles from a few words to a full
+// paragraph and a chain that keeps growing.
 const STEADY_SCANNER_FILLER='ask for the quote again and compare the two replies before deciding what to keep ';
 const steadyScannerBoard=({tasks=60,showPostpone=false,over={},taskOver=()=>({})}={})=>JSON.stringify(syncState({
  tasks:Array.from({length:tasks},(_,i)=>({...syncTask('steady-'+i,'Steady task '+i+' '+STEADY_SCANNER_FILLER.repeat([0,0,1,3,0,6,1][i%7])),createdAt:1790000000000+i,...taskOver(i)})),
@@ -23226,7 +23180,10 @@ async function steadyScannerPage(browser,board,{width=390,height=844,touch=true}
  return {context,page,errors};
 }
 const steadyScannerCenter=box=>({x:box.left+box.width/2,y:box.top+box.height/2});
+// Since #2420 the choices scroll with the page, so a person scrolls them onto
+// the screen before pressing one; where they are is read from there.
 const steadyScannerControls=page=>page.evaluate(()=>{
+ document.querySelector('.decide,[data-act="continue-scan"]')?.scrollIntoView({block:'center'});
  const box=act=>{const el=document.querySelector(`[data-act="${act}"]`);if(!el)return null;const r=el.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height};};
  return {yes:box('yes'),no:box('no'),cant:box('cant'),continue:box('continue-scan'),candidate:state.candidateId,intervention:!!state.interventionActive,chain:state.chain.length,viewportHeight:innerHeight,viewportWidth:innerWidth};
 });
@@ -23244,26 +23201,45 @@ async function steadyScannerAnswer(page,point,prior){
  await page.touchscreen.tap(point.x,point.y);
  await page.waitForFunction(prior=>state.candidateId!==prior||state.interventionActive,prior,{timeout:10000});
 }
-test('RISK steady scanner browser: Yes No and Cant keep their exact position on screen through a long run of real taps with varied titles in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+// The choices move a little with the title's length (#2420 accepts that), so
+// every answer taps where the choice is now, scrolled onto the screen first as
+// a person would. Scrolling the page by a known amount has to carry the
+// choices by exactly that amount: a row pinned to the screen would stay put.
+test('RISK steady scanner browser: Yes No and Cant sit inside the scanner box below the question and scroll with the page through a long run of real taps with varied titles in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const ANSWERS=36,failures=[];
  for(const [baseEngineName,engine] of await steadyScannerEngines())for(const viewport of [{width:390,height:844},{width:768,height:1024}]){
   const engineName=`${baseEngineName} ${viewport.width}px`;
   const browser=await engine.launch({headless:true,...(baseEngineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
   try{
-   const {page,errors}=await steadyScannerPage(browser,steadyScannerBoard({taskOver:i=>i%11===3?{due:'2026-01-02'}:{}}),viewport);
+   const {page,errors}=await steadyScannerPage(browser,steadyScannerBoard({over:{listOpen:true},taskOver:i=>i%11===3?{due:'2026-01-02'}:{}}),viewport);
    await steadyScannerStart(page);
-   let home=null,answered=0;
+   let answered=0;
    for(let guard=0;answered<ANSWERS&&guard<ANSWERS*3;guard++){
     const now=await steadyScannerControls(page);
     if(now.intervention){const c=steadyScannerCenter(now.continue);await page.touchscreen.tap(c.x,c.y);await page.waitForFunction(()=>!state.interventionActive,null,{timeout:10000});continue;}
     assert.ok(now.yes&&now.no&&now.cant,`${engineName} answer ${answered}: Yes, No and Can't are showing`);
-    home??=now;
+    const placed=await page.evaluate(()=>{
+     const rect=el=>{const r=el.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom};};
+     const at=()=>({scan:rect(document.getElementById('scan')),question:rect(document.querySelector('.qline')),...Object.fromEntries(['yes','no','cant'].map(act=>[act,rect(document.querySelector(`[data-act="${act}"]`))]))});
+     const scroller=document.scrollingElement,from=scroller.scrollTop,before=at();
+     scroller.scrollTop=from>40?from-37:from+37;
+     const moved=scroller.scrollTop-from,after=at();
+     scroller.scrollTop=from;
+     return {before,after,moved};
+    });
+    const {before,after,moved}=placed;
+    assert.ok(Math.abs(moved)>=30,`${engineName} answer ${answered}: positive control: the page scrolled ${moved}px`);
     for(const act of ['yes','no','cant']){
-     assert.ok(Math.abs(now[act].top-home[act].top)<=1&&Math.abs(now[act].left-home[act].left)<=1,`${engineName} answer ${answered}: ${act} stayed where it first appeared (chain ${now.chain}): started at ${Math.round(home[act].left)},${Math.round(home[act].top)} and is now at ${Math.round(now[act].left)},${Math.round(now[act].top)}`);
-     assert.ok(now[act].top>=0&&now[act].bottom<=now.viewportHeight&&now[act].left>=0&&now[act].right<=now.viewportWidth,`${engineName} answer ${answered}: ${act} is fully on screen: bottom ${Math.round(now[act].bottom)} of ${now.viewportHeight}`);
+     const c=before[act];
+     assert.ok(c.left>=before.scan.left&&c.right<=before.scan.right&&c.top>=before.scan.top&&c.bottom<=before.scan.bottom,`${engineName} answer ${answered}: ${act} sits inside the scanner box: ${JSON.stringify(c)} in ${JSON.stringify(before.scan)}`);
+     assert.ok(c.top>=before.question.bottom,`${engineName} answer ${answered}: ${act} sits below the question: starts ${Math.round(c.top)}, the question ends ${Math.round(before.question.bottom)}`);
+     assert.ok(Math.abs((before[act].top-after[act].top)-moved)<=1,`${engineName} answer ${answered}: ${act} scrolls with the page: the page moved ${moved}px and ${act} moved ${Math.round(before[act].top-after[act].top)}px`);
     }
     const act=answered%3===1?'yes':answered%7===5?'cant':'no';
-    await steadyScannerAnswer(page,steadyScannerCenter(home[act]),now.candidate);
+    await page.locator(`[data-act="${act}"]`).evaluate(el=>el.scrollIntoView({block:'center'}));
+    const target=(await steadyScannerControls(page))[act];
+    assert.ok(target.top>=-1&&target.bottom<=now.viewportHeight+1,`${engineName} answer ${answered}: ${act} can be scrolled fully onto the screen: ${JSON.stringify(target)} of ${now.viewportHeight}`);
+    await steadyScannerAnswer(page,steadyScannerCenter(target),now.candidate);
     answered++;
    }
    assert.equal(answered,ANSWERS,`${engineName}: every answer was accepted`);
@@ -23312,17 +23288,25 @@ const STEADY_ENLARGED_TEXT='.btn{font-size:21px!important}.crumbs{font-size:19px
 const steadySeededBoard=({floatingHeader=false,showPostpone=false,tasks=8}={})=>steadyScannerBoard({tasks,showPostpone,
  taskOver:i=>i===2?{due:'2026-01-02'}:{},
  over:{chain:['steady-0','steady-1'],candidateId:'steady-2',settings:{floatingHeader}}});
-test('RISK steady scanner browser: pinned choices stay readable and clear of content across narrow enlarged short-landscape floating-header and Run WOOP views in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+// #2420: the choices scroll with the page, so reachable means a person can
+// scroll each one fully onto the screen, clear of a floating header, and tap it.
+test('RISK steady scanner browser: every choice stays reachable unclipped and inside the scanner box across narrow enlarged short-landscape floating-header and overdue views in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[];
  const measure=page=>page.evaluate(()=>{
   const box=el=>{if(!el)return null;const r=el.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height};};
-  const controls=['yes','no','cant','postpone','run-woop'].map(act=>[act,document.querySelector(`[data-act="${act}"]`)]).filter(([,el])=>el);
-  const scroller=document.scrollingElement;scroller.scrollTo(0,scroller.scrollHeight);
-  const foot=box(document.querySelector('.foot')),title=document.querySelector('.card.cand .title');
-  const atEnd={foot,scrollY:scrollY};scroller.scrollTo(0,0);
-  return {controls:Object.fromEntries(controls.map(([act,el])=>[act,{...box(el),clipped:el.scrollWidth>el.clientWidth+1||el.scrollHeight>el.clientHeight+1}])),
-   titleText:title.textContent.trim(),titleClipped:title.scrollWidth>title.clientWidth+1||title.scrollHeight>title.clientHeight+1,atEnd,header:box(document.getElementById('appHeader')),headerFloating:document.getElementById('appHeader').classList.contains('floating'),
-   finishTop:box(document.querySelector('.decide-finish')).top,overflow:document.documentElement.scrollWidth-innerWidth,viewportHeight:innerHeight,viewportWidth:innerWidth};
+  const controls=['yes','no','cant','postpone'].map(act=>[act,document.querySelector(`[data-act="${act}"]`)]).filter(([,el])=>el);
+  const header=document.getElementById('appHeader'),scan=document.getElementById('scan'),title=document.querySelector('.card.cand .title');
+  const reach=el=>{
+   el.scrollIntoView({block:'center'});
+   const r=box(el),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);
+   return {...r,scan:box(scan),hit:!!hit&&el.contains(hit),clipped:el.scrollWidth>el.clientWidth+1||el.scrollHeight>el.clientHeight+1};
+  };
+  const seen=Object.fromEntries(controls.map(([act,el])=>[act,reach(el)]));
+  // #2422 review B1: the finish row's button is a decision-row button too.
+  const finish=document.querySelector('.decide-finish [data-act="start-working"]');if(finish)seen['start-working']=reach(finish);
+  document.scrollingElement.scrollTo(0,0);
+  return {controls:seen,titleText:title.textContent.trim(),titleClipped:title.scrollWidth>title.clientWidth+1||title.scrollHeight>title.clientHeight+1,
+   headerFloating:header.classList.contains('floating'),overflow:document.documentElement.scrollWidth-innerWidth,viewportHeight:innerHeight,viewportWidth:innerWidth};
  });
  for(const [engineName,engine] of await steadyScannerEngines()){
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
@@ -23344,30 +23328,35 @@ test('RISK steady scanner browser: pinned choices stay readable and clear of con
     const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard(spec),spec);
     try{
      if(spec.enlarged)await page.addStyleTag({content:STEADY_ENLARGED_TEXT});
-     await page.waitForFunction(()=>!!document.querySelector('[data-act="run-woop"]'),null,{timeout:15000}).catch(()=>{throw new Error(`${label}: the overdue candidate offers Run WOOP`);});
+     // #2421 removed Run WOOP: the overdue candidate gets only the ordinary choices.
+     await page.waitForFunction(()=>!!document.querySelector('.card.cand .due-overdue')&&!!document.querySelector('[data-act="no"]'),null,{timeout:15000}).catch(()=>{throw new Error(`${label}: the overdue candidate is offered`);});
+     assert.equal(await page.locator('[data-act="run-woop"]').count(),0,`${label}: the overdue candidate offers no Run WOOP`);
      await page.waitForTimeout(80);
      const shot=await measure(page);
-     const pinnedTop=Math.min(shot.finishTop,...Object.values(shot.controls).map(c=>c.top));
      for(const [act,c] of Object.entries(shot.controls)){
-      assert.ok(c.top>=0&&c.bottom<=shot.viewportHeight&&c.left>=0&&c.right<=shot.viewportWidth,`${label}: ${act} is on screen: ${JSON.stringify(c)}`);
+      assert.ok(c.top>=-1&&c.bottom<=shot.viewportHeight+1&&c.left>=0&&c.right<=shot.viewportWidth,`${label}: ${act} can be scrolled fully onto the screen: ${JSON.stringify(c)}`);
+      assert.ok(c.left>=c.scan.left&&c.right<=c.scan.right&&c.top>=c.scan.top&&c.bottom<=c.scan.bottom,`${label}: ${act} sits inside the scanner box`);
+      assert.equal(c.hit,true,`${label}: nothing covers ${act} once it is on screen`);
       assert.equal(c.clipped,false,`${label}: ${act} shows its whole label`);
       assert.ok(c.height>=44,`${label}: ${act} is ${Math.round(c.height)} px tall, too small to tap`);
      }
+     // "done adding for now" has the choices' 44px tap height (#2422 review B1,
+     // checked with the choices above) and its own line under them (review B2).
+     const doneAdding=shot.controls['start-working'],yes=shot.controls.yes;
+     assert.ok(doneAdding,`${label}: done adding for now is offered while dots are on the chain`);
+     assert.ok(doneAdding.top-doneAdding.scan.top>=yes.bottom-yes.scan.top-0.5,`${label}: done adding for now sits on its own line under the choices: it starts ${Math.round(doneAdding.top-doneAdding.scan.top)} px into the box, Yes ends at ${Math.round(yes.bottom-yes.scan.top)} px`);
      assert.ok(shot.overflow<=0,`${label}: no sideways page overflow: ${shot.overflow}`);
-     assert.ok(shot.atEnd.foot.bottom<=pinnedTop+1,`${label}: scrolled to the end, the footer clears the pinned row: footer ends ${Math.round(shot.atEnd.foot.bottom)}, the row starts ${Math.round(pinnedTop)}`);
      assert.equal(shot.titleText,('Steady task 2 '+STEADY_SCANNER_FILLER).trim(),`${label}: the candidate title is shown in full`);
      assert.equal(shot.titleClipped,false,`${label}: the candidate title is not cut off`);
-     if(spec.floatingHeader){assert.equal(shot.headerFloating,true,`${label}: the header floats`);assert.ok(shot.header.bottom<=pinnedTop,`${label}: the floating header and pinned row do not overlap`);}
-     // Run WOOP belongs to one candidate, so it must not move the choices when it goes.
+     if(spec.floatingHeader)assert.equal(shot.headerFloating,true,`${label}: the header floats`);
+     // A real press on No, where a person scrolled it, answers the overdue candidate.
      await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
-     const withWoop=await steadyScannerControls(page);
-     await page.evaluate(()=>document.scrollingElement.scrollTo(0,0));
-     const answerAt=steadyScannerCenter(withWoop.no);
+     await page.locator('[data-act="no"]').evaluate(el=>el.scrollIntoView({block:'center'}));
+     const overdue=await steadyScannerControls(page);
+     const answerAt=steadyScannerCenter(overdue.no);
      if(spec.touch===false)await page.mouse.click(answerAt.x,answerAt.y);else await page.touchscreen.tap(answerAt.x,answerAt.y);
-     await page.waitForFunction(prior=>state.candidateId!==prior,withWoop.candidate,{timeout:10000});
-     const after=await steadyScannerControls(page);
-     assert.equal(await page.locator('[data-act="run-woop"]').count(),0,`${label}: the next candidate is not overdue`);
-     for(const act of ['yes','no','cant'])assert.ok(Math.abs(after[act].top-withWoop[act].top)<=1&&Math.abs(after[act].left-withWoop[act].left)<=1,`${label}: ${act} stays put when Run WOOP goes: ${Math.round(withWoop[act].top)} to ${Math.round(after[act].top)}`);
+     await page.waitForFunction(prior=>state.candidateId!==prior,overdue.candidate,{timeout:10000});
+     assert.equal(await page.locator('.card.cand .due-overdue').count(),0,`${label}: the next candidate is not overdue`);
      assert.deepEqual(errors,[],`${label}: no page errors`);
     }catch(error){failures.push(error.message);}finally{await context.close();}
    }
@@ -23376,9 +23365,62 @@ test('RISK steady scanner browser: pinned choices stay readable and clear of con
  assert.deepEqual(failures,[]);
 });
 
-// With the row pinned, a second tap lands on the button of the next candidate
-// before anyone could have read it, so a physical press inside 200 ms of the new
-// task appearing is dropped.
+// #2422 review B2: when the finish row shared the choices' line at a tight width,
+// the rank chip broke at its hyphen and the list toggle squeezed to about 20px.
+// As in the released build, the finish row always takes its own line under the
+// choices, inside the scanner box, and neither the chip nor the toggle shrinks.
+// Web fonts change every width here, so each width runs with them allowed and
+// blocked (fallback fonts made it happen at every desktop width with Postpone).
+test('RISK steady scanner browser: the finish row sits on its own line under the choices with its rank chip on one line and the list toggle at full size at every width with and without web fonts and Postpone in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[],origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin,fontHosts=['fonts.googleapis.com','fonts.gstatic.com'];
+ const read=page=>page.evaluate(()=>{
+  const box=el=>{const r=el.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height};};
+  const finish=document.querySelector('.decide-finish'),chip=finish?.querySelector('.topkchip'),toggle=finish?.querySelector('[data-act="toggle-list"]');
+  if(!finish||!chip||!toggle)return null;
+  const range=document.createRange();range.selectNodeContents(chip);
+  const lines=new Set([...range.getClientRects()].filter(r=>r.width>0).map(r=>Math.round(r.top))).size;
+  const choices=['yes','no','cant','postpone'].map(act=>document.querySelector(`.decide>[data-act="${act}"]`)).filter(Boolean).map(box);
+  return {finish:box(finish),scan:box(document.getElementById('scan')),choices,chipLines:lines,chipText:chip.textContent,toggle:box(toggle),
+   fonts:[...document.fonts].filter(face=>face.status==='loaded').length,overflow:document.documentElement.scrollWidth-innerWidth};
+ });
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const fonts of ['web fonts','fonts blocked'])for(const showPostpone of [false,true])for(const width of [600,640,700,768,900,1024,1280]){
+    const label=`${engineName} ${width}px ${fonts}${showPostpone?' with Postpone':''}`;
+    const context=await browser.newContext({viewport:{width,height:900},deviceScaleFactor:2,serviceWorkers:'block',reducedMotion:'reduce'});
+    try{
+     await context.route('**/*',route=>{const url=new URL(route.request().url());return url.origin===origin||fonts==='web fonts'&&fontHosts.includes(url.hostname)?route.continue():route.abort();});
+     await context.addInitScript(board=>{
+      Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+      localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+      if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+     },steadyScannerBoard({tasks:24,showPostpone,over:{chain:['steady-0','steady-1'],candidateId:'steady-2'}}));
+     const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+     await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]')&&!!document.querySelector('.decide-finish .topkchip'),null,{timeout:60000});
+     await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(120);
+     const seen=await read(page);
+     assert.ok(seen,`${label}: the finish row shows done adding for now, the rank chip and the list toggle`);
+     if(fonts==='fonts blocked')assert.equal(seen.fonts,0,`${label}: positive control: no web font loaded`);
+     else assert.ok(seen.fonts>0,`${label}: positive control: the web fonts loaded, which needs the network`);
+     assert.equal(seen.chipLines,1,`${label}: the rank chip "${seen.chipText}" stays on one line`);
+     assert.ok(Math.abs(seen.toggle.width-30)<=0.5&&Math.abs(seen.toggle.height-30)<=0.5,`${label}: the list toggle keeps its 30 x 30 size: ${seen.toggle.width} x ${seen.toggle.height}`);
+     const lowest=Math.max(...seen.choices.map(c=>c.bottom));
+     assert.ok(seen.finish.top>=lowest-0.5,`${label}: the finish row starts on its own line under the choices: it starts at ${Math.round(seen.finish.top)}, the choices end at ${Math.round(lowest)}`);
+     assert.ok(seen.finish.left>=seen.scan.left&&seen.finish.right<=seen.scan.right&&seen.finish.bottom<=seen.scan.bottom,`${label}: the finish row sits inside the scanner box`);
+     assert.ok(seen.overflow<=0,`${label}: no sideways page overflow: ${seen.overflow}`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(error.message.split('\n')[0]);}finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+// When the next title is as long as the last, a second tap lands on the button
+// of the next candidate before anyone could have read it, so a physical press
+// inside 200 ms of the new task appearing is dropped.
 test('RISK steady scanner browser: a double tap or a repeated key answers only the shown task and the next answer after the window is accepted in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[];
  for(const [engineName,engine] of await steadyScannerEngines()){
@@ -23386,10 +23428,14 @@ test('RISK steady scanner browser: a double tap or a repeated key answers only t
   try{
    for(const input of ['two touch taps 60 ms apart','two touch taps 120 ms apart','mouse double click','two key presses']){
     const label=`${engineName} ${input}`,touch=input.includes('touch');
-    const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard({tasks:12}),{width:390,height:844,touch});
+    // Titles of one length keep No in place from one candidate to the next, so a
+    // second tap lands on the next candidate's No (#2422 review N1).
+    const board=steadyScannerBoard({tasks:12,taskOver:i=>({title:'Same length title number '+String(i).padStart(2,'0')}),over:{chain:['steady-0','steady-1'],candidateId:'steady-2'}});
+    const {page,context,errors}=await steadyScannerPage(browser,board,{width:390,height:844,touch});
     try{
      await page.waitForSelector('[data-act="no"]',{timeout:15000});await page.waitForTimeout(400);
      const first=await steadyScannerControls(page),at=steadyScannerCenter(first.no);
+     await page.evaluate(()=>{window.steadyPresses=[];document.addEventListener('click',event=>steadyPresses.push({act:event.target.closest?.('[data-act]')?.dataset.act,candidate:state.candidateId}),true);});
      if(input==='mouse double click')await page.mouse.click(at.x,at.y,{clickCount:2,delay:15});
      else if(input==='two key presses'){await page.keyboard.press('n');await page.waitForTimeout(40);await page.keyboard.press('n');}
      else{await page.touchscreen.tap(at.x,at.y);await page.waitForTimeout(input.includes('120')?120:60);await page.touchscreen.tap(at.x,at.y);}
@@ -23397,8 +23443,16 @@ test('RISK steady scanner browser: a double tap or a repeated key answers only t
      await page.waitForTimeout(40);
      const seen=await page.evaluate(()=>({answered:Object.keys(state.considered),candidate:state.candidateId}));
      assert.deepEqual(seen.answered,[first.candidate],`${label}: only the task on screen was answered: ${seen.answered}`);
+     if(input!=='two key presses'){
+      const presses=await page.evaluate(()=>steadyPresses);
+      assert.equal(presses.length,2,`${label}: both presses reached the page: ${JSON.stringify(presses)}`);
+      assert.deepEqual(presses.map(press=>press.act),['no','no'],`${label}: the second press landed on No, a guarded scanner button: ${JSON.stringify(presses)}`);
+      assert.equal(presses[1].candidate,seen.candidate,`${label}: the second press landed on the next candidate's No: ${JSON.stringify(presses)}`);
+     }
      await page.waitForTimeout(400);
-     if(touch)await page.touchscreen.tap(at.x,at.y);else if(input==='two key presses')await page.keyboard.press('n');else await page.mouse.click(at.x,at.y);
+     // The next title can be longer, which moves No (#2420), so the later press goes where No is now.
+     const later=steadyScannerCenter((await steadyScannerControls(page)).no);
+     if(touch)await page.touchscreen.tap(later.x,later.y);else if(input==='two key presses')await page.keyboard.press('n');else await page.mouse.click(later.x,later.y);
      await page.waitForFunction(prior=>state.candidateId!==prior,seen.candidate,{timeout:5000}).catch(()=>{throw new Error(`${label}: an answer after the window was not accepted`);});
      assert.equal(await page.evaluate(id=>state.considered[id],seen.candidate),'no',`${label}: the later answer counted`);
      assert.deepEqual(errors,[],`${label}: no page errors`);
@@ -23438,6 +23492,7 @@ test('RISK steady scanner browser: a double tap on Postpone or Done acts once an
     try{
      const selector=act==='postpone'?'.decide [data-act="postpone"]':`[data-act="${act}"]`;
      await page.waitForSelector(selector,{timeout:15000});await page.waitForTimeout(500);
+     await page.locator(selector).first().scrollIntoViewIfNeeded();
      const before=await page.evaluate(()=>undoStack.length),box=await page.locator(selector).first().boundingBox(),x=box.x+box.width/2,y=box.y+box.height/2;
      await page.touchscreen.tap(x,y);await page.waitForTimeout(60);await page.touchscreen.tap(x,y);
      await page.waitForTimeout(450);
@@ -23450,29 +23505,9 @@ test('RISK steady scanner browser: a double tap on Postpone or Done acts once an
  assert.deepEqual(failures,[]);
 });
 
-// Focus lands on mousedown, so a correction that scrolls then would move the
-// control away before mouseup and lose the click.
-test('RISK steady scanner browser: a mouse press on a control partly under the pinned row still clicks it in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
- const failures=[];
- for(const [engineName,engine] of await steadyScannerEngines()){
-  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
-  const {page,context}=await steadyScannerPage(browser,steadySeededBoard({tasks:12}),{width:1000,height:700,touch:false});
-  try{
-   await page.waitForSelector('.siderail [data-act="edit"]',{timeout:15000});await page.waitForTimeout(200);
-   const rects=()=>page.evaluate(()=>{const e=document.querySelector('.siderail [data-act="edit"]').getBoundingClientRect();return {left:e.left,width:e.width,top:e.top,bottom:e.bottom,rowTop:document.querySelector('.decide').getBoundingClientRect().top,y:scrollY};});
-   const start=await rects();
-   await page.evaluate(by=>scrollBy(0,by),start.top-(start.rowTop-13));await page.waitForTimeout(60);
-   const placed=await rects();
-   assert.ok(placed.top<placed.rowTop&&placed.bottom>placed.rowTop,`${engineName}: positive control: the control straddles the row: ${Math.round(placed.top)}-${Math.round(placed.bottom)}, row ${Math.round(placed.rowTop)}`);
-   await page.mouse.move(placed.left+placed.width/2,placed.top+6);await page.mouse.down();await page.waitForTimeout(90);await page.mouse.up();
-   await page.waitForFunction(()=>!!document.querySelector('#modalRoot [data-act="save-edit"],#modalRoot .frow'),null,{timeout:2000}).catch(()=>{throw new Error('Edit did not open');});
-  }catch(error){failures.push(`${engineName}: ${error.message.split('\n')[0]}`);}finally{await context.close();await browser.close();}
- }
- assert.deepEqual(failures,[]);
-});
-
-// A short page can leave the task being decided on entirely under the pinned row.
-test('RISK steady scanner browser: an answer reveals a next title the pinned row would cover on short screens, and a stable layout does not move between later answers in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+// #2420: nothing scrolls the page after an answer. The next title sits above the
+// choices in the box, and titles of one length keep the choices where they were.
+test('RISK steady scanner browser: an answer leaves the page where it is with the next title above the choices on short screens, and a stable layout does not move between later answers in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[];
  for(const [engineName,engine] of await steadyScannerEngines()){
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
@@ -23489,7 +23524,8 @@ test('RISK steady scanner browser: an answer reveals a next title the pinned row
      await page.keyboard.press('n');
      await page.waitForFunction(prior=>state.candidateId!==prior,opened.candidate,{timeout:5000});await page.waitForTimeout(60);
      const shown=await read();
-     assert.ok(shown.titleBottom<=shown.rowTop&&shown.titleTop>=0,`${label}: the next title is clear of the pinned row: ${Math.round(shown.titleTop)}-${Math.round(shown.titleBottom)}, the row starts ${Math.round(shown.rowTop)}, scrolled ${Math.round(shown.y)}`);
+     assert.equal(shown.y,opened.y,`${label}: the answer does not scroll the page`);
+     assert.ok(shown.titleBottom<=shown.rowTop,`${label}: the next title sits above the choices: ${Math.round(shown.titleTop)}-${Math.round(shown.titleBottom)}, the row starts ${Math.round(shown.rowTop)}`);
      let previous=shown;
      for(let answer=0;answer<3;answer++){
       await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
@@ -23505,27 +23541,6 @@ test('RISK steady scanner browser: an answer reveals a next title the pinned row
     }catch(error){failures.push(`${label}: ${error.message.split('\n')[0]}`);}finally{await context.close();}
    }
   }finally{await browser.close();}
- }
- assert.deepEqual(failures,[]);
-});
-
-// Past the phone widths the row stops reaching the screen edges, so it has to
-// line up with the panels above it. A row wider than them stuck out with square ends.
-test('RISK steady scanner browser: the pinned row lines up with the panels with rounded ends once it no longer reaches the screen edges in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
- const failures=[];
- for(const [engineName,engine] of await steadyScannerEngines()){
-  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
-  try{
-   const {page,context}=await steadyScannerPage(browser,steadySeededBoard(),{width:744,height:1133,touch:false});
-   await page.waitForSelector('[data-act="yes"]',{timeout:15000});
-   for(const width of [733,744,750,760,761,1000]){
-    await page.setViewportSize({width,height:1133});await page.waitForTimeout(60);
-    const seen=await page.evaluate(()=>{const row=document.querySelector('.decide'),a=row.getBoundingClientRect(),b=document.getElementById('listWrap').getBoundingClientRect();return {rowLeft:a.left,rowRight:a.right,panelLeft:b.left,panelRight:b.right,radius:parseFloat(getComputedStyle(row).borderTopLeftRadius)};});
-    if(Math.abs(seen.rowLeft-seen.panelLeft)>1||Math.abs(seen.rowRight-seen.panelRight)>1)failures.push(`${engineName} ${width}px: the row spans ${seen.rowLeft}-${seen.rowRight}, the panels ${seen.panelLeft}-${seen.panelRight}`);
-    if(!(seen.radius>0))failures.push(`${engineName} ${width}px: the row has square ends`);
-   }
-   await context.close();
-  }catch(error){failures.push(`${engineName}: ${error.message.split('\n')[0]}`);}finally{await browser.close();}
  }
  assert.deepEqual(failures,[]);
 });
@@ -23657,12 +23672,13 @@ test('RISK steady scanner browser: the trail fits again when web fonts finish lo
  assert.deepEqual(failures,[]);
 });
 
-// The first candidate after opening, Start or Resume has to be readable too, but
-// a person's own place on the page, such as a restored saved view, comes first.
-test('RISK steady scanner browser: the first candidate after opening Start or Resume is revealed without overriding a restored scroll position in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+// #2420: opening, Start and Resume leave the page where it is (#2312 scrolled
+// to reveal a title under its pinned row), and a restored place on the page stays.
+test('RISK steady scanner browser: opening Start and Resume leave the page where it is and a restored scroll position stays in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[];
- const clear=page=>page.evaluate(()=>{const t=document.querySelector('.card.cand .title')?.getBoundingClientRect(),row=document.querySelector('.decide')?.getBoundingClientRect();return t&&row?{bottom:t.bottom,top:t.top,rowTop:row.top,clear:t.bottom<=row.top&&t.top>=0}:null;});
  const titles=i=>({title:'Same length title number '+String(i).padStart(2,'0')});
+ const settle=page=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ const pressStill=async(page,selector)=>{const control=page.locator(selector).first();await control.scrollIntoViewIfNeeded();await settle(page);const y=await page.evaluate(()=>scrollY);await control.click();return y;};
  for(const [engineName,engine] of await steadyScannerEngines()){
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
   try{
@@ -23672,35 +23688,29 @@ test('RISK steady scanner browser: the first candidate after opening Start or Re
     const opened=await steadyScannerPage(browser,seeded,{...viewport,touch:false});
     try{
      await opened.page.waitForSelector('[data-act="yes"]',{timeout:15000});await opened.page.waitForTimeout(150);
-     const shown=await clear(opened.page);
-     assert.ok(shown?.clear,`${label}: opening reveals the first candidate: ${JSON.stringify(shown)}`);
-     // Resume from work mode, starting at the top of the page.
+     assert.equal(await opened.page.evaluate(()=>scrollY),0,`${label}: opening does not scroll the page`);
+     // Resume from work mode.
      await opened.page.locator('[data-act="start-working"]').first().click();
      await opened.page.waitForSelector('[data-act="resume-scan"]',{timeout:5000});
      await opened.page.evaluate(()=>scrollTo(0,0));
-     await opened.page.locator('[data-act="resume-scan"]').first().click();
+     const beforeResume=await pressStill(opened.page,'[data-act="resume-scan"]');
      await opened.page.waitForSelector('[data-act="yes"]',{timeout:5000});await opened.page.waitForTimeout(100);
-     const resumed=await clear(opened.page);
-     assert.ok(resumed?.clear,`${label}: Resume reveals the candidate: ${JSON.stringify(resumed)}`);
-     // A restored place on the page is the person's, even with the title covered.
-     const covered=await opened.page.evaluate(()=>{scrollTo(0,0);const t=document.querySelector('.card.cand .title').getBoundingClientRect(),row=document.querySelector('.decide').getBoundingClientRect();return t.bottom>row.top+24;});
-     if(covered){
-      await opened.page.evaluate(()=>scrollTo(0,12));await opened.page.waitForTimeout(100);
-      const place=await opened.page.evaluate(()=>scrollY);
-      assert.ok(place>0,`${label}: positive control: the page is scrolled`);
-      await opened.page.reload({waitUntil:'domcontentloaded'});
-      await opened.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true',null,{timeout:30000});await opened.page.waitForTimeout(200);
-      const after=await opened.page.evaluate(()=>scrollY);
-      assert.ok(Math.abs(after-place)<=3,`${label}: a restored position stays: ${place} became ${after}`);
-     }
+     assert.equal(await opened.page.evaluate(()=>scrollY),beforeResume,`${label}: Resume does not scroll the page`);
+     // A restored place on the page is the person's.
+     await opened.page.evaluate(()=>scrollTo(0,12));await opened.page.waitForTimeout(100);
+     const place=await opened.page.evaluate(()=>scrollY);
+     assert.ok(place>0,`${label}: positive control: the page is scrolled`);
+     await opened.page.reload({waitUntil:'domcontentloaded'});
+     await opened.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true',null,{timeout:30000});await opened.page.waitForTimeout(200);
+     const after=await opened.page.evaluate(()=>scrollY);
+     assert.ok(Math.abs(after-place)<=3,`${label}: a restored position stays: ${place} became ${after}`);
      assert.deepEqual(opened.errors,[],`${label}: no page errors`);
     }catch(error){failures.push(`${label}: ${error.message.split('\n')[0]}`);}finally{await opened.context.close();}
     const fresh=await steadyScannerPage(browser,steadyScannerBoard({tasks:12,taskOver:titles}),{...viewport,touch:false});
     try{
-     await fresh.page.locator('[data-act="start-scan"]').first().click();
+     const beforeStart=await pressStill(fresh.page,'[data-act="start-scan"]');
      await fresh.page.waitForFunction(()=>!!state.candidateId&&!!document.querySelector('[data-act="yes"]'),null,{timeout:15000});await fresh.page.waitForTimeout(100);
-     const started=await clear(fresh.page);
-     assert.ok(started?.clear,`${label}: Start reveals the first candidate: ${JSON.stringify(started)}`);
+     assert.equal(await fresh.page.evaluate(()=>scrollY),beforeStart,`${label}: Start does not scroll the page`);
     }catch(error){failures.push(`${label}: ${error.message.split('\n')[0]}`);}finally{await fresh.context.close();}
    }
   }finally{await browser.close();}
@@ -23708,9 +23718,10 @@ test('RISK steady scanner browser: the first candidate after opening Start or Re
  assert.deepEqual(failures,[]);
 });
 
-// The reveal belongs to answering. Undo and context changes are pressed from
-// above the scanner, and moving the page would carry that control off-screen.
-test('RISK steady scanner browser: Undo and a context change leave the page where it is while an answer still reveals a covered title in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+// Undo and context changes are pressed from above the scanner, and moving the
+// page would carry that control off-screen. Since #2420 an answer does not move
+// the page either.
+test('RISK steady scanner browser: an answer Undo and a context change leave the page where it is in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[];
  for(const [engineName,engine] of await steadyScannerEngines()){
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
@@ -23724,15 +23735,14 @@ test('RISK steady scanner browser: Undo and a context change leave the page wher
      const settle=()=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
      const title=()=>page.evaluate(()=>{const t=document.querySelector('.card.cand .title').getBoundingClientRect(),row=document.querySelector('.decide').getBoundingClientRect();return {bottom:t.bottom,rowTop:row.top,y:scrollY,candidate:state.candidateId};});
      const clickOn=async selector=>{const box=await page.locator(selector).first().boundingBox();await page.mouse.click(box.x+box.width/2,box.y+box.height/2);};
-     // Answering from the top of the page reveals the next title.
+     // Answering from the top of the page leaves the page there.
      await page.evaluate(()=>scrollTo(0,0));await settle();
      const opened=await title();
-     assert.ok(opened.bottom>opened.rowTop,`${label}: positive control: the title starts covered: ends ${Math.round(opened.bottom)}, row ${Math.round(opened.rowTop)}`);
      await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
      await page.keyboard.press('n');
      await page.waitForFunction(prior=>state.candidateId!==prior,opened.candidate,{timeout:5000});await settle();
      const answered=await title();
-     assert.ok(answered.bottom<=answered.rowTop,`${label}: the answer reveals the next title: ends ${Math.round(answered.bottom)}, row ${Math.round(answered.rowTop)}`);
+     assert.equal(answered.y,opened.y,`${label}: the answer does not move the page`);
      // Undo, pressed from the header at the top of the page, stays under the finger.
      await page.evaluate(()=>scrollTo(0,0));await settle();
      await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
@@ -23759,11 +23769,11 @@ test('RISK steady scanner browser: Undo and a context change leave the page wher
  assert.deepEqual(failures,[]);
 });
 
-// A fixed row sits over the page without the browser knowing, so a control under
-// it counted as already on screen: Tab stopped there and the focus ring was
-// invisible. Real key presses are the only way to observe the browser's choice.
-// macOS WebKit needs Option for Tab to stop on buttons.
-test('RISK steady scanner browser: Tab never stops on a control hidden behind the pinned row at phone short-landscape and desktop sizes in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+// #2312's pinned row once hid Tab stops and their focus ring. With the choices
+// back in the scanner box (#2420) and nothing pinned over the page, every stop,
+// the choices included, has to be in view. Real key presses are the only way to
+// observe the browser's choice. macOS WebKit needs Option for Tab to stop on buttons.
+test('RISK steady scanner browser: every Tab stop including the choices is in view at phone short-landscape and desktop sizes in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[],STOPS=70;
  for(const [engineName,engine] of await steadyScannerEngines()){
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
@@ -23775,22 +23785,25 @@ test('RISK steady scanner browser: Tab never stops on a control hidden behind th
     try{
      await page.waitForSelector('[data-act="yes"]',{timeout:15000});
      await page.waitForTimeout(80);
-     const hidden=[];let onThePage=0;
+     const hidden=[];let onThePage=0,choices=0;
      for(let i=0;i<STOPS;i++){
       await page.keyboard.press(engineName==='webkit'?'Alt+Tab':'Tab');
       await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
       const stop=await page.evaluate(()=>{
-       const el=document.activeElement,row=document.querySelector('.decide');
-       if(!el||el===document.body||el.closest('.decide'))return null;
+       const el=document.activeElement;
+       if(!el||el===document.body)return null;
        const r=el.getBoundingClientRect();
-       return {name:el.dataset.act||el.id||el.tagName,top:r.top,bottom:r.bottom,rowTop:row.getBoundingClientRect().top};
+       return {name:el.dataset.act||el.id||el.tagName,top:r.top,bottom:r.bottom,inChoices:!!el.closest('.decide'),viewportHeight:innerHeight};
       });
       if(!stop)continue;
-      onThePage++;
-      if(stop.bottom>stop.rowTop)hidden.push(`${stop.name} ends ${Math.round(stop.bottom)}, the row starts ${Math.round(stop.rowTop)}`);
+      onThePage++;choices+=stop.inChoices;
+      // A browser scrolls a stop already partly in view no further, so a
+      // paragraph-long title in All tasks can stay cut by the screen edge.
+      if(stop.bottom<=0||stop.top>=stop.viewportHeight)hidden.push(`${stop.name} spans ${Math.round(stop.top)}-${Math.round(stop.bottom)} of ${stop.viewportHeight}`);
      }
      assert.ok(onThePage>=30,`${label}: the walk reached the page's controls: ${onThePage} stops`);
-     assert.deepEqual(hidden,[],`${label}: ${hidden.length} of ${onThePage} focus stops are behind the pinned row`);
+     assert.ok(choices>=3,`${label}: the walk stopped on the choices: ${choices} stops`);
+     assert.deepEqual(hidden,[],`${label}: ${hidden.length} of ${onThePage} focus stops are off screen`);
      assert.deepEqual(errors,[],`${label}: no page errors`);
     }catch(error){failures.push(error.message.slice(0,900));}finally{await context.close();}
    }
@@ -23799,38 +23812,46 @@ test('RISK steady scanner browser: Tab never stops on a control hidden behind th
  assert.deepEqual(failures,[]);
 });
 
-test('RISK steady scanner browser: the pinned row exists only while a candidate is showing and clears the iPhone safe area and toasts',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
- const failures=[],safeBottom=34;
+// #2420: with the choices back in the scanner box, nothing is pinned to the
+// bottom of the screen, so the page keeps its ordinary bottom room, a toast
+// sits at its ordinary place and focus scrolling reserves nothing, with a
+// candidate showing and after the scan ends.
+test('RISK steady scanner browser: nothing is pinned to the bottom of the screen and the page keeps its ordinary bottom room toast and scroll padding while a candidate is showing',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ const read=page=>page.evaluate(()=>({
+  fixed:[...document.querySelectorAll('#scan *')].filter(e=>['fixed','sticky'].includes(getComputedStyle(e).position)).map(e=>e.dataset.act||e.className),
+  padding:parseFloat(getComputedStyle(document.querySelector('.wrap')).paddingBottom),
+  scrollPadding:getComputedStyle(document.documentElement).scrollPaddingBottom,
+  toastGap:(()=>{const t=document.querySelector('.toast.show');return t?innerHeight-t.getBoundingClientRect().bottom:null;})(),
+ }));
  for(const [engineName,engine] of await steadyScannerEngines()){
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
   try{
-   const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard({tasks:4}));
-   try{
-    await page.waitForSelector('[data-act="yes"]',{timeout:15000});
-    await page.evaluate(()=>toast('Saved'));await page.waitForTimeout(60);
-    const shown=await page.evaluate(()=>{const t=document.querySelector('.toast.show').getBoundingClientRect(),row=document.querySelector('.decide-finish').getBoundingClientRect();return {toastBottom:t.bottom,rowTop:row.top};});
-    assert.ok(shown.toastBottom<=shown.rowTop,`${engineName}: a toast sits above the pinned row: ends ${Math.round(shown.toastBottom)}, row starts ${Math.round(shown.rowTop)}`);
-    if(engineName==='chromium'){
-     const cdp=await context.newCDPSession(page);
-     await cdp.send('Emulation.setSafeAreaInsetsOverride',{insets:{top:47,topMax:47,left:0,leftMax:0,bottom:safeBottom,bottomMax:safeBottom,right:0,rightMax:0}});
+   for(const viewport of [{width:390,height:844},{width:768,height:1024}]){
+    const label=`${engineName} ${viewport.width}px`;
+    const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard({tasks:4}),viewport);
+    try{
+     await page.waitForSelector('[data-act="yes"]',{timeout:15000});
+     await page.evaluate(()=>toast('Saved'));await page.waitForTimeout(60);
+     const shown=await read(page);
+     assert.deepEqual(shown.fixed,[],`${label}: nothing in the scanner is pinned while a candidate is showing`);
+     assert.equal(shown.padding,60,`${label}: the page keeps its ordinary 60px of bottom room`);
+     assert.equal(shown.scrollPadding,'auto',`${label}: focus scrolling reserves no room for a pinned row`);
+     assert.ok(shown.toastGap>=20&&shown.toastGap<=30,`${label}: a toast sits at its ordinary place near the bottom: ${shown.toastGap}px up`);
+     for(let guard=0;guard<12&&await page.locator('[data-act="no"]').count();guard++){
+      const before=await steadyScannerControls(page);if(before.intervention)break;
+      await page.locator('[data-act="no"]').evaluate(el=>el.scrollIntoView({block:'center'}));
+      const no=(await steadyScannerControls(page)).no;
+      await steadyScannerAnswer(page,steadyScannerCenter(no),before.candidate);
+     }
      await page.waitForTimeout(80);
-     const clear=await page.evaluate(()=>({bottom:document.querySelector('[data-act="yes"]').getBoundingClientRect().bottom,height:innerHeight}));
-     assert.ok(clear.bottom<=clear.height-safeBottom,`${engineName}: Yes clears a ${safeBottom}px home indicator: ends ${Math.round(clear.bottom)} of ${clear.height}`);
-     await cdp.send('Emulation.clearSafeAreaInsetsOverride').catch(()=>{});
-    }
-    for(let guard=0;guard<12&&await page.locator('[data-act="no"]').count();guard++){
-     const before=await steadyScannerControls(page);if(before.intervention)break;
-     await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
-     await page.touchscreen.tap(steadyScannerCenter(before.no).x,steadyScannerCenter(before.no).y);
-     await page.waitForFunction(prior=>state.candidateId!==prior||state.interventionActive,before.candidate,{timeout:10000});
-    }
-    await page.waitForTimeout(80);
-    const ended=await page.evaluate(()=>({text:document.getElementById('scan').textContent,fixedDescendants:[...document.querySelectorAll('#scan *')].filter(e=>getComputedStyle(e).position==='fixed').length,padding:parseFloat(getComputedStyle(document.querySelector('.wrap')).paddingBottom)}));
-    assert.match(ended.text,/End of the list/,`${engineName}: the scan ended honestly: ${ended.text.slice(0,80)}`);
-    assert.equal(ended.fixedDescendants,0,`${engineName}: nothing stays pinned without a candidate`);
-    assert.ok(ended.padding<=62+(engineName==='chromium'?safeBottom:0),`${engineName}: the page gives back the room it reserved: ${ended.padding}`);
-    assert.deepEqual(errors,[],`${engineName}: no page errors`);
-   }catch(error){failures.push(error.message);}finally{await context.close();}
+     const ended=await read(page);
+     assert.match(await page.locator('#scan').textContent(),/End of the list/,`${label}: the scan ended honestly`);
+     assert.deepEqual(ended.fixed,[],`${label}: nothing stays pinned without a candidate`);
+     assert.equal(ended.padding,60,`${label}: the bottom room stays ordinary`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(error.message);}finally{await context.close();}
+   }
   }finally{await browser.close();}
  }
  assert.deepEqual(failures,[]);
@@ -35710,16 +35731,17 @@ test('RISK dependency filter placement: mounted Add and Edit put Filter dependen
  assert.match(edit,/Filter dependencies/);assert.ok(edit.indexOf('dependency-choices')<edit.indexOf('Filter dependencies'));assert.ok(edit.indexOf('Filter dependencies')<edit.indexOf('id="etEver"'),'Edit filter precedes Evergreen');
 });
 
-test('RISK FAQ sections: mounted Quick start matches Settings groups and covers WOOP lifecycle and dependency filter',async()=>{
+test('RISK FAQ sections: mounted Quick start matches Settings groups and covers the dependency filter, with no WOOP answers',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  for(const section of ['Scene and appearance','Scanning and recurrence','Contexts','Data and backups','Changelog'])assert.match(help,new RegExp('<h3>'+section+'</h3>'));
- for(const text of ['Last task WOOP','Filter dependencies','two recorded','Delete WOOP plan','Turning it off','Debug log'])assert.ok(help.includes(text),text);
+ for(const text of ['Filter dependencies','Debug log'])assert.ok(help.includes(text),text);
+ for(const text of ['What is Last task WOOP?','Can I run WOOP on an overdue task?','Delete WOOP plan'])assert.ok(!help.includes(text),text);
  assert.doesNotMatch(help,/In all three modes/);
 });
 
 test('RISK Last task WOOP: future conflicting and cyclic operation evidence is preserved read-only',async()=>{
- const app=await woopFixture(),{ctx,task,shim}=app;woopDislodgeTwice(app);
- const future={v:99,private:['exact evidence']};task.woopPlanOps=future;ctx.onAction('woop-start',{dataset:{benchmark:task.id}});assert.equal(vm.runInContext('woopDraft',ctx),null,'unsupported operation format blocks new writes');
+ const app=await woopFixture(),{ctx,task}=app;
+ const future={v:99,private:['exact evidence']};task.woopPlanOps=future;
  ctx.writeTaskWoop(task,null);assert.deepEqual(JSON.parse(JSON.stringify(task.woopPlanOps)),future,'direct writes preserve future operations');
  const snapshot={...task};delete snapshot.woopPlanOps;ctx.replaceTaskWoop(snapshot,task);assert.deepEqual(JSON.parse(JSON.stringify(snapshot.woopPlanOps)),future,'deliberate replacement preserves future causal evidence');
  const futureRecovery={id:task.id,woopEvidenceRecovery:{v:99,payload:'exact recovery'}};const healthy={id:task.id};ctx.mergeTaskWoop(healthy,futureRecovery);assert.deepEqual(JSON.parse(JSON.stringify(healthy.woopEvidenceRecovery)),futureRecovery.woopEvidenceRecovery,'incoming future recovery stays exact and read-only');
@@ -35731,21 +35753,14 @@ test('RISK Last task WOOP: future conflicting and cyclic operation evidence is p
  const plan={v:1,id:'plan-a',outcome:'Outcome',obstacle:'Obstacle',plan:'If obstacle, then act'},a={v:1,id:'op-a',observed:[],value:plan},b={v:1,id:'op-a',observed:[],value:null};
  const archived={id:task.id,woopPlan:plan,woopHead:'op-a',woopPlanOps:[a],ratingHistoryRecovery:[{woopRecovery:1,evidence:{woopPlan:{v:99,private:'preserved archive'}}}]},replacement={id:task.id,woopPlan:null};ctx.replaceTaskWoop(replacement,archived);assert.equal(ctx.supportedWoopEvidence(replacement),false,'replacement carries read-only peer archive before writes');assert.equal(replacement.woopPlanOps.length,1,'replacement cannot mint a successor over unknown evidence');assert.equal(JSON.stringify(replacement.ratingHistoryRecovery),JSON.stringify(archived.ratingHistoryRecovery));
  const winner={...task,woopPlan:plan,woopHead:'op-a',woopPlanOps:[a]},other={...task,woopPlan:null,woopHead:'op-a',woopPlanOps:[b]};ctx.mergeTaskWoop(winner,other);assert.equal(winner.woopPlanOps.length,2,'immutable ID conflicts retain both facts');assert.equal(JSON.stringify(winner.woopPlan),JSON.stringify(plan));
- task.woopPlanOps=[a,b];task.woopPlan=plan;ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Delete WOOP plan/,'ambiguous evidence is read-only');
+ task.woopPlanOps=[a,b];task.woopPlan=plan;assert.equal(ctx.writeTaskWoop(task,null),false,'ambiguous evidence is read-only');assert.equal(JSON.stringify(task.woopPlan),JSON.stringify(plan));
  task.woopPlanOps=[{...a,observed:['op-b']},{v:1,id:'op-b',observed:['op-a'],value:null}];ctx.writeTaskWoop(task,null);assert.equal(task.woopPlanOps.length,2,'cycles do not mint new operations');
 });
 
-test('RISK Last task WOOP: rendered Delete binding rejects same-ID board replacement and restored head',async()=>{
- const app=await woopFixture(),{ctx,task,shim}=app;woopDislodgeTwice(app);ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,'Outcome');woopStep(app,'Obstacle');woopStep(app,'If obstacle, then act');ctx.renderScan();
- const html=shim.document.getElementById('scan').innerHTML,control=html.match(/<button[^>]*data-act="woop-delete"[^>]*>/)[0];
- const dataset={benchmark:task.id,plan:task.woopPlan.id,head:task.woopHead};for(const [,key,value]of control.matchAll(/data-([a-z]+)="([^"]*)"/g))dataset[key]=value;
- ctx.replaceState(JSON.parse(ctx.cloudPayload()));ctx.onAction('woop-delete',{dataset});assert.ok(ctx.state.tasks.find(t=>t.id===task.id).woopPlan,'detached delete cannot change replaced board');
-});
-
 test('RISK Last task WOOP: Restore and Undo express deliberate successors without deleting later independent tasks',async()=>{
- const app=await woopFixture(),{ctx,task,shim}=app;woopDislodgeTwice(app);ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,'Saved outcome');woopStep(app,'Saved obstacle');woopStep(app,'If obstacle, then act');await ctx.persist();
+ const app=await woopFixture(),{ctx,task}=app;olderWoopWrite2421(ctx,task,olderWoopPlan2421('Saved outcome','Saved obstacle','If obstacle, then act'));await ctx.persist();
  const snapshot=ctx.cloudPayload();assert.equal(ctx.saveLocalBackup('manual',snapshot),true);const backup=ctx.readLocalBackups().find(row=>row.kind==='manual'&&row.payload===snapshot);
- ctx.onAction('woop-delete',{dataset:{benchmark:task.id,plan:task.woopPlan.id}});const later=ctx.addTask('Later independent task');await ctx.persist();ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(backup.id),true);
+ olderWoopWrite2421(ctx,task,null);const later=ctx.addTask('Later independent task');await ctx.persist();ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(backup.id),true);
  const restored=ctx.state.tasks.find(t=>t.id===task.id);assert.equal(restored.woopPlan.outcome,'Saved outcome');assert.ok(ctx.state.tasks.some(t=>t.id===later.id));assert.ok(restored.woopPlanOps.length>=3,'restoration supersedes creation and deletion');
  const stable=JSON.stringify(restored.woopPlanOps),old=JSON.parse(snapshot);ctx.mergeUndeletedTasks(ctx.state,old);assert.equal(JSON.stringify(restored.woopPlanOps),stable,'replayed snapshot creates no extra operation');
  ctx.undo();await ctx.persist();assert.equal(ctx.state.tasks.find(t=>t.id===task.id).woopPlan,null,'Undo Restore is a successor deletion');assert.ok(ctx.state.tasks.some(t=>t.id===later.id));
@@ -35753,7 +35768,7 @@ test('RISK Last task WOOP: Restore and Undo express deliberate successors withou
 });
 
 test('RISK Last task WOOP: delayed CAS repair keeps newer peer plan and title plus concurrent local intent',async()=>{
- const fixture=await woopFixture();woopDislodgeTwice(fixture);const raw=fixture.ctx.cloudPayload(),{indexedDB}=await import('fake-indexeddb'),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const fixture=await woopFixture();const raw=fixture.ctx.cloudPayload(),{indexedDB}=await import('fake-indexeddb'),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
  const app=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:'woop-cas-'+Date.now()+'-'+Math.random()}),{ctx,shim}=app,id=fixture.task.id;
  const store=shim.window.ScannerDeviceStore,original=store.commitHead.bind(store);let calls=0,entered,release;const started=new Promise(resolve=>entered=resolve),gate=new Promise(resolve=>release=resolve);
  store.commitHead=async options=>{
@@ -35761,73 +35776,13 @@ test('RISK Last task WOOP: delayed CAS repair keeps newer peer plan and title pl
   if(calls===2){entered();await gate;}return original(options);
  };
  const extra=ctx.addTask('Independent local task');const saving=ctx.persist();await started;
- ctx.state.mode='work';ctx.state.chain=[id];ctx.onAction('woop-start',{dataset:{benchmark:id}});woopStep(app,'Concurrent local outcome');woopStep(app,'Concurrent local obstacle');woopStep(app,'If local obstacle, then act');release();assert.equal(await saving,true);await ctx.persist();
+ olderWoopWrite2421(ctx,ctx.state.tasks.find(t=>t.id===id),olderWoopPlan2421('Concurrent local outcome','Concurrent local obstacle','If local obstacle, then act'));release();assert.equal(await saving,true);await ctx.persist();
  for(const board of [ctx.state,JSON.parse((await store.readHead()).payload)]){const task=board.tasks.find(t=>t.id===id);assert.equal(task.title,'Newer peer title');assert.equal(task.woopPlan.id,'peer-plan','durable peer plan remains selected on conflict');assert.ok(task.woopPlanOps.some(op=>op.value?.outcome==='Concurrent local outcome'),'concurrent local plan stays exact in causal evidence');assert.ok(board.tasks.some(t=>t.id===extra.id));}
  await store.close();
 });
 
 test('RISK Last task WOOP: imported long causal chains validate without recursive stack failure',async()=>{
  const {ctx}=await loadApp();const count=10000,ops=Array.from({length:count},(_,i)=>({v:1,id:'private-op-'+i,observed:i+1<count?['private-op-'+(i+1)]:[],value:null}));assert.equal(ctx.supportedWoopEvidence({woopPlanOps:ops}),true,'valid imported causal chains cannot interrupt rendering or persistence');
-});
-
-test('RISK Last task WOOP browser: mounted controls responsive saved revisit delete and offline reload',
- {skip:!process.env.WOOP_BROWSER_URL},async()=>{
- const {chromium,webkit}=await import(process.env.PLAYWRIGHT_MODULE||'playwright'),origin=new URL(process.env.WOOP_BROWSER_URL).origin;
- const output=process.env.WOOP_SCREENSHOT_DIR;if(output)fs.mkdirSync(output,{recursive:true});const samples=[];
- for(const [engine,type,sizes]of [['chrome',chromium,[[390,844],[768,1024],[1366,768],[568,320]]],['webkit',webkit,[[390,844],[768,1024]]]]){
-  const browser=await type.launch({headless:true,...(engine==='chrome'?{channel:'chrome'}:{})});
-  try{
-   for(const [width,height]of sizes){
-    const context=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'}),errors=[];
-    await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');});
-    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
-    const page=await context.newPage();page.on('pageerror',error=>errors.push(error.message));await page.goto(process.env.WOOP_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
-    const id=await page.evaluate(()=>{closeModal();document.querySelectorAll('dialog[open]').forEach(d=>d.close());state.addOpen=true;const task=addTask('Synthetic final task with a long title for responsive wrapping');state.chain=[task.id];state.mode='work';render();return task.id;});
-    assert.equal(await page.locator('[data-act=woop-start]').count(),0,'off by default');
-    const setting=async enabled=>{await page.evaluate(()=>openSettings());await page.locator('summary').filter({hasText:'Scanning and recurrence'}).click();await page.locator('#stLastTaskWoop').setChecked(enabled);await page.locator('[data-act=close-modal]').click();};
-    await setting(true);
-    for(let count=0;count<3;count++){
-     assert.equal(await page.locator('[data-act=woop-start]').count(),count===2?1:0,'recorded dislodge boundary '+count);
-     if(count<2){await page.locator('[data-act=dislodge]').click();await page.evaluate(id=>dotTask(id),id);}
-    }
-    await page.locator('[data-act=woop-start]').click();await page.locator('#woopAnswer').fill('Cancelled private draft');await page.locator('[data-act=woop-next]').click();await page.getByRole('button',{name:'Cancel',exact:true}).click();assert.equal(await page.evaluate(id=>taskById(id).woopPlan,id),undefined);
-    await page.locator('[data-act=woop-start]').click();
-    for(const [step,answer]of ['Best outcome: take a useful first step.','Obstacle: uncertainty about where to begin.','If I feel uncertain, then I will write one concrete next action.'].entries()){
-     await page.locator('#woopAnswer').fill(answer);
-     if(step===2&&output)await page.screenshot({path:path.join(output,engine+'-'+width+'-walkthrough.png'),fullPage:true});
-     await page.locator('[data-act=woop-next]').click();
-    }
-    assert.equal(await page.locator('[data-act=woop-start]').count(),0);assert.equal(await page.locator('[data-act=woop-delete]').count(),1);
-    await page.evaluate(()=>persist());
-    for(const theme of ['light','dark']){
-     await page.evaluate(theme=>setTheme(theme),theme);
-     const sample=await page.evaluate(()=>{
-      const inspect=selector=>{const e=document.querySelector(selector),s=getComputedStyle(e),r=e.getBoundingClientRect();return {fontFamily:s.fontFamily,fontSize:s.fontSize,fontWeight:s.fontWeight,lineHeight:s.lineHeight,color:s.color,backgroundColor:s.backgroundColor,left:r.left,right:r.right,width:r.width};};
-      return {plan:inspect('.woop-saved dd'),delete:inspect('[data-act=woop-delete]'),viewport:innerWidth,pageWidth:document.documentElement.scrollWidth,theme:document.documentElement.dataset.theme};
-     });
-     assert.equal(sample.theme,theme);assert.ok(sample.pageWidth<=width+1,'no page overflow');assert.ok(sample.delete.left>=0&&sample.delete.right<=width+1,'Delete fits');assert.equal(sample.delete.backgroundColor,'rgb(255, 255, 255)','Delete stays white in supported themes');
-     if(engine==='chrome'){
-      const cdp=await context.newCDPSession(page);await cdp.send('DOM.enable');await cdp.send('CSS.enable');const {root}=await cdp.send('DOM.getDocument');const {nodeId}=await cdp.send('DOM.querySelector',{nodeId:root.nodeId,selector:'.woop-saved dd'});sample.resolvedFonts=(await cdp.send('CSS.getPlatformFontsForNode',{nodeId})).fonts.map(font=>font.familyName);assert.ok(sample.resolvedFonts.length);await cdp.detach();
-     }
-     samples.push({engine,width,height,theme,...sample});if(output)await page.screenshot({path:path.join(output,engine+'-'+width+'-'+theme+'-saved.png'),fullPage:true});
-    }
-    await setting(false);assert.equal(await page.locator('.woop-saved').count(),0);assert.ok(await page.evaluate(id=>taskById(id).woopPlan,id));await setting(true);assert.equal(await page.locator('.woop-saved').count(),1);
-    await page.reload();await page.waitForFunction(id=>typeof state!=='undefined'&&state?.tasks&&taskById(id)?.woopPlan,id);await page.evaluate(id=>{state.mode='work';state.chain=[id];render();},id);assert.equal(await page.locator('.woop-saved').count(),1);
-    // Actual mounted order in both task forms, with the search node retained.
-    for(const scope of ['add','edit']){
-     if(scope==='edit')await page.evaluate(id=>openEdit(id),id);else await page.evaluate(()=>{closeModal();state.addOpen=true;render();});
-     const search=page.locator('#'+scope+'DependencySearch');await search.fill('Synthetic');await search.focus();
-     const geometry=await page.evaluate(scope=>{const filter=document.getElementById(scope+'DependencySearch'),choices=filter.parentElement.parentElement.querySelector('.dependency-choices'),ever=document.getElementById(scope==='add'?'addEver':'etEver');return {choices:choices.getBoundingClientRect().bottom,filter:filter.getBoundingClientRect().top,filterBottom:filter.getBoundingClientRect().bottom,ever:ever.getBoundingClientRect().top,focused:document.activeElement===filter};},scope);
-     assert.ok(geometry.choices<=geometry.filter+1);assert.ok(geometry.filterBottom<=geometry.ever+1);assert.equal(geometry.focused,true);assert.equal(await page.locator('label[for='+scope+'DependencySearch]').textContent(),'Filter dependencies');
-     if(output)await page.screenshot({path:path.join(output,engine+'-'+width+'-'+scope+'-dependencies.png'),fullPage:true});
-    }
-    await page.evaluate(()=>closeModal());await page.locator('[data-act=woop-delete]').click();await page.evaluate(()=>persist());assert.equal(await page.locator('[data-act=woop-start]').count(),1);
-    if(engine==='chrome'&&width===390){await page.evaluate(()=>navigator.serviceWorker.ready);await page.reload();await page.waitForFunction(()=>!!navigator.serviceWorker.controller);await context.setOffline(true);await page.reload();await page.waitForFunction(id=>typeof state!=='undefined'&&state?.tasks&&taskById(id),id);assert.equal(await page.evaluate(id=>taskById(id).woopPlan,id),null,'offline reload preserves deletion');await context.setOffline(false);}
-    assert.deepEqual(errors,[]);await context.close();
-   }
-  }finally{await browser.close();}
- }
- if(output)fs.writeFileSync(path.join(output,'typography-samples.json'),JSON.stringify({candidate:spawnSync('git',['rev-parse','HEAD'],{cwd:__dirname,encoding:'utf8'}).stdout.trim(),samples},null,2));
 });
 
 test('RISK per-edge dependency controls: Add and Edit binary checkbox transitions persist hard and soft without losing search selections',async()=>{
@@ -36763,26 +36718,6 @@ test('RISK FAQs menu browser: Chromium and WebKit show every section closed on e
  }
 });
 
-test('RISK Last task WOOP: exhausted scan reaches walkthrough through real Start and Dislodge handlers',async()=>{
- const app=await loadApp({seed:971}),{ctx,shim}=app,task=ctx.addTask('Private sole task');
- const action=name=>ctx.onAction(name,{dataset:['dislodge','woop-start'].includes(name)?{benchmark:task.id}:{}});
- ctx.openSettings();const field=shim.document.getElementById('stLastTaskWoop');field.id='stLastTaskWoop';field.checked=true;field.matches=()=>false;
- shim.document.dispatchEvent({type:'change',target:field});ctx.closeModal();
- action('start-scan');
- for(let count=0;count<2;count++){action('dislodge');assert.equal(ctx.taskDislodgeCount(ctx.state.tasks.find(t=>t.id===task.id)),count+1);action('rescan');action('start-scan');}
- assert.equal(ctx.state.mode,'scan');assert.equal(ctx.pool().length,0);assert.equal(ctx.state.chain.length,1);
- assert.match(shim.document.getElementById('scan').innerHTML,/End of the list/);
- assert.match(shim.document.getElementById('scan').innerHTML,/Walk Thru WOOP for Final Task/,'an exhausted sole-task scan must not require an unreachable pause control');
- action('woop-start');assert.match(shim.document.getElementById('modalRoot').innerHTML,/best outcome/i);
- woopStep(app,'Private outcome');woopStep(app,'Private obstacle');woopStep(app,'If blocked, then take one step');
- assert.match(shim.document.getElementById('scan').innerHTML,/Delete WOOP plan/);
- await ctx.persist();const reload=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(ctx.state)}});
- assert.equal(reload.ctx.state.settings.lastTaskWoop,true);assert.equal(reload.ctx.taskDislodgeCount(reload.ctx.state.tasks.find(t=>t.id===task.id)),2);
- assert.match(reload.shim.document.getElementById('scan').innerHTML,/Private outcome/);
- const peer=ctx.addTask('New eligible candidate');ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Private outcome|Delete WOOP plan/,'new arrivals rearm the scan and hide final-task plans');
- assert.ok(peer);assert.equal(ctx.state.tasks.find(t=>t.id===task.id).woopPlan.outcome,'Private outcome');
-});
-
 test('RISK bulk toolbar: mounted controls stay outside scrolling rows and retain filtered selection through filter changes',async()=>{
  const {ctx,shim}=await loadApp();const ids=[];for(let i=0;i<36;i++)ids.push(ctx.addTask('Private match '+i).id);const outside=ctx.addTask('Private outside');ctx.state.listOpen=true;ctx.setListQuery('Private match');
  const body=shim.document.getElementById('listBody'),toolbar=shim.document.getElementById('listBulkToolbar');
@@ -37508,68 +37443,151 @@ test('RISK always binary saved contexts: reload and cloud adoption derive red re
 test('RISK always binary context guidance: FAQ explains context-presence rule and separate green No Context eligibility',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;assert.match(help,/Whenever contexts exist,.*green.*red/i);assert.match(help,/No context.*green.*unassigned/i);assert.match(help,/With no active contexts, only tasks without a known context can scan/);assert.doesNotMatch(help,/No active contexts.*neutral/i);assert.match(help,/does not change saved neutral choices/i);
 });
-test('RISK overdue WOOP: offered action dots through existing comparison and saves with Last task WOOP off',async()=>{
- const app=await overdueWoopFixture(),{ctx,shim,task,base}=app;
- assert.equal(ctx.state.settings.lastTaskWoop,false);const control=overdueWoopControl(app);
- const equivalent=await overdueWoopFixture();equivalent.ctx.dotTask(equivalent.task.id);
- ctx.onAction('run-woop',control);
- assert.equal(ctx.state.chain.at(-1),task.id);assert.equal(ctx.state.mode,'work');
- assert.match(shim.document.getElementById('modalRoot').innerHTML,/best outcome/i);
- assert.equal(task.mu,equivalent.task.mu);assert.equal(task.sigma,equivalent.task.sigma);assert.equal(base.mu,equivalent.base.mu);
- assert.equal(task.ratingHistory.at(-1).kind,'dot','one existing explicit Dot signal, no WOOP reward');
- woopStep(app,'Outcome');woopStep(app,'Obstacle');woopStep(app,'If blocked, then act');
- assert.equal(task.woopPlan.plan,'If blocked, then act');assert.equal(ctx.state.settings.lastTaskWoop,false);
- await ctx.persist();const reload=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(ctx.state)}});
- assert.equal(reload.ctx.state.tasks.find(t=>t.id===task.id).woopPlan.plan,'If blocked, then act');
+// #2421 removed WOOP. An overdue task offered by the real Start handler, as the
+// retired overdue WOOP tests offered it, with nothing WOOP-specific set up.
+async function overdueOffered2421(){
+ const app=await loadApp({seed:971}),{ctx}=app;
+ const base=ctx.addTask('Private benchmark'),task=ctx.addTask('Private overdue',false,[],{due:ctx.todayISO(-1)});
+ ctx.dotTask(base.id);ctx.onAction('start-scan',{dataset:{}});ctx.state.candidateId=task.id;ctx.renderScan();
+ return {...app,base,task,scan:()=>app.shim.document.getElementById('scan').innerHTML};
+}
+const decideActs2421=markup=>[...(markup.split('<div class="decide">')[1]||'').matchAll(/data-act="([^"]+)"/g)].map(match=>match[1]);
+test('Removed WOOP: an overdue offered candidate gets only the ordinary choices, with no Run WOOP',async()=>{
+ const {ctx,task,scan}=await overdueOffered2421();
+ assert.equal(ctx.offeredCandidateId(),task.id,'precondition: the overdue task is the offered candidate');
+ assert.equal(ctx.dueInfo(task.due)?.cls,'due-overdue','precondition: its due date is before today');
+ assert.doesNotMatch(scan(),/Run WOOP|data-act="run-woop"/);
+ const overdue=decideActs2421(scan());task.due=null;ctx.renderScan();const ordinary=decideActs2421(scan());
+ assert.deepEqual(ordinary.slice(0,3),['yes','no','cant'],'precondition: an ordinary candidate gets Yes, No and Can’t');
+ assert.deepEqual(overdue,ordinary,'the overdue candidate gets exactly the choices a candidate with no due date gets');
 });
-test('RISK overdue WOOP: local due-day boundary stale eligibility and cancel retain the explicit dot',async()=>{
- const app=await overdueWoopFixture(),{ctx,shim,task}=app;
- for(const due of [null,ctx.todayISO(0),ctx.todayISO(1)]){task.due=due;ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/data-act="run-woop"/);}
- task.due=ctx.todayISO(-1);ctx.renderScan();const stale=overdueWoopControl(app),before=JSON.stringify(ctx.state);
- ctx.state.mode='work';ctx.onAction('run-woop',stale);assert.equal(task.woopPlan,undefined);assert.equal(ctx.state.chain.includes(task.id),false);
- ctx.state.mode='scan';task.done=true;ctx.onAction('run-woop',stale);assert.equal(ctx.state.chain.includes(task.id),false);task.done=false;
- task.startsAt=ctx.todayISO(1);ctx.onAction('run-woop',stale);assert.equal(ctx.state.chain.includes(task.id),false);task.startsAt=null;
- const prerequisite=ctx.addTask('Unfinished prerequisite');ctx.setTaskPrerequisites(task.id,[prerequisite.id]);ctx.onAction('run-woop',stale);assert.equal(ctx.state.chain.includes(task.id),false);
- ctx.setTaskPrerequisites(task.id,[]);ctx.state.candidateId=task.id;ctx.renderScan();ctx.onAction('run-woop',overdueWoopControl(app));ctx.onAction('close-modal',{dataset:{}});
- assert.equal(task.woopPlan,undefined);assert.equal(ctx.state.chain.at(-1),task.id,'Cancel discards answers, not the explicitly chosen dot');
- const history=JSON.stringify(task.ratingHistory);ctx.onAction('run-woop',stale);assert.equal(JSON.stringify(task.ratingHistory),history,'repeated old click cannot dot twice');
- assert.ok(before);
+test('Removed WOOP: Settings has no Last task WOOP, even on a board that saved it on',async()=>{
+ const board=syncState({tasks:[syncTask('a','Private task')],settings:{...syncState().settings,lastTaskWoop:true}}),raw=JSON.stringify(board);
+ const {ctx,shim}=await loadApp({seed:2421,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+ assert.equal(ctx.state.settings.lastTaskWoop,true,'precondition: the saved board has Last task WOOP on');
+ ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(settings,/<summary>Scanning and recurrence<\/summary>/,'precondition: Settings shows Scanning and recurrence');
+ assert.match(settings,/id="stChainStartsWith"/,'precondition: its neighboring settings are there');
+ assert.doesNotMatch(settings,/stLastTaskWoop|WOOP|dislodgements/);
 });
-test('RISK overdue WOOP: existing and legacy plans show explicit delete without silent replacement',async()=>{
- const app=await overdueWoopFixture(),{ctx,shim,task}=app;
- task.woopPlan={v:1,id:'legacy-plan',outcome:'Saved outcome',obstacle:'Saved obstacle',plan:'If saved, then act'};
- ctx.renderScan();ctx.onAction('run-woop',overdueWoopControl(app));
- assert.match(shim.document.getElementById('modalRoot').innerHTML,/Saved outcome/);assert.match(shim.document.getElementById('modalRoot').innerHTML,/Delete WOOP plan/);
- assert.equal(task.woopPlan.id,'legacy-plan');assert.equal(vm.runInContext('woopDraft',ctx),null);
- const tag=shim.document.getElementById('modalRoot').innerHTML.match(/<button[^>]*data-act="woop-delete"[^>]*>/)[0];
- const del={dataset:Object.fromEntries([...tag.matchAll(/data-([a-z]+)="([^"]*)"/g)].map(m=>[m[1],m[2]]))};ctx.onAction('woop-delete',del);
- assert.equal(task.woopPlan,null);assert.match(shim.document.getElementById('modalRoot').innerHTML,/best outcome/i);ctx.closeModal();
- assert.equal(task.woopPlan,null);assert.equal(ctx.state.chain.at(-1),task.id);
+// A plan exactly as an older version's walkthrough saved it: the plan, its one
+// causal operation and the head naming that operation.
+const savedPlan2421=(over={})=>{
+ const plan={v:1,id:'plan-2421',outcome:'Private outcome 2421',obstacle:'Private obstacle 2421',plan:'If blocked, then act 2421',...over};
+ return {woopPlan:plan,woopHead:'op-2421',woopPlanOps:[{v:1,id:'op-2421',observed:[],value:plan}]};
+};
+async function finalDot2421(task={}){
+ const saved={...syncTask('final','Private final task'),...task},board=syncState({tasks:[saved],settings:{...syncState().settings,lastTaskWoop:true}}),raw=JSON.stringify(board);
+ const app=await loadApp({seed:2421,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}}),{ctx}=app;
+ assert.equal(ctx.state.settings.lastTaskWoop,true,'precondition: the board saved Last task WOOP on');
+ return {...app,task:ctx.state.tasks.find(t=>t.id==='final'),scan:()=>app.shim.document.getElementById('scan').innerHTML};
+}
+const dislodges2421=task=>(task.ratingHistory||[]).filter(row=>row.kind==='dislodge').length;
+test('Removed WOOP: the sole remaining dot after two Dislodges offers no WOOP while paused, with Last task WOOP saved on',async()=>{
+ const {ctx,task,scan}=await finalDot2421();
+ for(let i=0;i<2;i++){ctx.state.chain=[task.id];ctx.state.mode='work';ctx.dislodge();await answersCaughtUp(ctx);}
+ ctx.state.chain=[task.id];ctx.state.mode='work';ctx.renderScan();
+ assert.equal(dislodges2421(task),2,'precondition: two recorded Dislodges');
+ assert.match(scan(),/class="card bench"[^]*Private final task/,'precondition: the task is the sole dot');
+ assert.doesNotMatch(scan(),/WOOP|data-act="woop-/);
 });
-test('RISK overdue WOOP: peer plan account and same-ID board replacement invalidate drafts and controls',async()=>{
- const app=await overdueWoopFixture(),{ctx,task}=app;const stale=overdueWoopControl(app);
- const replacement=JSON.parse(JSON.stringify(ctx.state));vm.runInContext('state=JSON.parse('+JSON.stringify(JSON.stringify(replacement))+')',ctx);
- ctx.onAction('run-woop',stale);assert.equal(ctx.state.chain.includes(task.id),false,'a same-ID replacement does not inherit the old rendered authority');
- ctx.renderScan();ctx.onAction('run-woop',overdueWoopControl(app));woopStep(app,'Outcome');woopStep(app,'Obstacle');
- const current=ctx.state.tasks.find(t=>t.id===task.id),peer={v:1,id:'peer',outcome:'Peer',obstacle:'Obstacle',plan:'If peer, then act'};current.woopPlan=peer;
- woopStep(app,'If local, then act');assert.equal(current.woopPlan.id,'peer');
- current.woopPlan=null;ctx.state.chain=ctx.state.chain.filter(id=>id!==task.id);ctx.state.mode='scan';ctx.state.candidateId=task.id;ctx.renderScan();
- ctx.onAction('run-woop',overdueWoopControl(app));woopStep(app,'Outcome');woopStep(app,'Obstacle');ctx.window.CloudSync={user:'different-account'};
- woopStep(app,'If changed account, then act');assert.equal(current.woopPlan,null);
+test('Removed WOOP: the sole dot at End of the list after two real Dislodges offers no WOOP, with Last task WOOP saved on',async()=>{
+ const {ctx,task,scan}=await finalDot2421();
+ const action=name=>ctx.onAction(name,{dataset:name==='dislodge'?{benchmark:task.id}:{}});
+ action('start-scan');
+ for(let count=0;count<2;count++){action('dislodge');action('rescan');action('start-scan');}
+ assert.equal(dislodges2421(ctx.state.tasks.find(t=>t.id===task.id)),2,'precondition: two recorded Dislodges');
+ assert.equal(ctx.state.mode,'scan');assert.equal(ctx.pool().length,0);assert.deepEqual([...ctx.state.chain],[task.id]);
+ assert.match(scan(),/End of the list/,'precondition: the scan is exhausted');
+ assert.doesNotMatch(scan(),/WOOP|data-act="woop-/);
 });
-test('RISK overdue WOOP: neutral automatic benchmark stays neutral and Cancel can Undo only the dot',async()=>{
- const app=await overdueWoopFixture(),{ctx,task,base}=app;ctx.writeTaskComparison(base,true);const before=[task.mu,task.sigma,base.mu,base.sigma];
- ctx.renderScan();ctx.onAction('run-woop',overdueWoopControl(app));assert.deepEqual([task.mu,task.sigma,base.mu,base.sigma],before);assert.equal(ctx.taskComparisonEligible(task),true);
- ctx.closeModal();ctx.undo();assert.equal(ctx.state.chain.includes(task.id),false);assert.equal(ctx.state.tasks.find(t=>t.id===task.id).woopPlan,undefined);
+test('Removed WOOP: a final dot with a saved plan shows no plan and no Delete',async()=>{
+ const {ctx,task,scan}=await finalDot2421(savedPlan2421());
+ ctx.state.chain=[task.id];ctx.state.mode='work';ctx.renderScan();
+ assert.equal(task.woopPlan.outcome,'Private outcome 2421','precondition: the plan is saved on the task');
+ assert.match(scan(),/class="card bench"[^]*Private final task/,'precondition: the task is the sole dot');
+ assert.doesNotMatch(scan(),/Private outcome 2421|Private obstacle 2421|If blocked, then act 2421|WOOP|data-act="woop-/);
 });
-test('RISK overdue WOOP: unsupported plans remain read-only and interrupted scan hides the action',async()=>{
- const app=await overdueWoopFixture(),{ctx,shim,task}=app;ctx.state.interventionActive=true;ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/data-act="run-woop"/);
- ctx.state.interventionActive=false;task.woopPlan={v:9,future:'preserve'};ctx.renderScan();ctx.onAction('run-woop',overdueWoopControl(app));
- assert.equal(ctx.state.chain.at(-1),task.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/unrecognized/);assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="woop-delete"|data-act="woop-next"/);assert.equal(task.woopPlan.future,'preserve');ctx.closeModal();
+test('Removed WOOP: a final dot with a saved plan in an unrecognized format shows no WOOP notice',async()=>{
+ const {ctx,task,scan}=await finalDot2421({woopPlan:{v:99,private:'future plan 2421'}});
+ ctx.state.chain=[task.id];ctx.state.mode='work';ctx.renderScan();
+ assert.equal(task.woopPlan.v,99,'precondition: the future-format plan is saved on the task');
+ assert.match(scan(),/class="card bench"[^]*Private final task/,'precondition: the task is the sole dot');
+ assert.doesNotMatch(scan(),/WOOP|unrecognized format|future plan 2421/);
+});
+// The changelog opens Help and keeps its history, earlier WOOP releases included.
+const helpWithoutChangelog2421=help=>{
+ const rest=help.replace(/<details class="help-faq" data-help-changelog>[^]*?Show original apology<\/button><\/p><\/details>/,'');
+ assert.notEqual(rest,help,'precondition: Help opens with its changelog');return rest;
+};
+test('Removed WOOP: Help has no Run WOOP or Last task WOOP answer',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/<h3>Scanning and recurrence<\/h3>/,'precondition: Help shows its scanning answers');
+ assert.doesNotMatch(help,/Can I run WOOP on an overdue task\?/);
+ assert.doesNotMatch(help,/What is Last task WOOP\?/);
+});
+test('Removed WOOP: no other Help answer mentions WOOP',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=helpWithoutChangelog2421(shim.document.getElementById('modalRoot').innerHTML);
+ assert.match(help,/Which settings save immediately\?/,'precondition: the settings answer is there');
+ assert.match(help,/Where are Yes, No and Can.t\?<\/dt>/,'precondition: the answer about where the choices sit is there');
+ assert.doesNotMatch(help,/WOOP/);
+});
+test('Removed WOOP: the changelog has one bullet saying WOOP was removed and saved plans stay in backups and exports',()=>{
+ const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1];
+ assert.ok(current,'precondition: the current changelog renders');
+ const items=[...current.matchAll(/<li>([\s\S]*?)<\/li>/g)].map(match=>match[1]).filter(item=>/WOOP/.test(item)&&/removed/i.test(item));
+ assert.equal(items.length,1,'exactly one bullet says WOOP was removed');
+ for(const promise of [/Run WOOP/,/Last task WOOP/,/saved plans?/i,/backups/,/exports/])assert.match(items[0],promise);
+});
+async function openWoopBoard2421(board=woopBoard2421()){
+ const raw=JSON.stringify(board),app=await loadApp({seed:2421,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+ assert.equal(woopSnapshot2421(app.ctx.state),woopSnapshot2421(board),'precondition: opening keeps every WOOP field');
+ return app;
+}
+const reopened2421=async app=>{assert.equal(await app.ctx.persist(),true);return loadApp({seed:2422,seedStorage:{[SYNC_STORE_KEY]:app.shim.localStorage.getItem(SYNC_STORE_KEY)}});};
+test('RISK removed WOOP data: committing another setting keeps a saved Last task WOOP value through a reload',async()=>{
+ const app=await openWoopBoard2421(),{ctx,shim}=app;
+ ctx.openSettings();commitSetting(shim,'stHorizon',90);ctx.closeModal();
+ assert.equal(ctx.state.settings.horizonMin,90,'positive control: the committed setting saved');
+ const reload=await reopened2421(app);
+ assert.equal(reload.ctx.state.settings.horizonMin,90);
+ assert.equal(reload.ctx.state.settings.lastTaskWoop,true,'the saved Last task WOOP value stays on');
+});
+test('RISK removed WOOP data: editing and saving a task with a saved plan keeps every WOOP field through a reload',async()=>{
+ const board=woopBoard2421(),app=await openWoopBoard2421(board);
+ assert.equal(await saveEditorChoice(app,'a',Date.now(),{title:'Private renamed task'}),true);
+ assert.equal(app.ctx.state.tasks.find(task=>task.id==='a').title,'Private renamed task','positive control: the edit saved');
+ assert.equal(woopSnapshot2421(app.ctx.state),woopSnapshot2421(board));
+ const reload=await reopened2421(app);
+ assert.equal(woopSnapshot2421(reload.ctx.state),woopSnapshot2421(board));
+});
+test('RISK removed WOOP data: Restore from pasted board data keeps every WOOP field',async()=>{
+ const board=woopBoard2421(),{ctx,shim}=await loadApp({seed:2421});
+ ctx.openSettings();shim.document.getElementById('jsonBox').value=JSON.stringify(board);ctx.onAction('import-json',{});
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Private planned task'),'positive control: the pasted board was restored');
+ assert.equal(woopSnapshot2421(ctx.state),woopSnapshot2421(board));
+});
+test('RISK removed WOOP data: deleting a task with a saved plan and Undo bring back every WOOP field',async()=>{
+ const board=woopBoard2421(),app=await openWoopBoard2421(board),{ctx}=app;
+ ctx.onAction('delete-task',{dataset:{id:'a'}});
+ assert.equal(ctx.state.tasks.some(task=>task.id==='a'),false,'positive control: the task was deleted');
+ await ctx.undo();
+ assert.equal(woopSnapshot2421(ctx.state),woopSnapshot2421(board));
+ const reload=await reopened2421(app);
+ assert.equal(woopSnapshot2421(reload.ctx.state),woopSnapshot2421(board));
+});
+test('RISK removed WOOP data: a plan saved in an unrecognized format stays exactly as it was through an edit and a reload',async()=>{
+ const board=woopBoard2421(),future={v:99,payload:{private:'future plan 2421'}};board.tasks[2].woopPlan=future;
+ const app=await openWoopBoard2421(board);
+ assert.equal(await saveEditorChoice(app,'c',Date.now(),{title:'Private renamed plain task'}),true);
+ const reload=await reopened2421(app);
+ assert.equal(reload.ctx.state.tasks.find(task=>task.id==='c').title,'Private renamed plain task','positive control: the edit saved');
+ assert.equal(JSON.stringify(reload.ctx.state.tasks.find(task=>task.id==='c').woopPlan),JSON.stringify(future));
+ assert.equal(woopSnapshot2421(reload.ctx.state),woopSnapshot2421(board));
 });
 test('RISK overdue scanner layout: enlarged candidate title chips and decision footer wrap without clipping choices',async()=>{
  const {ctx,shim}=await loadApp({seed:971});const b=ctx.addTask('Benchmark'),t=ctx.addTask('A readable overdue task title',false,[],{due:ctx.todayISO(-1)});ctx.dotTask(b.id);ctx.state.mode='scan';ctx.state.candidateId=t.id;ctx.renderScan();
- const markup=shim.document.getElementById('scan').innerHTML;assert.match(markup,/class="card cand"/);assert.match(markup,/class="chiprow"/);assert.match(markup,/class="decide-finish"/);assert.match(markup,/data-act="run-woop"/);
+ const markup=shim.document.getElementById('scan').innerHTML;assert.match(markup,/class="card cand"/);assert.match(markup,/class="chiprow"/);assert.match(markup,/class="decide-finish"/);assert.doesNotMatch(markup,/data-act="run-woop"/,'#2421: no Run WOOP');
  const source=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
  assert.match(source,/\.decide-finish\{[^}]*flex-wrap:wrap/,'the actual scanner finish group must wrap its button and rank controls instead of forcing horizontal overflow');
  assert.match(source,/\.card\{[^}]*flex-wrap:wrap/,'task chips may move below the title when the card is constrained');
@@ -37579,7 +37597,7 @@ test('RISK overdue scanner layout: enlarged candidate title chips and decision f
  assert.doesNotMatch(source,/\.decide-finish\{[^}]*(?:overflow:hidden|display:none)/,'containment must not hide scanner actions');
 });
 test('RISK overdue scanner layout: chosen-task breadcrumb stays within the enlarged scanner width',async()=>{
- const {ctx,shim}=await loadApp({seed:971}),b=ctx.addTask('A long previously chosen benchmark title'),t=ctx.addTask('Overdue task',false,[],{due:ctx.todayISO(-1)});ctx.dotTask(b.id);ctx.state.mode='scan';ctx.state.candidateId=t.id;ctx.renderScan();ctx.onAction('run-woop',overdueWoopControl({ctx,shim}));
+ const {ctx,shim}=await loadApp({seed:971}),b=ctx.addTask('A long previously chosen benchmark title'),t=ctx.addTask('Overdue task',false,[],{due:ctx.todayISO(-1)});ctx.dotTask(b.id);ctx.state.mode='scan';ctx.state.candidateId=t.id;ctx.renderScan();ctx.dotTask(t.id);ctx.renderScan();
  assert.match(shim.document.getElementById('scan').innerHTML,/class="crumb"/,'the explicit dot makes its former benchmark a breadcrumb');
  const source=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');assert.match(source,/\.crumb\{max-width:min\(190px,100%\)\}/,'its existing190px cap must also respect a narrower scanner instead of overflowing after the new dot');
 });
@@ -41512,21 +41530,6 @@ test('RISK recovery identity consumers: signed-in Add clears its captured draft 
  assert.equal(input.value,'','a durably accepted same-identity Add must clear its captured draft');
 });
 
-test('RISK recovery identity consumers: final-task WOOP advances after acknowledged recovery',async t=>{
- const app=await damagedAcknowledgedApp187(t),{ctx,shim}=app;
- await ctx.cloudPull();await ctx.sendPush();await settleRecovery188(app);
- assert.equal(ctx.state.syncIdentity,'owner');
- app.task=ctx.state.tasks[0];woopDislodgeTwice(app);
- ctx.onAction('woop-start',{dataset:{benchmark:app.task.id}});
- assert.match(shim.document.getElementById('modalRoot').innerHTML,/best outcome/i);
- woopStep(app,'A supported signed-in outcome');
- assert.match(shim.document.getElementById('modalRoot').innerHTML,/obstacle could get in your way/i,'a same-identity WOOP session must advance instead of cancelling its draft');
- woopStep(app,'A real signed-in obstacle');woopStep(app,'If blocked, take one small step.');assert.equal(await ctx.persist(),true);
- const task=ctx.state.tasks.find(row=>row.id===app.task.id);assert.equal(task.woopPlan.plan,'If blocked, take one small step.');ctx.renderScan();
- const button=shim.document.getElementById('scan').innerHTML.match(/<button[^>]*data-act="woop-delete"[^>]*>/)?.[0];assert.ok(button);
- const data=Object.fromEntries([...button.matchAll(/data-([a-z]+)="([^"]*)"/g)].map(match=>[match[1],match[2]]));await ctx.onAction('woop-delete',{dataset:data});assert.equal(task.woopPlan,null,'the mounted same-UID Delete control retains its complete owner binding');assert.equal(await ctx.persist(),true);
-});
-
 
 
 test('RISK recovery identity consumers: verified cloud adoption rebases independent saved extension fields for the same UID',async t=>{
@@ -41914,16 +41917,25 @@ test('RISK debug log link #2309: counting backups loads no backup rows, so a col
  assert.deepEqual(reads,[],'no backup row is loaded to count them');
 });
 
+test('Changelog #2420: one bullet says Yes No and Cant are back inside the scanner box and scroll with the page',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ const notes=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ const release=notes.split('<h3>November 17, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ const bullets=release.split('<li>').slice(1).filter(item=>/scanner box/.test(item));
+ assert.equal(bullets.length,1,'one bullet covers the move: '+release);
+ assert.match(bullets[0],/Yes, No and Can’t are back inside the scanner box, under the question, instead of pinned to the bottom of the screen/);
+ assert.match(bullets[0],/scroll with the page and move a little with each task’s title length/);
+});
+
 test('Help answers how the steady scanner, backup list, Debug log link and rank column now behave',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();
  const help=app.shim.document.getElementById('modalRoot').innerHTML;
  for(const [topic,answer] of [
-  [/stay at the bottom of the screen\?<\/dt>/,/Yes, No and Can’t stay in one place at the bottom of the screen/],
+  [/Where are Yes, No and Can’t\?<\/dt>/,/Inside the scanner box, under the question[^<]*scroll with the page/],
   [/How long can the dot trail get\?<\/dt>/,/stays on one row[^<]*a count such as \+3 earlier/],
   [/How long can the dot trail get\?<\/dt>/,/up to two of the newest dots, only as many as fit with their titles readable/],
-  [/Can I run WOOP on an overdue task\?<\/dt>/,/Run WOOP appears above the scanner choices/],
   [/Why didn’t my second tap count\?<\/dt>/,/ignored for a moment after a new task appears/],
-  [/Why does the page move after I answer\?<\/dt>/,/scrolls just enough to show the next task/],
+  [/Why do Yes, No and Can’t move a little between tasks\?<\/dt>/,/longer or shorter task title moves them[^<]*does not scroll when you answer/],
   [/Why does the rank column take a moment after an answer\?<\/dt>/,/catch up at most once a second/],
   [/Does Settings load every backup\?<\/dt>/,/opened only when you download, restore or delete it[^<]*damaged after it was saved, Restore refuses it/],
   [/How do I open the debug log if Settings will not open\?<\/dt>/,/opens the Debug log directly, without going through Settings/],
