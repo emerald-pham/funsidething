@@ -7948,17 +7948,22 @@ const changeRecordOutbox=(()=>{
   function saved(through){
     // #2417 second review B3: an Undo's row stays while the cloud still keeps
     // its answer's record, so that a reopened page knows not to apply it.
-    // A backend that cannot say (an older or a stand-in one) keeps nothing back:
-    // this runs after a save has committed, which nothing here may undo.
-    let heard=[];
-    try{const rows=window.CloudSync?.heardChangeRecords?.();if(Array.isArray(rows))heard=rows;}catch{heard=[];}
+    // #2417 third review N11: what the cloud keeps is unknown until the
+    // listener has heard this account (opened signed out or offline, or a
+    // backend that cannot say), so the row stays then too. This runs after a
+    // save has committed, which nothing here may undo.
+    let heard=null;
+    try{const rows=window.CloudSync?.heardChangeRecords?.();if(Array.isArray(rows))heard=rows;}catch{heard=null;}
     const device=store();
     if(!device)return;
     // #2417 third review B4: a save that began after an Undo holds it, so the
-    // Undo's full row ends here: it becomes a marker while the cloud still
-    // keeps its answer's record, and goes otherwise.
-    const held=settled.filter(row=>row.order<=through);
-    const kept=held.filter(row=>row.answer&&heard.some(record=>record.id===row.answer));
+    // Undo's full row ends here: it goes, or becomes a marker while it still
+    // has something to stop, the cloud's record of its answer or the answer's
+    // own row. That row goes now only if this save holds it too; no save holds
+    // one still being sent.
+    const held=settled.filter(row=>row.order<=through),going=new Set(held.filter(row=>!row.answer).map(row=>row.id));
+    const answerRowLeft=answer=>queue.some(entry=>entry.id===answer)||settled.some(row=>row.id===answer&&!going.has(row.id));
+    const kept=held.filter(row=>row.answer&&(heard===null||heard.some(record=>record.id===row.answer)||answerRowLeft(row.answer)));
     for(const row of kept)if(!row.marker){
       row.marker=true;
       device.putChangeRecord({expectedHash:deviceHeadHash,account:row.identity,id:row.id,parts:LOCAL_UNDO_MARKER,order:row.order}).catch(()=>{});

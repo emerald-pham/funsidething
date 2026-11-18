@@ -17720,3 +17720,93 @@ test('RISK change records: an answer given again after its Undo survives reopeni
  }
  assert.deepEqual(failed,[],'an answer given again after its Undo survives reopening');
 });
+
+// #2417 third reviews N11 and N12: an Undo whose full row this device could
+// not keep (refused, as by a full device) leaves a marker, so its answer's
+// own row is not replayed and the saved board never holds the answer. The
+// cloud still keeps the answer's record, and nothing else on this board makes
+// it a no-op: only the marker, which every opening reads into the undone
+// answers, stops it applying. It must survive a save made while the listener
+// has heard nothing (opened signed out), since the cloud's records are then
+// unknown, not gone.
+test('RISK change records: the cloud’s record of an answer this device undid never applies on reopening, also after a save made while signed out',{timeout:900000},async t=>{
+ const values=board=>JSON.stringify({ratings:board.tasks.map(task=>[task.id,task.mu,task.sigma]),considered:board.considered||{},cantAt:board.cantAt||{},
+  workedAt:board.workedAt||{},history:(board.workLog||[]).length});
+ const failed=[];
+ for(const act of ['no','cant','cand-worked','dislodge','bench-cant','worked']){
+  const device=await answeringDevice2408(t,{saveMs:0,dropDatabase:false});
+  await startAnswering2408(device);
+  const {ctx,clock,counters,docs}=device,store=ctx.window.ScannerDeviceStore;
+  // The full copy is held, so the cloud keeps the answer's record throughout,
+  // and from here no whole-board device save finishes before the app closes.
+  let release;device.faults.publishPending=new Promise(resolve=>{release=resolve;});t.after(()=>release());
+  device.saveMs=60000;
+  // The device refuses the Undo's full row: a marker is saved instead.
+  const put=store.putChangeRecord;
+  store.putChangeRecord=async row=>row.id.startsWith('local:undo:')&&JSON.parse(row.parts).localUndo?{ok:false,reason:'quota'}:put.call(store,row);
+  const before=values(ctx.state),commits=counters.commits.length;
+  device.tap(act);await clock.advance(100);
+  assert.notEqual(values(ctx.state),before,act+': positive control: the answer changes the board');
+  assert.equal(cloudRecords2417(docs).length,1,act+': positive control: the answer goes as a record');
+  assert.equal(await ctx.onAction('undo',{}),true,act+': positive control: Undo runs');
+  await clock.advance(400);
+  const expected=values(ctx.state);
+  assert.ok((await store.listChangeRecords('owner')).some(row=>row.id.startsWith('local:undo:')&&JSON.parse(row.parts).localUndo===null),act+': positive control: the Undo is kept as a marker');
+  assert.ok(counters.commits.slice(commits).every(commit=>commit.endedAt===undefined),act+': positive control: no whole-board save has finished');
+  await device.close();
+  // Reopened signed out: an edit is saved before the listener hears anything.
+  const first=await answeringDevice2408(t,{docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,signedIn:false});
+  await syncSettled(first.ctx,{within:30000});
+  assert.equal(values(first.ctx.state),expected,act+': positive control: the reopened board is the one the Undo left');
+  const saves=first.counters.commits.length;
+  first.ctx.state.tasks.at(-2).title+=' (edited while signed out)';first.ctx.save();
+  await syncSettled(first.ctx,{within:30000});
+  assert.ok(first.counters.commits.length>saves&&first.counters.commits.every(commit=>commit.endedAt!==undefined),act+': positive control: a save finishes while signed out');
+  await first.close();
+  assert.equal(cloudRecords2417(docs).length,1,act+': positive control: the cloud still keeps the answer’s record');
+  // Reopened signed in: the record is heard and the board synced.
+  const second=await answeringDevice2408(t,{docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,dropDatabase:true});
+  try{await syncSettled(second.ctx,{within:30000,synced:true});}
+  catch(error){failed.push(act+': the reopened app does not get synced: '+String(error.message).slice(0,160));await second.close();continue;}
+  if(values(second.ctx.state)!==expected)failed.push(act+': the undone answer comes back on reopening');
+  if(second.backend.CS.status==='error')failed.push(act+': the reopened app shows a cloud error');
+  if(values(await cloudCopy2408(docs))!==expected)failed.push(act+': the cloud copy it sends holds the undone answer');
+  await second.close();
+ }
+ assert.deepEqual(failed,[],'the cloud’s record of an answer this device undid never applies on reopening');
+});
+
+// #2417 third review B4, the answer's own row: Undo while the answer's record
+// is being sent, its Undo's whole-board save finishes, and the app closes
+// before the send does. The answer's own row is still on the device (unsent),
+// so the Undo's row must outlast that save, as a marker, or reopening sends a
+// record of the undone answer.
+test('RISK change records: an answer undone while its record was being sent is never sent after reopening, though its Undo’s save finished first',{timeout:900000},async t=>{
+ const values=board=>JSON.stringify({ratings:board.tasks.map(task=>[task.id,task.mu,task.sigma]),considered:board.considered||{},cantAt:board.cantAt||{},
+  workedAt:board.workedAt||{},history:(board.workLog||[]).length});
+ const failed=[];
+ for(const act of ['no','cant','cand-worked','dislodge','bench-cant','worked']){
+  const device=await answeringDevice2408(t,{saveMs:0,dropDatabase:false});
+  await startAnswering2408(device);
+  const {ctx,clock,counters,docs}=device;
+  // The send reaches the cloud's counter and waits there until the app has closed.
+  let open,started=false;const gate=new Promise(resolve=>{open=resolve;});t.after(()=>open());
+  device.faults.transactionRead=async path=>{if(/\/changeLog\//.test(path)){started=true;await gate;}};
+  device.tap(act);await clock.advance(100);
+  assert.ok(started&&cloudRecords2417(docs).length===0,act+': positive control: the record is being sent');
+  assert.equal(await ctx.onAction('undo',{}),true,act+': positive control: Undo runs');
+  const commits=counters.commits.length;
+  await clock.advance(3000);
+  const expected=values(ctx.state);
+  assert.ok(counters.commits.length>commits&&counters.commits.every(commit=>commit.endedAt!==undefined),act+': positive control: the Undo’s whole-board save has finished');
+  await device.close();
+  const reopened=await answeringDevice2408(t,{docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,dropDatabase:true});
+  try{await syncSettled(reopened.ctx,{within:30000,synced:true});}
+  catch(error){failed.push(act+': the reopened app does not get synced: '+String(error.message).slice(0,160));await reopened.close();continue;}
+  if(recordsWritten2417(reopened)!==0)failed.push(act+': the reopened app sends a record of the undone answer');
+  if(values(reopened.ctx.state)!==expected)failed.push(act+': the reopened app does not hold the board the Undo left');
+  if(reopened.backend.CS.status==='error')failed.push(act+': the reopened app shows a cloud error');
+  await reopened.close();
+ }
+ assert.deepEqual(failed,[],'an answer undone while its record was being sent is never sent after reopening');
+});
