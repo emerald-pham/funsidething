@@ -17669,3 +17669,54 @@ test('RISK change records: an answer made while a device save waits on another t
  const head=JSON.parse((await store.readHead()).payload);
  assert.ok(head.considered?.[candidate]==='no'||(await rowsAbout()).length===1,'the row goes only with a saved board that holds the answer');
 });
+
+// #2417 third review B4: answer, Undo, the same answer again, and the device
+// saves finish before the app closes: the saved board holds the Undo, so its
+// row must not replay over the answer given again, before or after the full
+// copy lands. Once a save holds the Undo, no full Undo row stays on the device.
+test('RISK change records: an answer given again after its Undo survives reopening, and no full Undo row outlives the save that holds the Undo',{timeout:900000},async t=>{
+ const canonical=value=>JSON.stringify(value,function(key,item){
+  if(key==='postponeOps'&&Array.isArray(item))return item.map(row=>JSON.stringify(row,Object.keys(row).sort())).sort().map(row=>JSON.parse(row));
+  return item&&typeof item==='object'&&!Array.isArray(item)?Object.fromEntries(Object.keys(item).sort().map(name=>[name,item[name]])):item;});
+ // The save time and the time the scanner last showed its candidate aside:
+ // a full copy read on opening can carry an earlier showing of the same one.
+ const content=board=>{const {updatedAt,presentedAt,...rest}=typeof board==='string'?JSON.parse(board):board;return canonical(rest);};
+ const reread=ctx=>content(vm.runInContext('(()=>{const board=JSON.parse(cloudPayload());hydrateState(board);return cloudPayloadFor(board);})()',ctx));
+ const failed=[];
+ for(const act of ['no','cant','cand-worked','dislodge','bench-cant','worked'])for(const landed of [false,true]){
+  const label=act+(landed?', after the full copy lands':', before the full copy lands');
+  const device=await answeringDevice2408(t,{saveMs:0,dropDatabase:false});
+  await startAnswering2408(device);
+  const {ctx,clock,counters,backend}=device;
+  let release=()=>{};
+  if(!landed){let open;device.faults.publishPending=new Promise(resolve=>{open=resolve;});release=open;}
+  device.tap(act);await clock.advance(100);
+  assert.equal(await ctx.onAction('undo',{}),true,label+': positive control: Undo runs');
+  // The scanner ignores a tap within 200 ms of drawing its tasks again.
+  await clock.advance(400);
+  const undone=reread(ctx);
+  device.tap(act);await clock.advance(100);
+  assert.notEqual(reread(ctx),undone,label+': positive control: the answer is given again');
+  // Every device save finishes; with the full copy held, it does not land.
+  const commits=counters.commits.length;
+  await clock.advance(30000);
+  if(landed)await clock.settle();
+  assert.ok(counters.commits.length>commits&&counters.commits.every(commit=>commit.endedAt!==undefined),label+': positive control: the device saves have finished');
+  // What reopening must show: the saved board, as an opening reads it.
+  ctx.__savedHead2417=(await ctx.window.ScannerDeviceStore.readHead()).payload;
+  const expected=content(vm.runInContext('(()=>{const board=JSON.parse(__savedHead2417);hydrateState(board);return cloudPayloadFor(board);})()',ctx));
+  assert.notEqual(expected,undone,label+': positive control: the saved board holds the answer given again');
+  const rows=await ctx.window.ScannerDeviceStore.listChangeRecords('owner');
+  const fullUndoRows=rows.filter(row=>row.id.startsWith('local:undo:')&&JSON.parse(row.parts).localUndo);
+  if(fullUndoRows.length)failed.push(label+': a full Undo row outlives the save that holds the Undo ('+fullUndoRows.map(row=>row.parts.length).join(',')+' characters)');
+  await device.close();release();
+  const reopened=await answeringDevice2408(t,{docs:device.docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,dropDatabase:true});
+  try{await syncSettled(reopened.ctx,{within:30000,synced:true});}
+  catch(error){failed.push(label+': the reopened app does not get synced: '+String(error.message).slice(0,160));await reopened.close();continue;}
+  if(reread(reopened.ctx)!==expected)failed.push(label+': the answer given again does not survive reopening');
+  if(reopened.backend.CS.status==='error')failed.push(label+': the reopened app shows a cloud error');
+  if(content(await cloudCopy2408(device.docs))!==expected)failed.push(label+': the cloud copy does not hold the answer given again');
+  await reopened.close();
+ }
+ assert.deepEqual(failed,[],'an answer given again after its Undo survives reopening');
+});

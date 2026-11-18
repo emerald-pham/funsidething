@@ -7845,6 +7845,9 @@ const CHANGE_RECORD_MAX_CHARS=64*1024,CHANGE_RECORD_BACKLOG=20;
 // #2417 specialist review B2: the id of an Undo's own device row starts so;
 // the cloud store refuses any id with a colon, so it can never go as a record.
 const LOCAL_UNDO_ROW="local:undo:";
+// What an Undo row becomes once a saved board holds its Undo: it only stops
+// the answer's own row, and the cloud's record of it, from applying here.
+const LOCAL_UNDO_MARKER=JSON.stringify({v:1,localUndo:null});
 const changeRecordOutbox=(()=>{
   const queue=[],settled=[];let draining=false,order=0,backlog=false;
   const store=()=>deviceStorageAuthority&&deviceStore&&typeof deviceStore.putChangeRecord==="function"&&
@@ -7949,8 +7952,19 @@ const changeRecordOutbox=(()=>{
     // this runs after a save has committed, which nothing here may undo.
     let heard=[];
     try{const rows=window.CloudSync?.heardChangeRecords?.();if(Array.isArray(rows))heard=rows;}catch{heard=[];}
-    const device=store(),done=settled.filter(row=>row.order<=through&&!(row.answer&&heard.some(record=>record.id===row.answer)));
-    if(!device||!done.length)return;
+    const device=store();
+    if(!device)return;
+    // #2417 third review B4: a save that began after an Undo holds it, so the
+    // Undo's full row ends here: it becomes a marker while the cloud still
+    // keeps its answer's record, and goes otherwise.
+    const held=settled.filter(row=>row.order<=through);
+    const kept=held.filter(row=>row.answer&&heard.some(record=>record.id===row.answer));
+    for(const row of kept)if(!row.marker){
+      row.marker=true;
+      device.putChangeRecord({expectedHash:deviceHeadHash,account:row.identity,id:row.id,parts:LOCAL_UNDO_MARKER,order:row.order}).catch(()=>{});
+    }
+    const done=held.filter(row=>!kept.includes(row));
+    if(!done.length)return;
     for(const row of done)settled.splice(settled.indexOf(row),1);
     const byIdentity=new Map();
     for(const row of done)byIdentity.set(row.identity,[...(byIdentity.get(row.identity)||[]),row.id]);
@@ -7969,7 +7983,7 @@ const changeRecordOutbox=(()=>{
      (Undo travels by the full copy until #2418): an app closed before the
      Undo's whole-board save reopens with the answer and its Undo both, and
      that board's next full copy carries the Undo to other devices. */
-  function undone(frame,before,after){
+  function undone(frame,before,after,undoEvent=null){
     const entry=frame?.changeRecordEntry,device=store();
     if(!entry||entry.undone)return;
     entry.undone=true;locallyUndoneRecords.add(entry.id);
@@ -7983,7 +7997,9 @@ const changeRecordOutbox=(()=>{
     // or saved is a marker: the answer's own row is then not replayed.
     let change=null;
     try{change=describeLocalUndo(before,after);}catch{change=null;}
-    const text=JSON.stringify({v:1,localUndo:change}),marker=JSON.stringify({v:1,localUndo:null});
+    // #2417 third review B4: the row names the Undo's own cancellation event,
+    // so an opening whose saved board holds that event knows the Undo is in it.
+    const text=JSON.stringify({v:1,localUndo:change,undoEvent:typeof undoEvent==="string"?undoEvent:null}),marker=LOCAL_UNDO_MARKER;
     const row={identity:entry.identity,id:LOCAL_UNDO_ROW+entry.id,order:++order,answer:entry.id};
     const put=parts=>device.putChangeRecord({expectedHash:deviceHeadHash,account:row.identity,id:row.id,parts,order:row.order});
     entry.saved.then(()=>put(text)).then(result=>result?.ok===true||text===marker?result:put(marker))
@@ -8015,7 +8031,13 @@ async function replaySavedChangeRecords(){
     for(const row of rows){
       let parts=null;
       try{parts=JSON.parse(row.parts);}catch{continue;}
-      if(row.id.startsWith(LOCAL_UNDO_ROW)){if(parts?.localUndo&&applyLocalUndo(state,parts.localUndo))changed=true;continue;}
+      if(row.id.startsWith(LOCAL_UNDO_ROW)){
+        // #2417 third review B4: a board that holds the Undo's own event holds
+        // the Undo, whatever its values look like now (the answer given again).
+        const holds=typeof parts?.undoEvent==="string"&&(state.decisionEvents||[]).some(event=>event?.id===parts.undoEvent);
+        if(parts?.localUndo&&!holds&&applyLocalUndo(state,parts.localUndo))changed=true;
+        continue;
+      }
       if(markers.has(row.id))continue;
       if(applyChangeRecordTo(state,parts))changed=true;
     }
@@ -11710,7 +11732,7 @@ const taskActionOwnerBundle=(()=>{
     }
     // Undo itself is persisted, so reload cannot resurrect the action.
     recomputeRanks();finishRatingObservation({...observation,membershipChanged:returnedDots});commit();
-    if(recordedAnswer)changeRecordOutbox.undone(frame,recordedAnswer,captureUndoBoard(state,recordedAnswer));
+    if(recordedAnswer)changeRecordOutbox.undone(frame,recordedAnswer,captureUndoBoard(state,recordedAnswer),cancellation?.id??null);
     return true;
   }
   return {
