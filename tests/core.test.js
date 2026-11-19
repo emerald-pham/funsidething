@@ -30493,9 +30493,12 @@ test('RISK BACKWARD COMPATIBILITY: change records keep the supported floor and t
  const candidate={...decisionCandidate146(),rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')};
  const board=label=>JSON.stringify({tasks:[{id:'kept',title:'Kept '+label,done:false}],future:{keep:'unknown data'}});
  const parts='{"v":1,"before":{},"after":{}}';
- let index=0;
- for(const sha of [...new Set([SUPPORTED_RELEASE,base])]){
-  const released=readReleasedClient(__dirname,sha);
+ // #2426: once #2423 shipped, the release base's rules know records, so the
+ // last release before them stays in the matrix to keep the fallback covered.
+ const LAST_RELEASE_WITHOUT_RECORDS='49f5d11bb234f897eb6c5d64584216ab0481b4ad';
+ let index=0,fallbackCovered=false;
+ for(const sha of [...new Set([SUPPORTED_RELEASE,LAST_RELEASE_WITHOUT_RECORDS,base])]){
+  const released=readReleasedClient(__dirname,sha),rulesKnowRecords=/match \/changeRecords\//.test(released.rules);
   for(const direction of ['old-client/new-rules','new-client/old-rules']){
    const label=sha.slice(0,7)+' '+direction,handles=[];
    const env=await initializeTestEnvironment({projectId:'demo-change-records-compat-'+(index++),firestore:{rules:direction==='old-client/new-rules'?candidate.rules:released.rules}});
@@ -30504,7 +30507,15 @@ test('RISK BACKWARD COMPATIBILITY: change records keep the supported floor and t
     handles.push(next,old);
     await assertRoundTrip(next.CS,board('newer'),0,label+': the newer version publishes');
     const appended=await next.CS.appendChangeRecord({id:'answer-'+index,parts});
+    if(direction==='new-client/old-rules'&&rulesKnowRecords){
+     // A release whose rules know records accepts this version's record.
+     assert.equal(appended.ok,true,label+': rules that know records accept them');
+     await assertRoundTrip(old.CS,board('older'),1,label+': and the released version publishes its full copy over it');
+     assert.equal((await next.CS.pull()).payload,board('older'),label+': the newer version reads the released one’s copy');
+     continue;
+    }
     if(direction==='new-client/old-rules'){
+     fallbackCovered=true;
      assert.equal(appended.unsupported,true,label+': rules without records refuse them');
      assert.notEqual(next.CS.status,'error',label+': and the newer version shows no error');
      await assertRoundTrip(next.CS,board('newer again'),1,label+': it goes on syncing by full copies');
@@ -30539,6 +30550,7 @@ test('RISK BACKWARD COMPATIBILITY: change records keep the supported floor and t
    }finally{for(const handle of handles)await handle.drain();await env.cleanup();}
   }
  }
+ assert.equal(fallbackCovered,true,'positive control: some released rules without records were exercised');
 });
 
 test('RISK BACKWARD COMPATIBILITY: released clients and candidate interoperate across both rule versions',{skip:!process.env.FIRESTORE_EMULATOR_HOST},async()=>{
