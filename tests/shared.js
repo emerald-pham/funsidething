@@ -2167,11 +2167,13 @@ async function loadCloudBackendV2({artifacts=null,sharedDocs=null,rootData=null,
  // the one clock that plays the server's for all of them. With 1234 every
  // upload still in flight was older than the collector's seven-day grace, so
  // one device's cleanup took another's copy before it was sealed, which
- // Firestore, stamping each upload when it begins, never does.
- const normalize=value=>Object.fromEntries(Object.entries(value).map(([key,item])=>{if(!item?.__serverTimestamp)return [key,item];const at=serverClock();return [key,{toMillis:()=>at}];}));
- const apply=(operation)=>{
-  if(operation.type==='set'){docs.set(operation.ref.path,normalize(clone(operation.value)));if(operation.ref.path===rootPath)writes.push(clone(docs.get(rootPath)));}
-  else if(operation.type==='update')docs.set(operation.ref.path,{...(docs.get(operation.ref.path)||{}),...normalize(clone(operation.value))});
+ // Firestore, stamping each upload when it begins, never does. Firestore
+ // gives every server timestamp in one commit the same time, so a commit
+ // reads the clock once (at) and every write in it takes that time.
+ const normalize=(value,at)=>Object.fromEntries(Object.entries(value).map(([key,item])=>[key,item?.__serverTimestamp?{toMillis:()=>at}:item]));
+ const apply=(operation,at=serverClock())=>{
+  if(operation.type==='set'){docs.set(operation.ref.path,normalize(clone(operation.value),at));if(operation.ref.path===rootPath)writes.push(clone(docs.get(rootPath)));}
+  else if(operation.type==='update')docs.set(operation.ref.path,{...(docs.get(operation.ref.path)||{}),...normalize(clone(operation.value),at)});
   else docs.delete(operation.ref.path);
   shared.versions.set(operation.ref.path,(shared.versions.get(operation.ref.path)||0)+1);
   docWrites.push({path:operation.ref.path,type:operation.type,bytes:operation.type==='delete'?0:Buffer.byteLength(JSON.stringify(operation.value??null),'utf8')});
@@ -2185,6 +2187,42 @@ async function loadCloudBackendV2({artifacts=null,sharedDocs=null,rootData=null,
  const recordDeleteAllowed=path=>!/^users\/[^/]+\/changeRecords\//.test(path)||
   Number.isSafeInteger(docs.get(rootPath)?.includedSeq)&&docs.get(path)?.seq<=docs.get(rootPath).includedSeq;
  const deniedRecordDelete=()=>Object.assign(Error('rules keep a change record the active copy does not include'),{code:'permission-denied'});
+ // #2426: Firestore checks a transaction's writes against the rules as the
+ // documents stand at its commit, before it checks the versions the
+ // transaction read. Where a rule reads a document another device has changed
+ // since, the write is refused with permission-denied, which the SDK counts
+ // as permanent and does not run again; only a write the rules still allow
+ // meets the stale read (aborted) and runs again. The emulator with the real
+ // rules does exactly that: two publications over one revision, one attempt
+ // each and permission-denied for the second; a staging generation sealed
+ // under a transaction that read it as staging, sealing it again is refused
+ // after one attempt, marking it deleting runs twice and commits. This is
+ // the part of firestore.rules that reads the documents those transactions
+ // read: the root's revision and active copy (users/{uid}), the
+ // change-record counter (changeLog/head), and a generation's state and
+ // whether the root or a recovery protection holds it.
+ const rulesRefuseAtCommit=operations=>operations.some(({type,ref:{path},value})=>{
+  const current=docs.get(path),parts=path.split('/');
+  if(parts.length===2&&parts[0]==='users'&&type!=='delete'){
+   const next=type==='set'?value:{...current,...value};
+   if(next?.rev!==(current?.rev??0)+1)return true;
+   return current?.schemaVersion===2&&next.schemaVersion===2&&next.previousGeneration!==current.activeGeneration;
+  }
+  if(parts.length===4&&parts[2]==='changeLog'&&parts[3]==='head'&&type!=='delete'){
+   const next=type==='set'?value:{...current,...value};
+   return next?.seq!==(current?.seq??0)+1;
+  }
+  if(parts.length===4&&parts[2]==='generations'&&type!=='set'){
+   if(!current)return true;
+   const root=docs.get(parts.slice(0,2).join('/')),held=root?.activeGeneration===parts[3]||root?.previousGeneration===parts[3]||
+    docs.has(parts.slice(0,2).join('/')+'/recoveryProtections/'+parts[3]);
+   if(type==='delete')return current.state!=='deleting'||held;
+   const to=value?.state;
+   return !(to==='sealed'&&current.state==='staging'||to==='published'&&current.state==='sealed'||
+    to==='deleting'&&['staging','sealed','published'].includes(current.state)&&!held);
+  }
+  return false;
+ });
  const F={
   getFirestore:()=>({}),doc:(_db,...parts)=>ref(...parts),collection:(_db,...parts)=>ref(...parts),
   query:(reference,...constraints)=>constraints.reduce((query,constraint)=>constraint?.where?{...query,filters:[...(query.filters||[]),constraint.where]}:{...query,...constraint},{...reference}),
@@ -2192,25 +2230,31 @@ async function loadCloudBackendV2({artifacts=null,sharedDocs=null,rootData=null,
   getDoc:async reference=>{if(reference.path===rootPath&&docs.get(rootPath)?.schemaVersion===2&&failures.stampPending)return failures.stampPending;if(reference.path===rootPath&&failures.pullPending)return failures.pullPending;if(reference.path===rootPath&&failures.pull)throw failures.pull;return snap(reference);},getDocs:async collectionRef=>{queries.push(collectionRef.path);return {docs:directRows(collectionRef)};},
   serverTimestamp:()=>({__serverTimestamp:true}),
   runTransaction:async(_db,fn)=>{transactionCalls++;await failures.beforeTransaction?.(docs);if(failures.pushPending)return failures.pushPending;if(failures.push)throw failures.push;
-   // A transaction commits only over the versions of the documents it read;
-   // otherwise it runs again, as Firestore's does, and after five attempts it
-   // fails. #2417 checked only the change-record counter, so two devices
-   // never took the same sequence number. #2426: two devices that read the
-   // root at one revision both published over it, a held publication
-   // included, and the device whose copy was replaced thought it was synced.
+   // A transaction commits only over the versions of the documents it read.
+   // Otherwise the rules refuse it with permission-denied where they read a
+   // document that changed (rulesRefuseAtCommit), and it runs again where
+   // they do not, failing after five attempts, as Firestore's does. #2417
+   // checked only the change-record counter, so two devices never took the
+   // same sequence number. #2426: two devices that read the root at one
+   // revision both published over it, a held publication included, and the
+   // device whose copy was replaced thought it was synced.
    for(let attempt=1;;attempt++){
     const operations=[],read=new Map(),tx={get:async reference=>{await failures.transactionRead?.(reference.path,docs);if(failures.changeRecords&&changeRecordPath(reference.path))throw failures.changeRecords;read.set(reference.path,shared.versions.get(reference.path)||0);return snap(reference);},set:(reference,value)=>operations.push({type:'set',ref:reference,value}),update:(reference,value)=>operations.push({type:'update',ref:reference,value}),delete:reference=>operations.push({type:'delete',ref:reference})};
     const result=await fn(tx);
     if(failures.changeRecords&&operations.some(op=>changeRecordPath(op.ref.path)))throw failures.changeRecords;
     if(failures.publishPending&&operations.some(op=>op.ref.path===rootPath)){failures.publicationStarted=true;await failures.publishPending;}
-    if([...read].some(([path,version])=>(shared.versions.get(path)||0)!==version)){if(attempt<5)continue;throw Object.assign(Error('transaction contention'),{code:'aborted'});}
-    for(const operation of operations){if(failures.enforceDeletingTransition&&operation.type==='update'&&operation.value.state==='deleting'&&docs.get(operation.ref.path)?.state==='deleting')throw Object.assign(Error('rules reject deleting to deleting'),{code:'permission-denied'});if(operation.type==='delete'&&!recordDeleteAllowed(operation.ref.path))throw deniedRecordDelete();apply(operation);}await failures.afterTransaction?.(docs);return result;
+    if([...read].some(([path,version])=>(shared.versions.get(path)||0)!==version)){
+     if(rulesRefuseAtCommit(operations))throw Object.assign(Error('rules refuse the write over a document changed since it was read'),{code:'permission-denied'});
+     if(attempt<5)continue;throw Object.assign(Error('transaction contention'),{code:'aborted'});
+    }
+    const at=serverClock();
+    for(const operation of operations){if(failures.enforceDeletingTransition&&operation.type==='update'&&operation.value.state==='deleting'&&docs.get(operation.ref.path)?.state==='deleting')throw Object.assign(Error('rules reject deleting to deleting'),{code:'permission-denied'});if(operation.type==='delete'&&!recordDeleteAllowed(operation.ref.path))throw deniedRecordDelete();apply(operation,at);}await failures.afterTransaction?.(docs);return result;
    }
   },
   writeBatch:()=>{const operations=[];return {set:(reference,value)=>operations.push({type:'set',ref:reference,value}),delete:reference=>operations.push({type:'delete',ref:reference}),async commit(){batchCommits++;if(batchCommits===batchFailureAt)throw Object.assign(Error('batch unavailable'),{code:'unavailable'});
    if(failures.changeRecords&&operations.some(op=>changeRecordPath(op.ref.path)))throw failures.changeRecords;
    if(operations.some(op=>op.type==='delete'&&!recordDeleteAllowed(op.ref.path)))throw deniedRecordDelete();
-   for(const operation of operations)apply(operation);}};},
+   const at=serverClock();for(const operation of operations)apply(operation,at);}};},
  };
  const readDoc=F.getDoc,readDocs=F.getDocs;
  F.getDoc=async reference=>failures.cacheMiss?{exists:()=>false}:readDoc(reference);

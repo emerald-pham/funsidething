@@ -17355,6 +17355,37 @@ test('RISK change records: two devices publishing full copies over the same revi
  assert.equal(docs.get('users/owner').rev,2,'the cloud is at that revision');
 });
 
+// #2426: a publication refused with permission-denied is taken for the
+// revision guard only when a fresh read of the root shows it has moved past
+// the revision the push began from. A refusal the root does not explain, or
+// one whose root this account cannot read, is a real refusal and still holds.
+test('RISK change records: a publication the rules refuse over an unmoved root, or whose root its account cannot read again, still holds its sync error',{timeout:60000},async t=>{
+ const docs=new Map(),board=title=>JSON.stringify(syncState({v:2,tasks:[syncTask('refused-2426',title)],syncAccount:'e@example.com',syncIdentity:'owner'}));
+ const denied=()=>Object.assign(Error('rules refuse'),{code:'permission-denied'});
+ const seeder=await loadCloudBackendV2({sharedDocs:docs,timeoutMs:5000,serverClock:Date.now});t.after(()=>seeder.CS.suspend());
+ assert.equal((await seeder.CS.push(board('Seed'),1792323000000,0)).ok,true,'positive control: the cloud holds a first copy');
+ // The publication's read of the root is refused, and nothing has moved it.
+ const unmoved=await loadCloudBackendV2({sharedDocs:docs,timeoutMs:5000,serverClock:Date.now,failures:{transactionRead:async path=>{if(path==='users/owner')throw denied();}}});
+ t.after(()=>unmoved.CS.suspend());
+ const held=await unmoved.CS.push(board('Unmoved'),1792323000001,1);
+ assert.equal(held.phase,'publication','positive control: the refusal is the publication’s: '+JSON.stringify(held));
+ assert.equal(held.code,'permission-denied','over an unmoved root the refusal stays a refusal: '+JSON.stringify(held));
+ assert.notEqual(held.conflict,true,'and is not taken for the revision guard');
+ assert.equal(unmoved.CS.status,'error','its device holds the error');
+ assert.equal(docs.get('users/owner').rev,1,'positive control: the root did not move');
+ // Another device publishes while this one's publication is refused, but
+ // this account cannot read the root again either.
+ const faults={transactionRead:async path=>{if(path!=='users/owner')return;
+  assert.equal((await seeder.CS.push(board('Other'),1792323000002,1)).ok,true,'positive control: another device publishes');
+  faults.serverRead=async readPath=>{if(readPath==='users/owner')throw denied();};throw denied();}};
+ const unreadable=await loadCloudBackendV2({sharedDocs:docs,timeoutMs:5000,serverClock:Date.now,failures:faults});t.after(()=>unreadable.CS.suspend());
+ const stillHeld=await unreadable.CS.push(board('Unreadable'),1792323000003,1);
+ assert.equal(docs.get('users/owner').rev,2,'positive control: the root moved past this push’s revision');
+ assert.equal(stillHeld.phase,'publication','positive control: the refusal is the publication’s: '+JSON.stringify(stillHeld));
+ assert.equal(stillHeld.code,'permission-denied','a root it cannot read again proves nothing, so the refusal holds: '+JSON.stringify(stillHeld));
+ assert.equal(unreadable.CS.status,'error','its device holds the error');
+});
+
 test('RISK change records: a decision conflict between two devices resolves on a third exactly as it does between two full copies, whatever the devices’ clocks',{timeout:300000},async t=>{
  const denied=()=>Object.assign(Error('rules without change records'),{code:'permission-denied'});
  const outcome=async records=>{
@@ -17373,6 +17404,15 @@ test('RISK change records: a decision conflict between two devices resolves on a
    'positive control: the '+name+'’s clock has not reached the 2 AM date marker that ends the pass the scan began');
   if(!records)for(const device of [phone,laptop,tablet])device.faults.changeRecords=denied();
   const releases=records?[holdFullCopy2417(t,phone),holdFullCopy2417(t,tablet)]:[];
+  // #2426: without records, both full copies read the root at one revision
+  // before either commits, as two devices answering at once do, so the one
+  // that commits second always meets the revision guard. On Firestore that
+  // commit is refused with permission-denied (the rules read the root), which
+  // left the loser holding a sync error while the fake reran it into a plain
+  // conflict, and the oracle passed only when the two did not overlap.
+  let openPublications=()=>{};
+  if(!records){const together=new Promise(resolve=>{openPublications=resolve;});t.after(()=>openPublications());
+   for(const device of [phone,tablet])device.faults.publishPending=together;}
   const candidate=phone.tap('no');tablet.tap('cant');
   assert.equal(phone.ctx.state.considered?.[candidate],'no','positive control: the phone answers No');
   assert.equal(tablet.ctx.state.considered?.[candidate],'cant','positive control: the tablet answers Can’t on the same candidate');
@@ -17380,6 +17420,9 @@ test('RISK change records: a decision conflict between two devices resolves on a
    await until2417(()=>decisionsAbout2417(laptop.ctx.state,[candidate]).length===2,'with records: the laptop holds both answers before either full copy lands');
    await syncSettled(laptop.ctx,{within:30000});
   }else{
+   await until2417(()=>phone.faults.publicationStarted===true&&tablet.faults.publicationStarted===true,
+    'full copies: positive control: both devices publish over the same revision at once',60000);
+   openPublications();
    await settledTogether([phone,tablet],[],{within:120000});
    // Settled alone can leave an answer waiting to go up after a conflict;
    // the oracle reads the cloud once neither device has anything unsent.
