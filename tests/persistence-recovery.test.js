@@ -17290,9 +17290,18 @@ test('RISK change records: a decision conflict between two devices resolves on a
  const denied=()=>Object.assign(Error('rules without change records'),{code:'permission-denied'});
  const outcome=async records=>{
   const {phone,laptop,tablet}=await threeOpenDevices2417(t,answeringBoard2408({tasks:20,padBytes:0}));
+  // #2426: the conflict is about one pass, and a clock that reaches the 2 AM
+  // date marker begins a new pass at its next draw, which clears the scan
+  // marks. A phone an hour ahead of the real clock reached it whenever the
+  // scan began between 1 and 2 AM local time, and its No was cleared. So
+  // every clock first goes two hours behind the real one, which none of them
+  // then passes.
+  for(const device of [phone,laptop,tablet])vm.runInContext('Date.now=(now=>()=>now()-7200000)(Date.now)',device.ctx);
   // The phone's clock runs an hour fast and the tablet's an hour slow.
   vm.runInContext('Date.now=(now=>()=>now()+3600000)(Date.now)',phone.ctx);
   vm.runInContext('Date.now=(now=>()=>now()-3600000)(Date.now)',tablet.ctx);
+  for(const [name,device] of Object.entries({phone,laptop,tablet}))assert.ok(vm.runInContext('Date.now()<passResetCutoff(state.passStartedAt)',device.ctx),
+   'positive control: the '+name+'’s clock has not reached the 2 AM date marker that ends the pass the scan began');
   if(!records)for(const device of [phone,laptop,tablet])device.faults.changeRecords=denied();
   const releases=records?[holdFullCopy2417(t,phone),holdFullCopy2417(t,tablet)]:[];
   const candidate=phone.tap('no');tablet.tap('cant');
