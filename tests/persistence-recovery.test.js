@@ -16180,7 +16180,8 @@ async function answeringDevice2408(t,{board=answeringBoard2408(),docs=new Map(),
  const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage,cryptoProvider:crypto});
  const {ctx,shim}=app;
  const faults={authPending:true};
- const backend=await loadCloudBackendV2({runtimeWindow:ctx.window,sharedDocs:docs,failures:faults,timeoutMs:5000,recordSyncError:ctx.recordSyncError,cryptoProvider:crypto});
+ // #2426: devices that share docs share the server's clock, the host's.
+ const backend=await loadCloudBackendV2({runtimeWindow:ctx.window,sharedDocs:docs,failures:faults,timeoutMs:5000,recordSyncError:ctx.recordSyncError,cryptoProvider:crypto,serverClock:Date.now});
  ctx.window.cloudPull=ctx.cloudPull;ctx.window.CLOUD_PUSH_DELAY_MS=20;ctx.closeModal();
  const clock=answerClock2408(ctx,counters),store=ctx.window.ScannerDeviceStore;
  // Every device-store call is real work in flight. A whole-board commit is a
@@ -17284,6 +17285,74 @@ test('RISK change records: independent answers from two devices are both kept on
  // A Can't is recorded as the task's disposition, a current choice.
  assert.deepEqual(phoneFirst.decisions,['current-choice:'+phoneFirst.benchmark,'no:'+phoneFirst.candidate].sort(),'the phone first: the laptop holds both decisions once each');
  assert.deepEqual(tabletFirst.decisions,['current-choice:'+tabletFirst.benchmark,'no:'+tabletFirst.candidate].sort(),'the tablet first: the laptop holds both decisions once each');
+});
+
+// #2426: Firestore stamps an upload's createdAt with its own commit time, so a
+// device that publishes a moment after another device began an upload finds
+// that upload seconds old, inside the collector's seven-day resume grace. The
+// shared fake stamped every server time 1234 (1970), so every upload in flight
+// looked a week old and a peer's collector marked it deleting; the upload's
+// seal then failed, a failure the app does not retry, and the board stayed
+// unsent until some later trigger. A real cloud can reach that only for an
+// upload that was in flight longer than the grace, as the server's clock runs.
+test('RISK change records: a device that publishes while another is still sending its full copy leaves that copy alone, and the sender meets the revision guard',{timeout:60000},async t=>{
+ const docs=new Map(),board=title=>JSON.stringify(syncState({v:2,tasks:[syncTask('upload-2426',title)],syncAccount:'e@example.com',syncIdentity:'owner'}));
+ const seeder=await loadCloudBackendV2({sharedDocs:docs,timeoutMs:5000,serverClock:Date.now});t.after(()=>seeder.CS.suspend());
+ assert.equal((await seeder.CS.push(board('Seed'),1792323000000,0)).ok,true,'positive control: the cloud holds a first copy');
+ // The tablet stops once its chunks are written, just before it seals them:
+ // its second read of its generation is the seal's.
+ const generationPath=/^users\/owner\/generations\/[^/]+$/;let generationReads=0,arrive,resume;
+ const atSeal=new Promise(resolve=>{arrive=resolve;}),held=new Promise(resolve=>{resume=resolve;});t.after(()=>resume());
+ const tabletFaults={transactionRead:async path=>{if(generationPath.test(path)&&++generationReads===2){arrive(path);await held;}}};
+ const tablet=await loadCloudBackendV2({sharedDocs:docs,timeoutMs:60000,failures:tabletFaults,serverClock:Date.now});t.after(()=>tablet.CS.suspend());
+ const sending=tablet.CS.push(board('Tablet answer'),1792323000002,1);
+ const tabletGeneration=(await atSeal).split('/').at(-1);
+ assert.equal(docs.get('users/owner/generations/'+tabletGeneration)?.state,'staging','positive control: the tablet’s copy is in flight');
+ // The phone publishes over the same revision, and its cleanup runs.
+ const phoneFaults={},listed=new Promise(resolve=>{phoneFaults.serverRead=async path=>{if(path==='users/owner/generations')resolve();};});
+ const phone=await loadCloudBackendV2({sharedDocs:docs,timeoutMs:5000,failures:phoneFaults,serverClock:Date.now});t.after(()=>phone.CS.suspend());
+ assert.equal((await phone.CS.push(board('Phone answer'),1792323000001,1)).ok,true,'positive control: the phone publishes');
+ await listed;
+ // The cleanup works on the fake's promises alone; give it time to finish.
+ await new Promise(resolve=>setTimeout(resolve,200));
+ const afterCleanup=docs.get('users/owner/generations/'+tabletGeneration)?.state??'removed';
+ resume();
+ const result=await sending;
+ assert.notEqual(result.code,'seal-failed','the tablet’s copy is sealed: '+JSON.stringify(result));
+ assert.equal(afterCleanup,'staging','the phone’s cleanup left the copy the tablet was still sending alone');
+ assert.equal(result.conflict,true,'and it meets the revision guard, as the phone published first: '+JSON.stringify(result));
+ assert.equal(result.rev,docs.get('users/owner').rev,'at the revision the phone published');
+});
+
+// #2426: a Firestore transaction commits only over the documents it read as
+// they still are, and otherwise runs again. The shared fake did that only for
+// the change-record counter, so two devices that read the root at the same
+// revision both published over it: each was told its copy was that revision,
+// one copy replaced the other, and the device whose copy was lost thought it
+// had nothing left to send.
+test('RISK change records: two devices publishing full copies over the same revision at once: one publishes, the other meets the revision guard',{timeout:60000},async t=>{
+ const docs=new Map(),board=title=>JSON.stringify(syncState({v:2,tasks:[syncTask('publish-2426',title)],syncAccount:'e@example.com',syncIdentity:'owner'}));
+ const seeder=await loadCloudBackendV2({sharedDocs:docs,timeoutMs:5000,serverClock:Date.now});t.after(()=>seeder.CS.suspend());
+ assert.equal((await seeder.CS.push(board('Seed'),1792323000000,0)).ok,true,'positive control: the cloud holds a first copy');
+ // Each device stops at its publication's read of the root until both are there.
+ let release;const bothRead=new Promise(resolve=>{release=resolve;});t.after(()=>release());
+ const arrived=[],device=async name=>{
+  let reached;const atRoot=new Promise(resolve=>{reached=resolve;});
+  const faults={transactionRead:async path=>{if(path==='users/owner'&&!arrived.includes(name)){arrived.push(name);reached();await bothRead;}}};
+  const backend=await loadCloudBackendV2({sharedDocs:docs,timeoutMs:60000,failures:faults,serverClock:Date.now});t.after(()=>backend.CS.suspend());
+  return {backend,atRoot};
+ };
+ const phone=await device('phone'),tablet=await device('tablet');
+ const sending=[phone.backend.CS.push(board('Phone answer'),1792323000001,1),tablet.backend.CS.push(board('Tablet answer'),1792323000002,1)];
+ await Promise.all([phone.atRoot,tablet.atRoot]);
+ release();
+ const results=await Promise.all(sending);
+ const published=results.filter(result=>result.ok),guarded=results.filter(result=>result.conflict);
+ assert.equal(published.length,1,'exactly one copy publishes: '+JSON.stringify(results));
+ assert.equal(guarded.length,1,'the other meets the revision guard: '+JSON.stringify(results));
+ assert.equal(published[0].rev,2,'as the next revision');
+ assert.equal(guarded[0].rev,2,'and the guard names the revision the other device published');
+ assert.equal(docs.get('users/owner').rev,2,'the cloud is at that revision');
 });
 
 test('RISK change records: a decision conflict between two devices resolves on a third exactly as it does between two full copies, whatever the devices’ clocks',{timeout:300000},async t=>{

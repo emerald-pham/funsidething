@@ -2131,7 +2131,7 @@ function sharedCloudState(docs){
 // #2417: the change-record counter and records (firestore.rules), which the
 // fake's change-record failures refuse, as rules without them do.
 const changeRecordPath=path=>/^users\/[^/]+\/(changeRecords|changeLog)(\/|$)/.test(path);
-async function loadCloudBackendV2({artifacts=null,sharedDocs=null,rootData=null,batchFailureAt=Infinity,failures={},timeoutMs=25,recoveryTimeoutMs=timeoutMs,recordSyncError,cryptoProvider=webcrypto,runtimeWindow=null,firebaseSDK=null,timerProvider=null}={}){
+async function loadCloudBackendV2({artifacts=null,sharedDocs=null,rootData=null,batchFailureAt=Infinity,failures={},timeoutMs=25,recoveryTimeoutMs=timeoutMs,recordSyncError,cryptoProvider=webcrypto,runtimeWindow=null,firebaseSDK=null,timerProvider=null,serverClock=()=>1234}={}){
  const moduleMatch=(artifacts?.html||html).match(/<script type="module">([\s\S]*?)<\/script>/);assert.ok(moduleMatch);
  const moduleSource=moduleMatch[1].replace(/const \[appMod, A, F\] = await Promise\.all\(\[[\s\S]*?\]\);/,
   'const [appMod, A, F] = globalThis.__cloudModules;');
@@ -2161,7 +2161,14 @@ async function loadCloudBackendV2({artifacts=null,sharedDocs=null,rootData=null,
  // every document its live listeners receive: the cloud writes and reads the
  // change-record tests count.
  const docWrites=[],liveReads=[],liveQueries=[];
- const normalize=value=>Object.fromEntries(Object.entries(value).map(([key,item])=>[key,item?.__serverTimestamp?{toMillis:()=>1234}:item]));
+ // A server timestamp is the server's clock at the write. serverClock gives
+ // it; the default, 1234, is a fixed time from 1970 that tests of one device
+ // assert as it is. #2426: devices sharing these docs pass the host clock,
+ // the one clock that plays the server's for all of them. With 1234 every
+ // upload still in flight was older than the collector's seven-day grace, so
+ // one device's cleanup took another's copy before it was sealed, which
+ // Firestore, stamping each upload when it begins, never does.
+ const normalize=value=>Object.fromEntries(Object.entries(value).map(([key,item])=>{if(!item?.__serverTimestamp)return [key,item];const at=serverClock();return [key,{toMillis:()=>at}];}));
  const apply=(operation)=>{
   if(operation.type==='set'){docs.set(operation.ref.path,normalize(clone(operation.value)));if(operation.ref.path===rootPath)writes.push(clone(docs.get(rootPath)));}
   else if(operation.type==='update')docs.set(operation.ref.path,{...(docs.get(operation.ref.path)||{}),...normalize(clone(operation.value))});
@@ -2185,15 +2192,19 @@ async function loadCloudBackendV2({artifacts=null,sharedDocs=null,rootData=null,
   getDoc:async reference=>{if(reference.path===rootPath&&docs.get(rootPath)?.schemaVersion===2&&failures.stampPending)return failures.stampPending;if(reference.path===rootPath&&failures.pullPending)return failures.pullPending;if(reference.path===rootPath&&failures.pull)throw failures.pull;return snap(reference);},getDocs:async collectionRef=>{queries.push(collectionRef.path);return {docs:directRows(collectionRef)};},
   serverTimestamp:()=>({__serverTimestamp:true}),
   runTransaction:async(_db,fn)=>{transactionCalls++;await failures.beforeTransaction?.(docs);if(failures.pushPending)return failures.pushPending;if(failures.push)throw failures.push;
-   // #2417: a transaction that read the change-record counter commits only
-   // over the versions it read; otherwise it runs again, as Firestore's does,
-   // so two devices never take the same sequence number.
+   // A transaction commits only over the versions of the documents it read;
+   // otherwise it runs again, as Firestore's does, and after five attempts it
+   // fails. #2417 checked only the change-record counter, so two devices
+   // never took the same sequence number. #2426: two devices that read the
+   // root at one revision both published over it, a held publication
+   // included, and the device whose copy was replaced thought it was synced.
    for(let attempt=1;;attempt++){
     const operations=[],read=new Map(),tx={get:async reference=>{await failures.transactionRead?.(reference.path,docs);if(failures.changeRecords&&changeRecordPath(reference.path))throw failures.changeRecords;read.set(reference.path,shared.versions.get(reference.path)||0);return snap(reference);},set:(reference,value)=>operations.push({type:'set',ref:reference,value}),update:(reference,value)=>operations.push({type:'update',ref:reference,value}),delete:reference=>operations.push({type:'delete',ref:reference})};
     const result=await fn(tx);
     if(failures.changeRecords&&operations.some(op=>changeRecordPath(op.ref.path)))throw failures.changeRecords;
-    if(attempt<5&&[...read].some(([path,version])=>changeRecordPath(path)&&(shared.versions.get(path)||0)!==version))continue;
-    if(failures.publishPending&&operations.some(op=>op.ref.path===rootPath)){failures.publicationStarted=true;await failures.publishPending;}for(const operation of operations){if(failures.enforceDeletingTransition&&operation.type==='update'&&operation.value.state==='deleting'&&docs.get(operation.ref.path)?.state==='deleting')throw Object.assign(Error('rules reject deleting to deleting'),{code:'permission-denied'});if(operation.type==='delete'&&!recordDeleteAllowed(operation.ref.path))throw deniedRecordDelete();apply(operation);}await failures.afterTransaction?.(docs);return result;
+    if(failures.publishPending&&operations.some(op=>op.ref.path===rootPath)){failures.publicationStarted=true;await failures.publishPending;}
+    if([...read].some(([path,version])=>(shared.versions.get(path)||0)!==version)){if(attempt<5)continue;throw Object.assign(Error('transaction contention'),{code:'aborted'});}
+    for(const operation of operations){if(failures.enforceDeletingTransition&&operation.type==='update'&&operation.value.state==='deleting'&&docs.get(operation.ref.path)?.state==='deleting')throw Object.assign(Error('rules reject deleting to deleting'),{code:'permission-denied'});if(operation.type==='delete'&&!recordDeleteAllowed(operation.ref.path))throw deniedRecordDelete();apply(operation);}await failures.afterTransaction?.(docs);return result;
    }
   },
   writeBatch:()=>{const operations=[];return {set:(reference,value)=>operations.push({type:'set',ref:reference,value}),delete:reference=>operations.push({type:'delete',ref:reference}),async commit(){batchCommits++;if(batchCommits===batchFailureAt)throw Object.assign(Error('batch unavailable'),{code:'unavailable'});
