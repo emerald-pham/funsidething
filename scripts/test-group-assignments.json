@@ -761,6 +761,11 @@
       "reason": "Env-gated Firestore rules test: needs the Firestore emulator (FIRESTORE_EMULATOR_HOST), which the CI test groups do not start; it runs in the Data safety rules gate (npm run test:rules)."
     },
     {
+      "root": "Firestore rules: two devices publishing full copies over one revision at once: the second meets the revision guard, shows no error and publishes next, while a refused account still holds",
+      "environment": "FIRESTORE_EMULATOR_HOST",
+      "reason": "Env-gated Firestore rules test: needs the Firestore emulator (FIRESTORE_EMULATOR_HOST), which the CI test groups do not start; it runs in the Data safety rules gate (npm run test:rules)."
+    },
+    {
       "root": "RISK BACKWARD COMPATIBILITY: change records keep the supported floor and the release base syncing by full copies in both deployment orders, an older full copy never drops a record, and rules without records fall back with no error",
       "environment": "FIRESTORE_EMULATOR_HOST",
       "reason": "Env-gated Firestore emulator test: needs FIRESTORE_EMULATOR_HOST, which the CI test groups do not start; it runs in the Data safety backward compatibility gate (npm run test:compatibility)."
