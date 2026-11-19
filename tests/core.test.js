@@ -42146,8 +42146,8 @@ test('Changelog #2420: one bullet says Yes No and Cant are back inside the scann
 
 test('Changelog #2426: one bullet says two devices saving at the same moment no longer leave a sync error',async()=>{
  const notes=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
- assert.ok(notes.indexOf('<h3>November 18, 2026</h3>')<notes.indexOf('<h3>November 17, 2026</h3>')&&notes.includes('<h3>November 18, 2026</h3>'),'the newest release comes first');
- const release=notes.split('<h3>November 18, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.ok(notes.indexOf('<h3>November 19, 2026</h3>')<notes.indexOf('<h3>November 17, 2026</h3>')&&notes.includes('<h3>November 19, 2026</h3>'),'the newest release comes first');
+ const release=notes.split('<h3>November 19, 2026</h3>')[1]?.split('</ul>')[0]||'';
  const bullets=release.split('<li>').slice(1).filter(item=>/at the same moment/.test(item));
  assert.equal(bullets.length,1,'one bullet covers the fix: '+release);
  assert.match(bullets[0],/With sync on, when two devices save at the same moment/);
