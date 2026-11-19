@@ -17,9 +17,29 @@ service cloud.firestore {
       function notProtected(generationId) {
         return !exists(protectionPath(generationId));
       }
+      // #2417: change records. Each is created once, in the same request that
+      // moves the account's counter on by one and names it, so every record
+      // has its own sequence number and none can be rewritten. A root names,
+      // as includedSeq, the number up to which its full copy includes them,
+      // never past the counter; only records it includes may be deleted.
+      function recordHeadPath() {
+        return /databases/$(database)/documents/users/$(uid)/changeLog/head;
+      }
+      function recordPath(recordId) {
+        return /databases/$(database)/documents/users/$(uid)/changeRecords/$(recordId);
+      }
+      function recordHeadSeq() {
+        return exists(recordHeadPath()) ? get(recordHeadPath()).data.seq : 0;
+      }
+      function validIncludedSeq() {
+        return !request.resource.data.keys().hasAny(['includedSeq'])
+          || (request.resource.data.includedSeq is int && request.resource.data.includedSeq >= 0
+            && request.resource.data.includedSeq <= recordHeadSeq());
+      }
       function datedRevision() {
         return request.resource.data.keys().hasAll(['payload', 'updatedAt', 'rev', 'serverUpdatedAt'])
-          && !request.resource.data.keys().hasAny(['schemaVersion'])
+          // #2417 review: only a v2 root names the change records it includes.
+          && !request.resource.data.keys().hasAny(['schemaVersion', 'includedSeq'])
           && request.resource.data.payload is string
           && request.resource.data.rev is int
           && request.resource.data.serverUpdatedAt == request.time;
@@ -28,8 +48,9 @@ service cloud.firestore {
         return request.resource.data.keys().hasAll(['schemaVersion', 'rev', 'activeGeneration',
             'previousGeneration', 'updatedAt', 'serverUpdatedAt'])
           && request.resource.data.keys().hasOnly(['schemaVersion', 'rev', 'activeGeneration',
-            'previousGeneration', 'updatedAt', 'serverUpdatedAt', 'decisionCapability'])
+            'previousGeneration', 'updatedAt', 'serverUpdatedAt', 'decisionCapability', 'includedSeq'])
           && request.resource.data.get('decisionCapability', 1) == 1
+          && validIncludedSeq()
           && request.resource.data.schemaVersion == 2
           && request.resource.data.rev is int
           && request.resource.data.rev > 0
@@ -67,6 +88,50 @@ service cloud.firestore {
       allow update: if owner() && ((resource.data.get('schemaVersion', 1) != 2
           && datedRevision() && request.resource.data.rev == resource.data.get('rev', 0) + 1) || v2Update());
       allow delete: if false;
+
+      // #2417: the change-record counter. It only ever moves on by one, to
+      // name the record created in the same request with that number.
+      match /changeLog/head {
+        function validHead(seq) {
+          return request.resource.data.keys().hasAll(['seq', 'lastId'])
+            && request.resource.data.keys().hasOnly(['seq', 'lastId'])
+            && request.resource.data.seq == seq
+            && request.resource.data.lastId is string
+            && !exists(recordPath(request.resource.data.lastId))
+            && existsAfter(recordPath(request.resource.data.lastId))
+            && getAfter(recordPath(request.resource.data.lastId)).data.seq == seq;
+        }
+        allow read: if owner();
+        allow create: if owner() && validHead(1);
+        allow update: if owner() && validHead(resource.data.seq + 1);
+        allow delete: if false;
+      }
+      // #2417: change records: owner-only, append-only and immutable, and
+      // removable only once the active full copy includes them.
+      match /changeRecords/{recordId} {
+        function validRecord() {
+          return request.resource.data.keys().hasAll(['v', 'seq', 'parts', 'createdAt'])
+            && request.resource.data.keys().hasOnly(['v', 'seq', 'parts', 'createdAt'])
+            && request.resource.data.v == 1
+            && request.resource.data.seq is int && request.resource.data.seq >= 1
+            && request.resource.data.parts is string
+            && request.resource.data.parts.size() > 0 && request.resource.data.parts.size() <= 262144
+            && request.resource.data.createdAt == request.time;
+        }
+        allow read: if owner();
+        // #2417 review: created only as the counter moves on to it in the
+        // same request, so a removed record cannot be created again.
+        allow create: if owner() && validRecord()
+          && ((!exists(recordHeadPath()) && request.resource.data.seq == 1)
+            || (exists(recordHeadPath()) && get(recordHeadPath()).data.seq == request.resource.data.seq - 1))
+          && existsAfter(recordHeadPath())
+          && getAfter(recordHeadPath()).data.seq == request.resource.data.seq
+          && getAfter(recordHeadPath()).data.lastId == recordId;
+        allow update: if false;
+        allow delete: if owner() && exists(userPath())
+          && get(userPath()).data.get('schemaVersion', 0) == 2
+          && resource.data.seq <= get(userPath()).data.get('includedSeq', 0);
+      }
 
       // Root replacement by a released client cannot erase these independent
       // incident sources. Retention has no client expiry or unpin operation.

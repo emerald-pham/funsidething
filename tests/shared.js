@@ -2120,12 +2120,26 @@ async function loadCloudBackend({ serverData={rev:4}, serverExists=true, failure
   return {...h,getStored:()=>({exists:h.docs.has('users/owner'),data:h.docs.get('users/owner')})};
 }
 
+// #2417: for one shared docs map, each document's version and the live
+// collection listeners, which every fake backend over that map shares, so a
+// write by one device reaches another device's listener as Firestore's does.
+const sharedCloudStates=new WeakMap();
+function sharedCloudState(docs){
+ if(!sharedCloudStates.has(docs))sharedCloudStates.set(docs,{versions:new Map(),listeners:new Set()});
+ return sharedCloudStates.get(docs);
+}
+// #2417: the change-record counter and records (firestore.rules), which the
+// fake's change-record failures refuse, as rules without them do.
+const changeRecordPath=path=>/^users\/[^/]+\/(changeRecords|changeLog)(\/|$)/.test(path);
 async function loadCloudBackendV2({artifacts=null,sharedDocs=null,rootData=null,batchFailureAt=Infinity,failures={},timeoutMs=25,recoveryTimeoutMs=timeoutMs,recordSyncError,cryptoProvider=webcrypto,runtimeWindow=null,firebaseSDK=null,timerProvider=null}={}){
  const moduleMatch=(artifacts?.html||html).match(/<script type="module">([\s\S]*?)<\/script>/);assert.ok(moduleMatch);
  const moduleSource=moduleMatch[1].replace(/const \[appMod, A, F\] = await Promise\.all\(\[[\s\S]*?\]\);/,
   'const [appMod, A, F] = globalThis.__cloudModules;');
  const clone=value=>value==null||typeof value!=='object'?value:Array.isArray(value)?value.map(clone):Object.fromEntries(Object.entries(value).map(([key,item])=>[key,clone(item)]));
  const docs=sharedDocs||new Map(),rootPath='users/owner';
+ // #2417: what every backend over these docs shares: each document's version
+ // and the live collection listeners (sharedCloudState).
+ const shared=sharedCloudState(docs);
  if(rootData)docs.set(rootPath,clone(rootData));
  const pathOf=(parts)=>parts.filter(part=>part!==undefined).join('/');
  const ref=(...parts)=>({path:pathOf(parts),id:String(parts.at(-1))});
@@ -2133,32 +2147,91 @@ async function loadCloudBackendV2({artifacts=null,sharedDocs=null,rootData=null,
   const observedExists=docs.has(reference.path),observedData=observedExists?clone(docs.get(reference.path)):undefined;
   return {id:reference.id,ref:reference,exists:()=>observedExists,data:()=>observedExists?clone(observedData):undefined};
  };
- const directRows=collectionRef=>[...docs].filter(([key])=>key.startsWith(collectionRef.path+'/')&&
-  !key.slice(collectionRef.path.length+1).includes('/')).map(([key])=>snap(ref(...key.split('/')))).slice(0,collectionRef.limit??Infinity);
+ // #2417: a query keeps its where filters and its order, as Firestore applies them.
+ const matches=(data,[field,op,value])=>{const actual=data?.[field];
+  return op==='>'?actual>value:op==='>='?actual>=value:op==='<'?actual<value:op==='<='?actual<=value:op==='=='?actual===value:false;};
+ const directRows=collectionRef=>{
+  let rows=[...docs].filter(([key])=>key.startsWith(collectionRef.path+'/')&&!key.slice(collectionRef.path.length+1).includes('/'));
+  for(const filter of collectionRef.filters||[])rows=rows.filter(([,data])=>matches(data,filter));
+  if(collectionRef.order){const [field,direction]=collectionRef.order;rows.sort(([,a],[,b])=>(a?.[field]>b?.[field]?1:a?.[field]<b?.[field]?-1:0)*(direction==='desc'?-1:1));}
+  return rows.map(([key])=>snap(ref(...key.split('/')))).slice(0,collectionRef.limit??Infinity);
+ };
  const writes=[],popupProviders=[],authCalls=[],queries=[],network=[];let batchCommits=0,transactionCalls=0;
+ // #2417: every document this backend writes (path, kind and bytes), and
+ // every document its live listeners receive: the cloud writes and reads the
+ // change-record tests count.
+ const docWrites=[],liveReads=[],liveQueries=[];
  const normalize=value=>Object.fromEntries(Object.entries(value).map(([key,item])=>[key,item?.__serverTimestamp?{toMillis:()=>1234}:item]));
  const apply=(operation)=>{
   if(operation.type==='set'){docs.set(operation.ref.path,normalize(clone(operation.value)));if(operation.ref.path===rootPath)writes.push(clone(docs.get(rootPath)));}
   else if(operation.type==='update')docs.set(operation.ref.path,{...(docs.get(operation.ref.path)||{}),...normalize(clone(operation.value))});
   else docs.delete(operation.ref.path);
+  shared.versions.set(operation.ref.path,(shared.versions.get(operation.ref.path)||0)+1);
+  docWrites.push({path:operation.ref.path,type:operation.type,bytes:operation.type==='delete'?0:Buffer.byteLength(JSON.stringify(operation.value??null),'utf8')});
+  for(const listener of shared.listeners){
+   const parent=listener.reference.path+'/';
+   if(operation.ref.path.startsWith(parent)&&!operation.ref.path.slice(parent.length).includes('/'))listener.schedule();
+  }
  };
+ // #2417: the rules let a change record go only once the active full copy
+ // includes it (firestore.rules); the fake refuses the same deletes.
+ const recordDeleteAllowed=path=>!/^users\/[^/]+\/changeRecords\//.test(path)||
+  Number.isSafeInteger(docs.get(rootPath)?.includedSeq)&&docs.get(path)?.seq<=docs.get(rootPath).includedSeq;
+ const deniedRecordDelete=()=>Object.assign(Error('rules keep a change record the active copy does not include'),{code:'permission-denied'});
  const F={
   getFirestore:()=>({}),doc:(_db,...parts)=>ref(...parts),collection:(_db,...parts)=>ref(...parts),
-  query:(reference,...constraints)=>({...reference,...Object.assign({},...constraints)}),limit:limit=>({limit}),
+  query:(reference,...constraints)=>constraints.reduce((query,constraint)=>constraint?.where?{...query,filters:[...(query.filters||[]),constraint.where]}:{...query,...constraint},{...reference}),
+  where:(field,op,value)=>({where:[field,op,value]}),orderBy:(field,direction='asc')=>({order:[field,direction]}),limit:limit=>({limit}),
   getDoc:async reference=>{if(reference.path===rootPath&&docs.get(rootPath)?.schemaVersion===2&&failures.stampPending)return failures.stampPending;if(reference.path===rootPath&&failures.pullPending)return failures.pullPending;if(reference.path===rootPath&&failures.pull)throw failures.pull;return snap(reference);},getDocs:async collectionRef=>{queries.push(collectionRef.path);return {docs:directRows(collectionRef)};},
   serverTimestamp:()=>({__serverTimestamp:true}),
-  runTransaction:async(_db,fn)=>{transactionCalls++;await failures.beforeTransaction?.(docs);if(failures.pushPending)return failures.pushPending;if(failures.push)throw failures.push;const operations=[],tx={get:async reference=>{await failures.transactionRead?.(reference.path,docs);return snap(reference);},set:(reference,value)=>operations.push({type:'set',ref:reference,value}),update:(reference,value)=>operations.push({type:'update',ref:reference,value}),delete:reference=>operations.push({type:'delete',ref:reference})};const result=await fn(tx);if(failures.publishPending&&operations.some(op=>op.ref.path===rootPath)){failures.publicationStarted=true;await failures.publishPending;}for(const operation of operations){if(failures.enforceDeletingTransition&&operation.type==='update'&&operation.value.state==='deleting'&&docs.get(operation.ref.path)?.state==='deleting')throw Object.assign(Error('rules reject deleting to deleting'),{code:'permission-denied'});apply(operation);}await failures.afterTransaction?.(docs);return result;},
-  writeBatch:()=>{const operations=[];return {set:(reference,value)=>operations.push({type:'set',ref:reference,value}),delete:reference=>operations.push({type:'delete',ref:reference}),async commit(){batchCommits++;if(batchCommits===batchFailureAt)throw Object.assign(Error('batch unavailable'),{code:'unavailable'});for(const operation of operations)apply(operation);}};},
+  runTransaction:async(_db,fn)=>{transactionCalls++;await failures.beforeTransaction?.(docs);if(failures.pushPending)return failures.pushPending;if(failures.push)throw failures.push;
+   // #2417: a transaction that read the change-record counter commits only
+   // over the versions it read; otherwise it runs again, as Firestore's does,
+   // so two devices never take the same sequence number.
+   for(let attempt=1;;attempt++){
+    const operations=[],read=new Map(),tx={get:async reference=>{await failures.transactionRead?.(reference.path,docs);if(failures.changeRecords&&changeRecordPath(reference.path))throw failures.changeRecords;read.set(reference.path,shared.versions.get(reference.path)||0);return snap(reference);},set:(reference,value)=>operations.push({type:'set',ref:reference,value}),update:(reference,value)=>operations.push({type:'update',ref:reference,value}),delete:reference=>operations.push({type:'delete',ref:reference})};
+    const result=await fn(tx);
+    if(failures.changeRecords&&operations.some(op=>changeRecordPath(op.ref.path)))throw failures.changeRecords;
+    if(attempt<5&&[...read].some(([path,version])=>changeRecordPath(path)&&(shared.versions.get(path)||0)!==version))continue;
+    if(failures.publishPending&&operations.some(op=>op.ref.path===rootPath)){failures.publicationStarted=true;await failures.publishPending;}for(const operation of operations){if(failures.enforceDeletingTransition&&operation.type==='update'&&operation.value.state==='deleting'&&docs.get(operation.ref.path)?.state==='deleting')throw Object.assign(Error('rules reject deleting to deleting'),{code:'permission-denied'});if(operation.type==='delete'&&!recordDeleteAllowed(operation.ref.path))throw deniedRecordDelete();apply(operation);}await failures.afterTransaction?.(docs);return result;
+   }
+  },
+  writeBatch:()=>{const operations=[];return {set:(reference,value)=>operations.push({type:'set',ref:reference,value}),delete:reference=>operations.push({type:'delete',ref:reference}),async commit(){batchCommits++;if(batchCommits===batchFailureAt)throw Object.assign(Error('batch unavailable'),{code:'unavailable'});
+   if(failures.changeRecords&&operations.some(op=>changeRecordPath(op.ref.path)))throw failures.changeRecords;
+   if(operations.some(op=>op.type==='delete'&&!recordDeleteAllowed(op.ref.path)))throw deniedRecordDelete();
+   for(const operation of operations)apply(operation);}};},
  };
  const readDoc=F.getDoc,readDocs=F.getDocs;
  F.getDoc=async reference=>failures.cacheMiss?{exists:()=>false}:readDoc(reference);
- F.getDocFromServer=async reference=>{network.push('server:'+reference.path);if(failures.serverOffline)throw Object.assign(Error('offline'),{code:'unavailable'});await failures.serverRead?.(reference.path,docs);return readDoc(reference);};
- F.getDocsFromServer=async reference=>{network.push('server:'+reference.path);if(failures.serverOffline)throw Object.assign(Error('offline'),{code:'unavailable'});await failures.serverRead?.(reference.path,docs);return readDocs(reference);};
+ F.getDocFromServer=async reference=>{network.push('server:'+reference.path);if(failures.serverOffline)throw Object.assign(Error('offline'),{code:'unavailable'});if(failures.changeRecords&&changeRecordPath(reference.path))throw failures.changeRecords;await failures.serverRead?.(reference.path,docs);return readDoc(reference);};
+ F.getDocsFromServer=async reference=>{network.push('server:'+reference.path);if(failures.serverOffline)throw Object.assign(Error('offline'),{code:'unavailable'});if(failures.changeRecords&&changeRecordPath(reference.path))throw failures.changeRecords;await failures.serverRead?.(reference.path,docs);return readDocs(reference);};
  F.disableNetwork=async()=>{network.push('disable');if(failures.disable)throw failures.disable;};
  F.enableNetwork=async()=>{network.push('enable');if(failures.enablePending)await failures.enablePending;};
  const subscriptions=[];
+ // #2417: a live collection query, as Firestore runs one: a snapshot at once,
+ // then one after each change any backend over these docs makes to the
+ // collection, carrying the documents that changed. Root listeners stay as
+ // before: a test emits their snapshots itself (emitSnapshot).
+ const emitCollection=entry=>{
+  if(!entry.active)return;
+  if(failures.changeRecords&&changeRecordPath(entry.reference.path)){entry.active=false;shared.listeners.delete(entry);entry.error?.(failures.changeRecords);return;}
+  const rows=directRows(entry.reference),now=new Map(rows.map(row=>[row.id,JSON.stringify(row.data())])),changes=[];
+  for(const row of rows){const before=entry.seen.get(row.id);if(before===undefined)changes.push({type:'added',doc:row});else if(before!==now.get(row.id))changes.push({type:'modified',doc:row});}
+  for(const id of entry.seen.keys())if(!now.has(id))changes.push({type:'removed',doc:{id,exists:()=>false,data:()=>undefined}});
+  const first=!entry.delivered;entry.delivered=true;entry.seen=now;
+  if(!changes.length&&!first)return;
+  for(const change of changes)if(change.type!=='removed')liveReads.push(entry.reference.path+'/'+change.doc.id);
+  entry.next({docs:rows,size:rows.length,empty:!rows.length,docChanges:()=>changes,metadata:{fromCache:false,hasPendingWrites:false}});
+ };
  F.onSnapshot=(reference,options,next,error)=>{
-  const entry={reference,options,next,error,active:true};subscriptions.push(entry);
+  const entry={reference,options,next,error,active:true};
+  if(reference.path.split('/').length%2===1){
+   Object.assign(entry,{seen:new Map(),delivered:false,scheduled:false});
+   entry.schedule=()=>{if(entry.scheduled||!entry.active)return;entry.scheduled=true;setTimeout(()=>{entry.scheduled=false;emitCollection(entry);},0);};
+   liveQueries.push(entry);shared.listeners.add(entry);entry.schedule();
+   return ()=>{entry.active=false;shared.listeners.delete(entry);};
+  }
+  subscriptions.push(entry);
   return ()=>{entry.active=false;};
  };
  let authListener=null;
@@ -2184,7 +2257,7 @@ async function loadCloudBackendV2({artifacts=null,sharedDocs=null,rootData=null,
  for(const file of ['device-store-v2.js','cloud-store-v2.js'])vm.runInContext(artifacts?(file==='device-store-v2.js'?artifacts.storage:artifacts.cloud):fs.readFileSync(path.join(__dirname,file),'utf8'),context,{filename:file});
  if(!runtimeWindow)window.ChainStorageV2=context.ChainStorageV2;window.ChainCloudV2=context.ChainCloudV2;
  await vm.runInContext(`(async()=>{${moduleSource}\n})()`,context,{filename:'index.html#cloud-v2-backend'});
- return {CS:window.CloudSync,sdk,auth,docs,pending,events,batchCommits,writes,popupProviders,authCalls,transactionCalls,queries,network,subscriptions,
+ return {CS:window.CloudSync,sdk,auth,docs,pending,events,batchCommits,writes,popupProviders,authCalls,transactionCalls,queries,network,subscriptions,docWrites,liveReads,liveQueries,
   emitSnapshot(entry,data,{fromCache=false,hasPendingWrites=false}={}){entry.next({exists:()=>data!==null,data:()=>clone(data),metadata:{fromCache,hasPendingWrites}});},
   emitAuth(user){auth.currentUser=user;authListener?.(user);}};
 }

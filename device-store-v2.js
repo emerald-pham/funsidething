@@ -127,6 +127,10 @@
     if(!crypto?.subtle) throw new Error("Web Crypto is unavailable");
     if(!Number.isFinite(openTimeoutMs)||openTimeoutMs<1) throw new Error("IndexedDB open timeout is invalid");
     let db=null,opening=null,reconnectAllowed=false,openEpoch=0,cancelOpen=null;
+    // #2417: the heads this store, this copy of the app, has written lately. A
+    // change record's row is refused only when another copy wrote the head.
+    const ownHeads=new Set();
+    const noteOwnHead=hash=>{ownHeads.delete(hash);ownHeads.add(hash);while(ownHeads.size>16)ownHeads.delete(ownHeads.values().next().value);};
     const sha=async value=>hex(await crypto.subtle.digest("SHA-256",bytes(value)));
     const storeNames=["meta","snapshots","backups","opaque"];
     const recoveryNow=()=>typeof root.performance?.now==="function"?root.performance.now():Date.now();
@@ -945,7 +949,7 @@
     async function commitHead({expectedHash,expectedHead,encodeHead=pendingJSON,payload,account=null,backup=null,backups=[],removeBackupIds=[],removeRedundantBackups=[],releaseRecoveryHold=null}={}){
       ensureOpen();
       if(typeof payload!=="string") return {error:true,code:"invalid-payload"};
-      const nextHash=await sha(payload);
+      const nextHash=await sha(payload);noteOwnHead(nextHash);
       const requested=[...(Array.isArray(backups)?backups:[]),...(backup?[backup]:[])],preparedBackups=[];
       const ids=new Set();
       for(const candidate of requested){
@@ -1180,6 +1184,68 @@
       if(!same){tx.abort();try{await done;}catch{}return false;}
       store.delete(pendingKey(account));await done;return true;
     }
+    // #2417: a change record waits on this device as a small row of its own in
+    // the meta store (no new store, so older app versions still open this
+    // database), keyed by the account, until it has gone up and a whole-board
+    // save holds its change. The row is written only while the head is still
+    // one this copy of the app saved (the caller's, or one of its own saves
+    // still returning): another copy of the app writing first refuses it, as
+    // commitHead is refused, and so does a full device. A refused row means
+    // the record is not sent; the full copy carries it.
+    const changeRecordPrefix=account=>"changeRecord:"+encodeURIComponent(account)+":";
+    const validChangeRecordRow=(row,account)=>!!row&&typeof row==="object"&&row.account===account&&typeof row.id==="string"&&!!row.id&&
+      typeof row.parts==="string"&&Number.isSafeInteger(row.order)&&(row.sentSeq===null||Number.isSafeInteger(row.sentSeq)&&row.sentSeq>=1);
+    async function putChangeRecord({expectedHash,account,id,parts,order}={}){
+      ensureOpen();
+      if(typeof account!=="string"||!account||typeof id!=="string"||!id||typeof parts!=="string"||!parts||!Number.isSafeInteger(order))
+        return {error:true,code:"invalid-change-record"};
+      try{
+        const tx=await beginTransaction("meta","readwrite"),done=transactionDone(tx),store=tx.objectStore("meta");
+        try{
+          const head=await requestResult(store.get("head"));
+          if((head?.hash??null)!==(expectedHash??null)&&!ownHeads.has(head?.hash)){tx.abort();try{await done;}catch{}return {conflict:true,hash:head?.hash??null};}
+          store.put({account,id,parts,order,sentSeq:null},changeRecordPrefix(account)+id);
+          await done;return {ok:true};
+        }catch(error){try{tx.abort();}catch{}try{await done;}catch{}throw error;}
+      }catch(error){
+        return {error:true,code:error?.name==="QuotaExceededError"?"quota-exhausted":"change-record-write-failed"};
+      }
+    }
+    async function changeRecordRows(account,mode,visit){
+      ensureOpen();
+      const tx=await beginTransaction("meta",mode),done=transactionDone(tx),store=tx.objectStore("meta");
+      try{
+        const keys=(await requestResult(store.getAllKeys())).filter(key=>typeof key==="string"&&key.startsWith("changeRecord:"));
+        const rows=await Promise.all(keys.map(key=>requestResult(store.get(key))));
+        const result=visit(keys.map((key,index)=>({key,row:rows[index]})),store);
+        await done;return result;
+      }catch(error){try{tx.abort();}catch{}try{await done;}catch{}throw error;}
+    }
+    // This account's records, oldest first.
+    async function listChangeRecords(account){
+      if(typeof account!=="string"||!account)return [];
+      return changeRecordRows(account,"readonly",entries=>entries.filter(({key,row})=>key.startsWith(changeRecordPrefix(account))&&
+        validChangeRecordRow(row,account)).map(({row})=>({...row})).sort((a,b)=>a.order-b.order));
+    }
+    async function markChangeRecordSent(account,id,seq){
+      if(typeof account!=="string"||!account||typeof id!=="string"||!Number.isSafeInteger(seq)||seq<1)return false;
+      return changeRecordRows(account,"readwrite",(entries,store)=>{
+        const entry=entries.find(({key})=>key===changeRecordPrefix(account)+id);
+        if(!validChangeRecordRow(entry?.row,account))return false;
+        store.put({...entry.row,sentSeq:seq},entry.key);return true;
+      });
+    }
+    // Removes the named records of this account; with otherAccounts, every
+    // record of any other account instead (a sign-in to another account).
+    async function removeChangeRecords(account,ids=[],{otherAccounts=false}={}){
+      if(typeof account!=="string"||!account)return 0;
+      const named=new Set(Array.isArray(ids)?ids.map(id=>changeRecordPrefix(account)+id):[]);
+      return changeRecordRows(account,"readwrite",(entries,store)=>{
+        let removed=0;
+        for(const {key} of entries)if(otherAccounts?!key.startsWith(changeRecordPrefix(account)):named.has(key)){store.delete(key);removed++;}
+        return removed;
+      });
+    }
     async function setLegacyFingerprint(expectedHash,fingerprint){
       ensureOpen();if(typeof fingerprint!=="string"||!fingerprint)return false;
       const tx=await beginTransaction("meta","readwrite"),done=transactionDone(tx),store=tx.objectStore("meta"),current=await requestResult(store.get("head"));
@@ -1195,7 +1261,7 @@
     }
     const api={open,close,readRawExportSnapshot,readRawExportRows,readRawFingerprint,readRawRows,readHead,withCurrentHead,countBackups,listBackups,listBackupFacts,readBackups,listOpaqueArchives,listOpaqueArchiveKeys,readOpaqueArchive,readCloudRecoverySummary,saveCloudRecoverySummaries,protectRecoverySource,repairHeadSnapshot,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,commitHeadIfCurrent:commitHead,putBackup,
       updateBackupKind,deleteBackup,getPendingUpload,setPendingUpload,setPendingUploadIfCurrent,clearPendingUpload,clearPendingUploadIfCurrent,setLegacyFingerprint,
-      getRecoveryTrim,beginRecoveryTrim,continueRecoveryTrim};
+      getRecoveryTrim,beginRecoveryTrim,continueRecoveryTrim,putChangeRecord,listChangeRecords,markChangeRecordSent,removeChangeRecords};
     return api;
   }
 

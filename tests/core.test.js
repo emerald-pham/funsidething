@@ -3977,6 +3977,32 @@ test('RISK sync responsiveness guidance: mounted Help and the changelog say answ
  assert.ok(rapid.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
 });
 
+// #2417: Help and the changelog say a scanner answer shows on other open
+// devices within about a second, what waits and what falls back, in what the
+// person sees; the changelog keeps one feature per bullet.
+test('RISK change records guidance: mounted Help and the changelog say a scanner answer shows on other open devices within about a second, one feature per bullet',async()=>{
+ const {ctx,shim}=await loadApp();
+ for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=help.split('<dt>How soon does an answer show on my other devices?</dt><dd>')[1]?.split('</dd>')[0];assert.ok(answer,'Data and backups answers how soon an answer shows on other devices');
+ assert.match(answer,/^With sync on, a Yes, No, Can’t, Done, Worked on it, Postpone or Dislodge on the scanner shows on your other open devices within about a second/);
+ assert.match(answer,/however large the board/);assert.match(answer,/they don’t download it/);
+ assert.match(answer,/saved on this device first; if it can’t be saved, it isn’t sent/);
+ assert.match(answer,/Offline answers go up when you reconnect, and a long run of them goes as one copy of the board/);
+ assert.match(answer,/while you tap the scanner or edit waits until you finish/);
+ assert.match(answer,/An app copy from before this update syncs as before/);assert.match(answer,/until the cloud accepts these quick updates, answers reach other devices as before/);
+ assert.doesNotMatch(answer,/change record|sequence|includedSeq|listener/i,'the answer says what the person sees, not how it works');
+ assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
+ const current=shim.document.getElementById('appChangelogCurrent').innerHTML.split('<h3>November 17, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ const items=current.split('<li>').slice(1);
+ const quick=items.filter(item=>/shows on your other open devices within about a second/.test(item));
+ assert.equal(quick.length,1,'one bullet says an answer reaches other open devices within about a second');
+ assert.match(quick[0],/without them downloading it/);assert.match(quick[0],/goes up when you reconnect/);assert.match(quick[0],/waits until you finish/);assert.match(quick[0],/answers reach other devices as before/);
+ assert.doesNotMatch(quick[0],/saved on this device before it is sent/,'saving on the device first is its own feature');
+ // #2417 review N3: the feature's limit stays in its bullet: it applies with sync on.
+ assert.ok(items.some(item=>/^With sync on, an answer is now saved on this device before it is sent, so an app closed right after an answer opens with it/.test(item)),'saving an answer on the device first has its own bullet, which says it applies with sync on');
+});
+
 test('RISK sync responsiveness guidance: mounted Help explains large boards and bounded damaged-source recovery',async()=>{
  const {ctx,shim}=await loadApp();
  for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
@@ -16713,7 +16739,8 @@ test('CLOUD ACCOUNT: a transaction binds its document before auth can switch', (
   assert.match(push,/const pushUser\s*=\s*auth\.currentUser/);
   assert.match(push,/const pushUid\s*=\s*pushUser\.uid/);
   assert.match(html,/const rootRef=uid=>F\.doc\(db,"users",uid\)/);
-  assert.match(html,/publishGeneration\(uid,id,\{baseRev,updatedAt,hash,expectedHeader,stillCurrent,decisionCapability\}\)/);
+  // #2417 adds includedSeq, the change records a full copy includes.
+  assert.match(html,/publishGeneration\(uid,id,\{baseRev,updatedAt,hash,expectedHeader,stillCurrent,decisionCapability,includedSeq\}\)/);
   assert.match(html,/if\(stillCurrent&&!stillCurrent\(\)\)return \{cancelled:true\}/,'the manifest transaction rechecks identity after its reads');
   assert.match(push,/const stillCurrent=\(\)=>auth\.currentUser\?\.uid===pushUid&&operation===pushOperation&&recoveryStillCurrent\(\)/,'the shared named guard retains both captured identity and operation');
   assert.match(push,/generationStore\.push\(pushUid,[\s\S]*?stillCurrent\}\)/,'the exact captured guard reaches the publication adapter');
@@ -29906,6 +29933,70 @@ test('Firestore rules: v2 chunks are owner-only, immutable, sealed before publis
  }finally{await env.cleanup();}
 });
 
+// #2417: change records (users/{uid}/changeRecords) and their counter
+// (users/{uid}/changeLog/head), as the rules allow them. Each check names what
+// it refuses; a refused request is permission-denied, anything else fails it.
+test('Firestore rules: change records are owner-only, append-only and immutable, numbered one by one by the counter, and removable only once the active full copy includes them', {skip:!process.env.FIRESTORE_EMULATOR_HOST}, async()=>{
+ const {initializeTestEnvironment}=await import('@firebase/rules-unit-testing');
+ const {doc,getDoc,getDocs,collection,setDoc,updateDoc,deleteDoc,writeBatch,serverTimestamp}=await import('firebase/firestore');
+ const env=await initializeTestEnvironment({projectId:'demo-change-records-2417',firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}});
+ const allowed=async promise=>{try{await promise;return true;}catch(error){if(!/permission-denied|PERMISSION_DENIED/i.test(String(error?.code||error?.message)))throw error;return false;}};
+ try{
+  const alice=env.authenticatedContext('alice').firestore(),bob=env.authenticatedContext('bob').firestore(),guest=env.unauthenticatedContext().firestore();
+  const head=db=>doc(db,'users/alice/changeLog/head'),record=(db,id)=>doc(db,'users/alice/changeRecords/'+id);
+  const row=seq=>({v:1,seq,parts:'{"v":1,"before":{},"after":{}}',createdAt:serverTimestamp()});
+  const append=(db,id,seq,{headSeq=seq,lastId=id}={})=>{const batch=writeBatch(db);batch.set(head(db),{seq:headSeq,lastId});batch.set(record(db,id),row(seq));return batch.commit();};
+  assert.equal(await allowed(append(alice,'r1',1)),true,'the owner appends the first record with the counter naming it');
+  assert.equal(await allowed(append(alice,'r2',2)),true,'and the next, numbered one more');
+  assert.equal(await allowed(append(alice,'r4',4)),false,'a number skipped is refused');
+  assert.equal(await allowed(append(alice,'r2b',2)),false,'a number taken again is refused');
+  assert.equal(await allowed(append(alice,'r3',3,{lastId:'other'})),false,'a record the counter does not name is refused');
+  assert.equal(await allowed(setDoc(record(alice,'r3'),row(3))),false,'a record without the counter moving is refused');
+  assert.equal(await allowed(setDoc(head(alice),{seq:3,lastId:'r3'})),false,'the counter moving without its record is refused');
+  assert.equal(await allowed(updateDoc(record(alice,'r1'),{parts:'changed'})),false,'a record is never rewritten');
+  assert.equal(await allowed(setDoc(record(alice,'r1'),row(1))),false,'nor written again');
+  assert.equal(await allowed(setDoc(head(alice),{seq:1,lastId:'r1'})),false,'the counter never goes back');
+  assert.equal(await allowed(deleteDoc(head(alice))),false,'nor is deleted');
+  assert.equal(await allowed(getDoc(record(alice,'r1'))),true,'the owner reads a record');
+  assert.equal(await allowed(getDocs(collection(alice,'users/alice/changeRecords'))),true,'and lists them');
+  assert.equal(await allowed(getDoc(record(bob,'r1'))),false,'another account cannot read a record');
+  assert.equal(await allowed(getDocs(collection(bob,'users/alice/changeRecords'))),false,'nor list them');
+  assert.equal(await allowed(getDoc(head(guest))),false,'a guest cannot read the counter');
+  assert.equal(await allowed(getDoc(record(guest,'r1'))),false,'nor a record');
+  assert.equal(await allowed(append(bob,'rb',3)),false,'another account cannot append');
+  assert.equal(await allowed(deleteDoc(record(alice,'r1'))),false,'with no full copy, no record can go');
+  await env.withSecurityRulesDisabled(async context=>{
+   for(const id of ['g1','g2'])await setDoc(doc(context.firestore(),'users/alice/generations/'+id),{schemaVersion:2,state:'sealed'});
+  });
+  const root=doc(alice,'users/alice'),manifest=(rev,active,previous,extra={})=>({schemaVersion:2,rev,activeGeneration:active,previousGeneration:previous,updatedAt:rev,serverUpdatedAt:serverTimestamp(),...extra});
+  assert.equal(await allowed(setDoc(root,manifest(1,'g1',null,{includedSeq:3}))),false,'a full copy cannot name records past the counter');
+  assert.equal(await allowed(setDoc(root,manifest(1,'g1',null,{includedSeq:'1'}))),false,'or name them other than by number');
+  assert.equal(await allowed(setDoc(root,manifest(1,'g1',null,{includedSeq:1}))),true,'a full copy names the records it includes');
+  assert.equal(await allowed(deleteDoc(record(alice,'r2'))),false,'a record the active copy does not include stays');
+  assert.equal(await allowed(deleteDoc(record(bob,'r1'))),false,'another account cannot delete one it includes');
+  assert.equal(await allowed(deleteDoc(record(alice,'r1'))),true,'the owner deletes a record the active copy includes');
+  assert.equal(await allowed(setDoc(root,manifest(2,'g2','g1'))),true,'an older app’s full copy, which names none, still publishes');
+  assert.equal(await allowed(deleteDoc(record(alice,'r2'))),false,'and after it no record can go');
+  // #2417 specialist review N2: a removed record the counter still names
+  // cannot be created again without the counter moving on, and a dated (v1)
+  // root names no included records, so under one no record can go.
+  assert.equal(await allowed(setDoc(root,manifest(3,'g1','g2',{includedSeq:2}))),true,'positive control: a full copy that includes both records');
+  assert.equal(await allowed(deleteDoc(record(alice,'r2'))),true,'positive control: the record the counter names goes once included');
+  assert.equal(await allowed(setDoc(record(alice,'r2'),{...row(2),parts:'{"v":1,"before":{},"after":{"rewritten":true}}'})),false,'a removed record the counter still names cannot be created again');
+  assert.equal(await allowed(append(alice,'r3',3)),true,'positive control: the next record still goes, the counter moving on');
+  const carol=env.authenticatedContext('carol').firestore(),carolRoot=doc(carol,'users/carol');
+  const dated=(rev,extra={})=>({payload:'{}',updatedAt:rev,rev,serverUpdatedAt:serverTimestamp(),...extra});
+  assert.equal(await allowed(setDoc(carolRoot,dated(1,{includedSeq:999}))),false,'a dated root cannot name included records');
+  assert.equal(await allowed(append(carol,'c1',1)),false,'carol cannot append under alice’s paths');
+  const carolHead=doc(carol,'users/carol/changeLog/head'),carolRecord=doc(carol,'users/carol/changeRecords/c1');
+  const carolAppend=()=>{const batch=writeBatch(carol);batch.set(carolHead,{seq:1,lastId:'c1'});batch.set(carolRecord,row(1));return batch.commit();};
+  assert.equal(await allowed(carolAppend()),true,'positive control: carol appends her first record');
+  assert.equal(await allowed(deleteDoc(carolRecord)),false,'under no full copy naming it, her record stays');
+  assert.equal(await allowed(setDoc(carolRoot,dated(1))),true,'positive control: a dated root without included records publishes');
+  assert.equal(await allowed(deleteDoc(carolRecord)),false,'and under a dated root no record can go');
+ }finally{await env.cleanup();}
+});
+
 test('RISK SCALABLE LOCAL BOARD: a multi-megabyte legacy board migrates without rewriting source bytes and survives edit Undo and offline reload',async()=>{
  const {indexedDB}=await import('fake-indexeddb');
  const dbName='chain-scanner-app-large-'+Date.now()+'-'+Math.random();
@@ -30386,6 +30477,68 @@ test('RISK CLOUD V2 STARTUP: a transient chunk read automatically recovers to sy
  assert.equal(attempts,2,'a transient chunk failure must enter the existing bounded retry path');
  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');assert.equal(pushes,0);
  assert.equal(ctx.state.tasks[0].id,'shared');assert.equal(adapter.roots.get('owner').rev,1);
+});
+
+// #2417: change records across app versions and both deployment orders, on
+// the emulator with each version's real backend and rules. An older version
+// ignores records and keeps syncing by full copies; its full copy names none,
+// so a newer version reapplies every record it keeps, and the record stays in
+// the cloud. Rules that know no records refuse them, and a newer version then
+// syncs by full copies alone, showing no error.
+test('RISK BACKWARD COMPATIBILITY: change records keep the supported floor and the release base syncing by full copies in both deployment orders, an older full copy never drops a record, and rules without records fall back with no error',{skip:!process.env.FIRESTORE_EMULATOR_HOST},async()=>{
+ const {readReleasedClient,assertRoundTrip,SUPPORTED_RELEASE}=await import('../scripts/backward-compatibility.mjs');
+ const {initializeTestEnvironment}=await import('@firebase/rules-unit-testing');
+ const F=await import('firebase/firestore');
+ const base=process.env.COMPATIBILITY_BASE_SHA||spawnSync('git',['rev-parse','origin/main'],{cwd:__dirname,encoding:'utf8'}).stdout.trim();
+ const candidate={...decisionCandidate146(),rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')};
+ const board=label=>JSON.stringify({tasks:[{id:'kept',title:'Kept '+label,done:false}],future:{keep:'unknown data'}});
+ const parts='{"v":1,"before":{},"after":{}}';
+ let index=0;
+ for(const sha of [...new Set([SUPPORTED_RELEASE,base])]){
+  const released=readReleasedClient(__dirname,sha);
+  for(const direction of ['old-client/new-rules','new-client/old-rules']){
+   const label=sha.slice(0,7)+' '+direction,handles=[];
+   const env=await initializeTestEnvironment({projectId:'demo-change-records-compat-'+(index++),firestore:{rules:direction==='old-client/new-rules'?candidate.rules:released.rules}});
+   try{
+    const next=await decisionBackend146(candidate,env.authenticatedContext('owner').firestore(),F),old=await decisionBackend146(released,env.authenticatedContext('owner').firestore(),F);
+    handles.push(next,old);
+    await assertRoundTrip(next.CS,board('newer'),0,label+': the newer version publishes');
+    const appended=await next.CS.appendChangeRecord({id:'answer-'+index,parts});
+    if(direction==='new-client/old-rules'){
+     assert.equal(appended.unsupported,true,label+': rules without records refuse them');
+     assert.notEqual(next.CS.status,'error',label+': and the newer version shows no error');
+     await assertRoundTrip(next.CS,board('newer again'),1,label+': it goes on syncing by full copies');
+     await assertRoundTrip(old.CS,board('older'),2,label+': and so does the older version');
+     assert.equal((await next.CS.pull()).payload,board('older'),label+': the newer version reads the older one’s copy');
+     continue;
+    }
+    assert.equal(appended.ok,true,label+': the newer version sends a record');
+    assert.equal(appended.seq,1,label+': numbered by the cloud');
+    // The older version reads and publishes full copies as before.
+    assert.equal((await old.CS.pull()).payload,board('newer'),label+': the older version reads the newer copy');
+    await assertRoundTrip(old.CS,board('older'),1,label+': and publishes its own full copy');
+    let root=null;await env.withSecurityRulesDisabled(async context=>{root=(await F.getDoc(F.doc(context.firestore(),'users/owner'))).data();});
+    assert.equal(root.includedSeq,undefined,label+': its root names no records');
+    for(let wait=0;!(next.CS.heardChangeRecords()||[]).some(row=>row.seq===1)&&wait<200;wait++)await new Promise(resolve=>setTimeout(resolve,10));
+    const read=await next.CS.pull();
+    assert.equal(read.payload,board('older'),label+': the newer version reads the older copy');
+    assert.deepEqual(Array.from(read.changeRecords?.records??[],row=>row.seq),[1],label+': and reapplies the record that copy leaves out');
+    let kept=false;await env.withSecurityRulesDisabled(async context=>{kept=(await F.getDoc(F.doc(context.firestore(),'users/owner/changeRecords/answer-'+index))).exists();});
+    assert.equal(kept,true,label+': the record stays in the cloud');
+    // #2417 review N2: a root that names the records its copy includes is
+    // read, and published over, by the older version without loss.
+    const rootData=async()=>{let data=null;await env.withSecurityRulesDisabled(async context=>{data=(await F.getDoc(F.doc(context.firestore(),'users/owner'))).data();});return data;};
+    const naming=await next.CS.push(board('newer naming its records'),1,read.rev,null,{includedSeq:1});
+    assert.equal(naming?.ok,true,label+': the newer version publishes a copy naming the record it includes');
+    assert.equal((await rootData()).includedSeq,1,label+': positive control: its root names it');
+    const olderRead=await old.CS.pull();
+    assert.equal(olderRead.payload,board('newer naming its records'),label+': the older version reads that copy');
+    await assertRoundTrip(old.CS,board('older over a naming copy'),olderRead.rev,label+': and publishes over it');
+    assert.equal((await rootData()).includedSeq,undefined,label+': its root names no records');
+    assert.equal((await next.CS.pull()).payload,board('older over a naming copy'),label+': the newer version reads it');
+   }finally{for(const handle of handles)await handle.drain();await env.cleanup();}
+  }
+ }
 });
 
 test('RISK BACKWARD COMPATIBILITY: released clients and candidate interoperate across both rule versions',{skip:!process.env.FIRESTORE_EMULATOR_HOST},async()=>{

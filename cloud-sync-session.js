@@ -55,9 +55,13 @@
   const copyOf=copy=>typeof copy?.generationId==="string"&&copy.generationId&&typeof copy.hash==="string"&&/^[a-f0-9]{64}$/.test(copy.hash)
     ? {generationId:copy.generationId,hash:copy.hash} : null;
   const text=value=>typeof value==="string"&&value?value:null;
+  // #2417: what the cloud holds is its active full copy plus the change
+  // records it keeps (GLOSSARY: Change record). through is the sequence
+  // number up to which the known copy includes them; a copy that includes
+  // none (only the full copy) carries no through, as before records.
   const NOTHING_KNOWN=Object.freeze({payload:null,account:null,revision:null});
-  const knownCopy=(payload,account,revision)=>Object.freeze({payload:typeof payload==="string"?payload:null,account,
-    revision:Number.isSafeInteger(revision)?revision:null});
+  const knownCopy=(payload,account,revision,through=0)=>Object.freeze({payload:typeof payload==="string"?payload:null,account,
+    revision:Number.isSafeInteger(revision)?revision:null,...(Number.isSafeInteger(through)&&through>0?{through}:{})});
 
   // The closed list of sync work (#2378), so a misspelt kind throws instead of
   // going uncounted. Steps that run: a cloud read, a cloud write, a device save
@@ -69,6 +73,9 @@
   // #2407: a scanner answer's queued catch-up (its History, ranks, Undo seal,
   // and the device save and push it then asks for) is scheduled sync work.
   WORK_KINDS.add("answer-catch-up");
+  // #2417: sending a change record (its device save and cloud write) and
+  // applying the ones the cloud delivers are sync work too.
+  WORK_KINDS.add("record-send");WORK_KINDS.add("record-apply");
 
   function createSyncSession({backend,identity,acknowledgement,events,unsent=null}={}){
     if(typeof backend!=="function"||typeof identity!=="function"||typeof acknowledgement?.get!=="function"||
@@ -189,9 +196,9 @@
           if(!open||!proof||!stillNamed(proof))return null;
           return {rev:proof.rev,generationId:proof.generationId,hash:proof.hash,payload:proof.payload};
         },
-        accept({payload=null,revision=null}={}){
+        accept({payload=null,revision=null,through=0}={}){
           if(!open)return false;
-          before={authority,known};authority=reader;known=knownCopy(payload,reader,revision);changed();
+          before={authority,known};authority=reader;known=knownCopy(payload,reader,revision,through);changed();
           return true;
         },
         revert(){
@@ -247,7 +254,7 @@
         // withdrawn, unless a sign-out, hide or newer read replaced them
         // meanwhile. bind:false is the saved-decisions Apply, which records
         // nothing and binds nothing (D7).
-        async accept(reply,{payload=null,install=()=>true,bind=true}={}){
+        async accept(reply,{payload=null,install=()=>true,bind=true,through=0}={}){
           if(!open)return {accepted:false,reason:"ended"};
           const settle=result=>{release();return result;};
           if(!current())return settle({accepted:false,reason:"obsolete",readRequired:obsolete()});
@@ -269,7 +276,7 @@
           if(bind){
             before={authority,known,owner};
             if(!ordinary)authority=ticket.account;
-            known=knownCopy(payload,ticket.account,reply.rev);
+            known=knownCopy(payload,ticket.account,reply.rev,through);
             made={authority,known,owner:bindOwner()};
           }
           let installed=false,error=null;
@@ -296,6 +303,62 @@
       };
       writer=write;changed();
       return {go:true,write};
+    }
+
+    // #2417: a change record's send ticket. Records go up beside a full copy
+    // and never wait for its write slot, but a record's reply is accepted with
+    // a push reply's checks: it still belongs to the connection, identity,
+    // owner binding and read authority its send started under, it is not
+    // older than this device's revision, and install(), this device's own
+    // note that the record it saved went up, succeeds. Acceptance adds
+    // nothing to what the page knows the cloud holds: the record reaches the
+    // known copy only when the cloud delivers it back (receive()).
+    // #2417 review B1: a record goes only under the connection, account and
+    // identity it was made in; the caller names them, and a ticket is refused
+    // when they are not the current ones.
+    function mayRecord({backend,account:made,identity:madeIdentity}={}){
+      const cloud=connection();
+      if(!cloud?.user||!cloud.ready)return {go:false,wait:"not-ready"};
+      if(backend!==undefined&&backend!==cloud||made!==undefined&&made!==cloud.user||
+        madeIdentity!==undefined&&madeIdentity!==rawIdentity())return {go:false,refused:"account"};
+      if(authority!==cloud.user)return {go:false,wait:"read"};
+      const ticket={backend:cloud,account:cloud.user,identity:rawIdentity(),owner};
+      let open=true;
+      const current=()=>{
+        const now=connection();
+        return now===ticket.backend&&now.user===ticket.account&&rawIdentity()===ticket.identity&&!!now.ready&&
+          owner===ticket.owner&&authority===ticket.account;
+      };
+      const send={...ticket,current,
+        async accept(reply,{install=()=>true}={}){
+          if(!open)return {accepted:false,reason:"ended"};
+          open=false;
+          if(!current())return {accepted:false,reason:"obsolete"};
+          if(!reply)return {accepted:false,reason:"unavailable"};
+          if(reply.cancelled)return {accepted:false,reason:"cancelled"};
+          if(reply.unsupported)return {accepted:false,reason:"unsupported"};
+          if(reply.error)return {accepted:false,reason:"failed"};
+          if(!Number.isSafeInteger(reply.seq)||reply.seq<1||!Number.isSafeInteger(reply.rev))return {accepted:false,reason:"unavailable"};
+          if(reply.rev<acknowledged()?.revision)return {accepted:false,reason:"stale"};
+          let installed=false,error=null;
+          try{installed=await install()===true;}catch(caught){error=caught;}
+          if(!installed)return {accepted:false,reason:"unsaved",...(error?{error}:{})};
+          return {accepted:true,seq:reply.seq,revision:reply.rev};
+        },
+        end(){open=false;},
+      };
+      return {go:true,send};
+    }
+    // #2417: the change records the cloud delivered, applied over the copy
+    // this page knew, are now what it knows the cloud holds: the same
+    // payload and revision moved on to through. Only over the known copy of
+    // this account and revision, and only forward.
+    function receive({payload,revision,through}={}){
+      const user=account();
+      if(!user||authority!==user||known.account!==user||known.revision!==revision||typeof payload!=="string"||
+        !Number.isSafeInteger(through)||through<=(known.through??0))return false;
+      known=knownCopy(payload,user,revision,through);changed();
+      return true;
     }
 
     // A finished read's report: {user, identity, outcome: "damaged"|"healthy",
@@ -352,7 +415,7 @@
         end,
       };
     }
-    return {startRead,observeRead,mayPush,bindOwner,requireRead,snapshot,onChange,track};
+    return {startRead,observeRead,mayPush,mayRecord,receive,bindOwner,requireRead,snapshot,onChange,track};
   }
 
   root.ChainSyncSession={createSyncSession};

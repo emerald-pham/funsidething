@@ -115,12 +115,22 @@ and this device has saved the acknowledged board. It starts empty each time the
 app opens.
 _Avoid_: Sync manager, cloud cache
 
+**Change record**:
+One scanner answer sent to the cloud on its own, as the parts of the board it
+touched, saved on the device first and numbered by the cloud in the order it
+took them. Other open devices apply it through the same merge as a full copy
+holding only that change, without downloading the board. Full copies stay the
+checkpoints: each names the records it includes, a device opening from one
+applies the records it does not name, and a record is removed only once the
+active full copy includes it.
+_Avoid_: Delta, patch, sync event
+
 **Settled (sync)**:
 The Sync session's report that no sync step is running (a cloud read or
-write, a device save or a recovery flow) and none is scheduled (an answer's
-catch-up still queued, a save debounce, a push waiting on its debounce or its
-longest wait, a live or backup read, or a retry), so the app will do no more
-sync work on its own. Work that waits on something outside the app, such as
+write, sending or applying a change record, a device save or a recovery flow)
+and none is scheduled (an answer's catch-up still queued, a save debounce, a
+push waiting on its debounce or its longest wait, a live, backup or change
+record read, or a retry), so the app will do no more sync work on its own. Work that waits on something outside the app, such as
 an open editor, a hidden page or a read still owed, is listed as waiting and
 does not count. Only tests read it; nothing in the app or on screen does.
 _Avoid_: idle, quiet window

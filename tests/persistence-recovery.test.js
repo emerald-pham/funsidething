@@ -17056,3 +17056,757 @@ test('RISK answer shows first: Undo straight after a benchmark Can’t tapped wh
  // The same numbers as the code before #2407 for the same taps (fa159866).
  assert.equal(app.digest(),'8ea79b3af17a5a27846050e56ceb0b85fa329c8cfbac911294cc6ecabcaeb462','the settled board matches the code before #2407: '+app.outcome().slice(0,300));
 });
+
+// #2417 (spec #2416): a scanner answer travels to the cloud as a small change
+// record, and every other open device applies it through the board merge
+// without downloading the board. These cases use the seams agreed on #2406 and
+// #2416: the loaded app, the shared fake cloud serving several devices with
+// live change notifications, the real device store over test IndexedDB and the
+// #2378 settled signal. Work is counted where the fake backend writes a
+// document and where a device reads one, never timed.
+async function until2417(predicate,message,within=5000){
+ const deadline=Date.now()+within;
+ while(!predicate()){
+  if(Date.now()>deadline)assert.fail(message);
+  await new Promise(resolve=>setTimeout(resolve,10));
+ }
+}
+// A phone and a laptop open on one account and one board, both settled, the
+// phone scanning with a candidate on offer.
+async function twoOpenDevices2417(t,board){
+ const docs=new Map();
+ const phone=await answeringDevice2408(t,{board,docs,saveMs:0,dropDatabase:true});
+ phone.ctx.onAction('start-scan',{dataset:{}});
+ await syncSettled(phone.ctx,{within:60000});
+ const laptop=await answeringDevice2408(t,{docs,storage:sharedScannerStorage(),saveMs:0,dropDatabase:true});
+ await settledTogether([phone,laptop],[],{within:60000});
+ assert.ok(phone.ctx.state.candidateId,'positive control: the phone offers a candidate');
+ assert.equal(laptop.ctx.state.candidateId,phone.ctx.state.candidateId,'positive control: the laptop shows the same candidate');
+ assert.deepEqual([...laptop.ctx.state.chain],[...phone.ctx.state.chain],'positive control: and the same chain');
+ // The scanner ignores a tap within 200 ms of drawing its tasks; a person reads them first.
+ await new Promise(resolve=>setTimeout(resolve,300));
+ return {phone,laptop,docs};
+}
+
+// #2417 review B2: the receiving device's own work for an answer: device
+// saves (whole-board commits), device backups, and whole-board text work
+// (JSON text of at least half the board, made or read), counted from now, and
+// as they stood at the first drawing that shows the answer.
+function receiverWork2417(device,boardBytes,shows){
+ const {ctx}=device,store=ctx.window.ScannerDeviceStore,counts={saves:0,backups:0,boardText:0};
+ const put=store.putBackup,commit=store.commitHead;
+ store.putBackup=async(...args)=>{counts.backups++;return put.apply(store,args);};
+ store.commitHead=async(...args)=>{counts.saves++;return commit.apply(store,args);};
+ // Devices share the host's JSON, so this device alone gets its own.
+ const host=ctx.JSON,big=Math.max(1024,Math.floor(boardBytes/2));
+ ctx.JSON={[Symbol.toStringTag]:'JSON',
+  stringify(...args){const text=host.stringify(...args);if(typeof text==='string'&&text.length>=big)counts.boardText++;return text;},
+  parse(text,...rest){if(typeof text==='string'&&text.length>=big)counts.boardText++;return host.parse(text,...rest);}};
+ const now=()=>({...counts}),render=ctx.render;
+ let shown=null;
+ ctx.render=function(...args){const result=render.apply(this,args);if(!shown&&shows())shown=now();return result;};
+ return {now,beforePaint:()=>shown};
+}
+
+test('RISK change records: a scanner answer reaches another open device before the sender’s next full copy lands and without reading chunks, and the work per answer does not grow with board size',{timeout:300000},async t=>{
+ const measure=async(label,board)=>{
+  const {phone,laptop,docs}=await twoOpenDevices2417(t,board),revision=docs.get('users/owner').rev;
+  // The phone's next full copy is held back, so only something else can carry the answer.
+  let release;phone.faults.publishPending=new Promise(resolve=>{release=resolve;});t.after(()=>release());
+  const writesFrom=phone.backend.docWrites.length,deliveredFrom=laptop.backend.liveReads.length,readsFrom=laptop.backend.network.length;
+  let candidate=null;
+  const receiver=receiverWork2417(laptop,Buffer.byteLength(laptop.ctx.cloudPayload(),'utf8'),()=>candidate!==null&&laptop.ctx.state.considered?.[candidate]==='no');
+  candidate=phone.tap('no');
+  assert.equal(phone.ctx.state.considered?.[candidate],'no',label+': positive control: the phone takes the No');
+  await until2417(()=>laptop.ctx.state.considered?.[candidate]==='no',label+': the laptop shows the phone’s No before the phone’s full copy lands');
+  await syncSettled(laptop.ctx,{within:30000});
+  assert.equal(docs.get('users/owner').rev,revision,label+': positive control: the phone’s full copy has not landed');
+  assert.ok(laptop.ctx.state.decisionEvents.some(event=>event.kind==='no'&&event.candidateId===candidate),label+': the laptop holds the No as a recorded decision');
+  const serverReads=laptop.backend.network.slice(readsFrom);
+  assert.deepEqual(serverReads.filter(path=>path.endsWith('/chunks')),[],label+': the laptop reads no chunks for it: '+JSON.stringify(serverReads));
+  // The full copy keeps its schedule in this ticket; what carried the answer is everything else the phone wrote.
+  const writes=phone.backend.docWrites.slice(writesFrom).filter(write=>write.path!=='users/owner'&&!write.path.includes('/generations/'));
+  const work={writes:writes.length,bytes:writes.reduce((sum,write)=>sum+write.bytes,0),reads:laptop.backend.liveReads.length-deliveredFrom+serverReads.length};
+  // The phone's full copy lands and the laptop reads it, as its root
+  // listener would have it do: that copy holds nothing the laptop lacks.
+  release();await settledTogether([phone,laptop],[],{within:120000});
+  await syncSettled(phone.ctx,{within:60000,synced:true});
+  assert.ok(docs.get('users/owner').rev>revision,label+': positive control: the phone’s full copy has landed');
+  laptop.ctx.window.dispatchEvent({type:'cloudboardchange',detail:{user:'e@example.com',rev:docs.get('users/owner').rev}});
+  await settledTogether([phone,laptop],[],{within:120000});
+  assert.equal(laptop.ctx.state.syncRev,docs.get('users/owner').rev,label+': positive control: the laptop has read the phone’s full copy');
+  return {...work,beforePaint:receiver.beforePaint(),receiver:receiver.now()};
+ };
+ const small=await measure('small board',answeringBoard2408({tasks:20,padBytes:0}));
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const large=await measure('large board',JSON.parse(fixture.payload));
+ t.diagnostic(JSON.stringify({small,large,largeBoardBytes:fixture.stats.serializedBytes}));
+ assert.ok(small.writes>0&&small.bytes>0,'positive control: the answer went up as its own write: '+JSON.stringify(small));
+ assert.equal(large.writes,small.writes,'the phone makes as many cloud writes for the answer on the large board as on a small one');
+ assert.equal(large.reads,small.reads,'the laptop makes as many reads for it');
+ // On the large board the answer also moves two ratings, so its record carries those two tasks' new History rows; never the board or a task's whole History.
+ assert.ok(large.bytes<=small.bytes*1.5+2048&&large.bytes<fixture.stats.serializedBytes/500,'and the bytes sent for the answer do not grow with the board: '+JSON.stringify({small,large}));
+ // #2417 review B2: the laptop shows the answer before any whole-board save
+ // and with no whole-board work at all before that drawing; the answer then
+ // costs it one device save and no backup, and the phone's full copy, which
+ // holds nothing the laptop lacks, costs it neither, on either board.
+ for(const [label,run] of [['small board',small],['large board',large]]){
+  assert.deepEqual(run.beforePaint,{saves:0,backups:0,boardText:0},label+': nothing whole-board happens before the laptop shows the answer: '+JSON.stringify(run));
+  assert.deepEqual({saves:run.receiver.saves,backups:run.receiver.backups},{saves:1,backups:0},label+': the answer costs the laptop one device save and no backup, the full copy after it none: '+JSON.stringify(run));
+ }
+});
+
+test('RISK change records: a device opening from a full copy applies the retained records it does not list, and a record is removed only once the active full copy includes it',{timeout:180000},async t=>{
+ const {phone,laptop,docs}=await twoOpenDevices2417(t,answeringBoard2408({tasks:20,padBytes:0}));
+ const records=()=>[...docs].filter(([path])=>path.startsWith('users/owner/changeRecords/')).map(([,row])=>row.seq);
+ let release;phone.faults.publishPending=new Promise(resolve=>{release=resolve;});t.after(()=>release());
+ const candidate=phone.tap('no');
+ assert.equal(phone.ctx.state.considered?.[candidate],'no','positive control: the phone takes the No');
+ await until2417(()=>records().length===1,'positive control: the answer went up as a record');
+ const root=docs.get('users/owner');
+ assert.ok(!Number.isSafeInteger(root.includedSeq)||root.includedSeq<records()[0],'positive control: the active full copy does not include it');
+ // A tablet opens now, from that full copy.
+ const tablet=await answeringDevice2408(t,{docs,storage:sharedScannerStorage(),saveMs:0,dropDatabase:true});
+ await until2417(()=>tablet.ctx.state.considered?.[candidate]==='no','the tablet opening from the full copy applies the record it does not list');
+ assert.equal(docs.get('users/owner').rev,root.rev,'positive control: the phone’s full copy has not landed');
+ assert.deepEqual(records(),[1],'the record stays while the active full copy does not include it');
+ release();
+ await settledTogether([phone,laptop,tablet],[],{within:60000});
+ const published=docs.get('users/owner');
+ assert.ok(published.rev>root.rev,'positive control: the phone’s full copy landed');
+ assert.equal(published.includedSeq,1,'the full copy names the record it includes');
+ await until2417(()=>records().length===0,'and the record is removed once the active full copy includes it');
+ assert.equal(tablet.ctx.state.considered?.[candidate],'no','the tablet keeps the answer');
+});
+
+// The change records this account's cloud holds, by sequence.
+const cloudRecords2417=docs=>[...docs].filter(([path])=>/^users\/owner\/changeRecords\//.test(path)).map(([,row])=>row).sort((a,b)=>a.seq-b.seq);
+// The change records a device's backend wrote to the cloud, kept or since removed.
+const recordsWritten2417=device=>device.backend.docWrites.filter(write=>write.type==='set'&&/^users\/owner\/changeRecords\//.test(write.path)).length;
+test('RISK change records: a record is saved on the device before it is sent, a refused device save sends nothing, and this device’s own save in progress refuses nothing',{timeout:180000},async t=>{
+ // Storage full: the device refuses every save, the record's own included.
+ const full=await answeringDevice2408(t,{saveMs:0,dropDatabase:true});
+ await startAnswering2408(full);
+ const fullStore=full.ctx.window.ScannerDeviceStore,quota=async()=>({error:true,code:'quota-exhausted'});
+ fullStore.commitHead=quota;fullStore.putChangeRecord=quota;
+ full.tap('no');await full.clock.advance(5000);
+ assert.ok(full.ctx.state.decisionEvents.some(event=>event.kind==='no'),'storage full: positive control: the answer is taken');
+ assert.equal(recordsWritten2417(full),0,'storage full: no record is sent');
+ // Another copy of the app on this device writes the board first.
+ const shared=await answeringDevice2408(t,{saveMs:0,dropDatabase:true});
+ await startAnswering2408(shared);
+ const other=await loadApp({indexedDBProvider:shared.indexedDB,deviceDbName:shared.dbName,sharedStorage:shared.storage});
+ t.after(()=>other.dispose());
+ other.ctx.addTask('Added in another tab');assert.equal(await other.ctx.persist(),true,'another copy: positive control: the other tab saves');
+ shared.tap('no');await shared.clock.advance(0);
+ assert.equal(recordsWritten2417(shared),0,'another copy writing: the record is not sent');
+ // This device's own save commits just before the record is saved: that is
+ // no other copy writing, so the record goes up, after its device save.
+ const own=await answeringDevice2408(t,{saveMs:0,dropDatabase:true});
+ await startAnswering2408(own);
+ const store=own.ctx.window.ScannerDeviceStore,commit=store.commitHead,put=store.putChangeRecord,order=[];
+ let hold=null;
+ store.commitHead=async options=>{const result=await commit(options);if(hold)await hold.promise;return result;};
+ store.putChangeRecord=async options=>{order.push('device');return put(options);};
+ const write=own.backend.CS.appendChangeRecord;own.backend.CS.appendChangeRecord=record=>{order.push('cloud');return write(record);};
+ own.tap('no');await own.clock.advance(1000);
+ assert.equal(recordsWritten2417(own),1,'positive control: the first answer went up as a record');
+ // A save of this device has committed, and its reply is still on its way.
+ hold=deferredSyncFixture();
+ own.ctx.state.tasks[0].title+=' edited';own.ctx.save();await own.clock.advance(400);
+ own.tap('no');await own.clock.advance(0);
+ hold.resolve();await own.clock.settle();
+ assert.equal(recordsWritten2417(own),2,'the record is sent while this device’s own save completes');
+ assert.deepEqual(order,['device','cloud','device','cloud'],'each record is saved on the device before it is sent');
+});
+
+test('RISK change records: an app closed after an answer but before its whole-board device save reopens with the answer',{timeout:120000},async t=>{
+ const device=await answeringDevice2408(t,{saveMs:0});
+ await startAnswering2408(device);
+ const {ctx,clock,counters}=device,commits=counters.commits.length;
+ const candidate=device.tap('no');
+ // The answer's catch-up runs; its device save waits for its debounce.
+ await clock.advance(100);
+ assert.equal(counters.commits.length,commits,'positive control: no whole-board save has run');
+ assert.equal(ctx.state.considered?.[candidate],'no','positive control: the answer is on the board');
+ const head=JSON.parse((await ctx.window.ScannerDeviceStore.readHead()).payload);
+ assert.notEqual(head.considered?.[candidate],'no','positive control: the saved board does not hold it');
+ await device.close();
+ const reopened=await answeringDevice2408(t,{docs:device.docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,signedIn:false});
+ await syncSettled(reopened.ctx,{within:20000});
+ assert.equal(reopened.ctx.state.considered?.[candidate],'no','the reopened app holds the answer');
+ assert.ok(reopened.ctx.state.decisionEvents.some(event=>event.kind==='no'&&event.candidateId===candidate),'as its recorded decision');
+});
+
+// A phone, a laptop and a tablet open on one account and one board, settled,
+// with the scanner on show long enough to tap.
+async function threeOpenDevices2417(t,board){
+ const {phone,laptop,docs}=await twoOpenDevices2417(t,board);
+ const tablet=await answeringDevice2408(t,{docs,storage:sharedScannerStorage(),saveMs:0,dropDatabase:true});
+ await settledTogether([phone,laptop,tablet],[],{within:60000});
+ assert.equal(tablet.ctx.state.candidateId,phone.ctx.state.candidateId,'positive control: the tablet shows the same candidate');
+ await new Promise(resolve=>setTimeout(resolve,300));
+ return {phone,laptop,tablet,docs};
+}
+// Holds a device's next full copy until the returned release is called.
+function holdFullCopy2417(t,device){
+ let release;device.faults.publishPending=new Promise(resolve=>{release=resolve;});t.after(()=>release());
+ return release;
+}
+// The decisions a board holds about the given tasks, by kind and task.
+const decisionsAbout2417=(board,ids)=>(board.decisionEvents||[]).filter(event=>ids.includes(event.candidateId??event.taskId??event.target?.id))
+ .map(event=>event.kind+':'+(event.candidateId??event.taskId??event.target?.id)).sort();
+
+test('RISK change records: independent answers from two devices are both kept on a third device in either delivery order, and applying the same records again changes nothing',{timeout:300000},async t=>{
+ const outcome=async first=>{
+  const {phone,laptop,tablet,docs}=await threeOpenDevices2417(t,answeringBoard2408({tasks:20,padBytes:0}));
+  const releases=[holdFullCopy2417(t,phone),holdFullCopy2417(t,tablet)];
+  // The device answering second in the cloud's order sends only once the first has.
+  const later=first==='phone'?tablet:phone,gate=deferredSyncFixture(),append=later.backend.CS.appendChangeRecord;
+  later.backend.CS.appendChangeRecord=async record=>{await gate.promise;return append(record);};
+  const benchmark=tablet.ctx.state.chain.at(-1),candidate=phone.tap('no');tablet.tap('bench-cant');
+  assert.equal(phone.ctx.state.considered?.[candidate],'no','positive control: the phone answers No on the candidate');
+  assert.equal(tablet.ctx.state.considered?.[benchmark],'cant','positive control: the tablet answers Can’t on the benchmark');
+  await until2417(()=>cloudRecords2417(docs).length===1,first+' first: its record goes up first');
+  gate.resolve();
+  await until2417(()=>cloudRecords2417(docs).length===2,first+' first: then the other device’s');
+  await until2417(()=>laptop.ctx.state.considered?.[candidate]==='no'&&laptop.ctx.state.considered?.[benchmark]==='cant',first+' first: the laptop keeps both answers');
+  await syncSettled(laptop.ctx,{within:30000});
+  const decisions=decisionsAbout2417(laptop.ctx.state,[candidate,benchmark]),settledBoard=laptop.ctx.cloudPayload();
+  // A full read applies the records the cloud keeps over its full copy again.
+  await laptop.ctx.cloudPull();await syncSettled(laptop.ctx,{within:30000});
+  assert.equal(laptop.ctx.cloudPayload(),settledBoard,first+' first: applying the same records again changes nothing');
+  for(const release of releases)release();
+  await settledTogether([phone,laptop,tablet],[],{within:120000});
+  return {decisions,candidate,benchmark};
+ };
+ const phoneFirst=await outcome('phone'),tabletFirst=await outcome('tablet');
+ // A Can't is recorded as the task's disposition, a current choice.
+ assert.deepEqual(phoneFirst.decisions,['current-choice:'+phoneFirst.benchmark,'no:'+phoneFirst.candidate].sort(),'the phone first: the laptop holds both decisions once each');
+ assert.deepEqual(tabletFirst.decisions,['current-choice:'+tabletFirst.benchmark,'no:'+tabletFirst.candidate].sort(),'the tablet first: the laptop holds both decisions once each');
+});
+
+test('RISK change records: a decision conflict between two devices resolves on a third exactly as it does between two full copies, whatever the devices’ clocks',{timeout:300000},async t=>{
+ const denied=()=>Object.assign(Error('rules without change records'),{code:'permission-denied'});
+ const outcome=async records=>{
+  const {phone,laptop,tablet}=await threeOpenDevices2417(t,answeringBoard2408({tasks:20,padBytes:0}));
+  // The phone's clock runs an hour fast and the tablet's an hour slow.
+  vm.runInContext('Date.now=(now=>()=>now()+3600000)(Date.now)',phone.ctx);
+  vm.runInContext('Date.now=(now=>()=>now()-3600000)(Date.now)',tablet.ctx);
+  if(!records)for(const device of [phone,laptop,tablet])device.faults.changeRecords=denied();
+  const releases=records?[holdFullCopy2417(t,phone),holdFullCopy2417(t,tablet)]:[];
+  const candidate=phone.tap('no');tablet.tap('cant');
+  assert.equal(phone.ctx.state.considered?.[candidate],'no','positive control: the phone answers No');
+  assert.equal(tablet.ctx.state.considered?.[candidate],'cant','positive control: the tablet answers Can’t on the same candidate');
+  if(records){
+   await until2417(()=>decisionsAbout2417(laptop.ctx.state,[candidate]).length===2,'with records: the laptop holds both answers before either full copy lands');
+   await syncSettled(laptop.ctx,{within:30000});
+  }else{
+   await settledTogether([phone,tablet],[],{within:120000});
+   // Settled alone can leave an answer waiting to go up after a conflict;
+   // the oracle reads the cloud once neither device has anything unsent.
+   for(const device of [phone,tablet])await syncSettled(device.ctx,{within:60000,synced:true});
+   laptop.ctx.window.dispatchEvent({type:'cloudboardchange',detail:{user:'e@example.com',rev:laptop.backend.docs.get('users/owner').rev}});
+   await syncSettled(laptop.ctx,{within:60000});
+   assert.equal(decisionsAbout2417(laptop.ctx.state,[candidate]).length,2,'full copies: positive control: the laptop holds both answers');
+  }
+  const board=laptop.ctx.state,result={considered:board.considered?.[candidate]??null,onChain:board.chain.includes(candidate),
+   cantAt:board.cantAt?.[candidate]??null,decisions:decisionsAbout2417(board,[candidate]).map(row=>row.replace(candidate,'candidate'))};
+  for(const release of releases)release();
+  await settledTogether([phone,laptop,tablet],[],{within:120000});
+  return result;
+ };
+ const fullCopies=await outcome(false),changeRecords=await outcome(true);
+ t.diagnostic(JSON.stringify({fullCopies,changeRecords}));
+ assert.deepEqual({...changeRecords,cantAt:changeRecords.cantAt!==null},{...fullCopies,cantAt:fullCopies.cantAt!==null},'the conflict resolves as between two full copies');
+});
+
+test('RISK change records: answers made offline go up as records on reconnect, and a long offline backlog goes as one full copy instead',{timeout:240000},async t=>{
+ const device=await answeringDevice2408(t,{saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock,faults,docs}=device,offline=Object.assign(Error('offline'),{code:'unavailable'});
+ const answerOffline=async count=>{
+  faults.serverOffline=true;faults.push=offline;
+  for(let i=0;i<count;i++){device.tap('no');await clock.advance(1500);}
+  await clock.advance(30000);
+ };
+ const reconnect=async()=>{delete faults.serverOffline;delete faults.push;device.shim.window.dispatchEvent({type:'online'});await clock.settle();};
+ // A short run: each answer goes up as its own record once back online.
+ let written=recordsWritten2417(device);
+ await answerOffline(3);
+ assert.equal(recordsWritten2417(device),written,'positive control: offline, no record goes up');
+ const before=ctx.state.decisionEvents.length;
+ await reconnect();
+ assert.equal(recordsWritten2417(device)-written,3,'after reconnecting the three answers go up as three records');
+ assert.equal(answeredDecisions2408(await cloudCopy2408(docs),device.counters.taps.slice(-3)).length,3,'and the cloud holds them');
+ // A long run: the backlog goes as the one full copy, with no record.
+ written=recordsWritten2417(device);
+ const firstLong=device.counters.taps.length;
+ await answerOffline(25);
+ await reconnect();
+ assert.equal(recordsWritten2417(device),written,'a backlog of 25 answers sends no record');
+ assert.equal(answeredDecisions2408(await cloudCopy2408(docs),device.counters.taps.slice(firstLong)).length,25,'the full copy carries all 25');
+ assert.ok(ctx.state.decisionEvents.length>before,'positive control: the answers are on the board');
+});
+
+test('RISK change records: a record arriving during a scanner tap or while an editor is open waits, as a live pull does, and applies when it ends',{timeout:240000},async t=>{
+ const {phone,laptop}=await twoOpenDevices2417(t,answeringBoard2408({tasks:20,padBytes:0}));
+ holdFullCopy2417(t,phone);
+ // A finger is on the laptop's scanner.
+ laptop.shim.document.dispatchEvent({type:'pointerdown',target:laptop.shim.document.body});
+ const first=phone.tap('no');
+ await until2417(()=>laptop.backend.liveReads.some(path=>path.includes('/changeRecords/')),'positive control: the laptop receives the record');
+ await new Promise(resolve=>setTimeout(resolve,200));
+ assert.notEqual(laptop.ctx.state.considered?.[first],'no','during the tap the record waits');
+ laptop.shim.document.dispatchEvent({type:'pointerup',target:laptop.shim.document.body});
+ await until2417(()=>laptop.ctx.state.considered?.[first]==='no','when the tap ends it applies');
+ await syncSettled(laptop.ctx,{within:30000});
+ // The laptop has an editor open: a field holds focus.
+ await new Promise(resolve=>setTimeout(resolve,300));
+ laptop.shim.document.activeElement={matches:selector=>selector.includes('input')};
+ assert.ok(vm.runInContext('hasActiveEditor()',laptop.ctx),'positive control: an editor is open on the laptop');
+ const reads=laptop.backend.liveReads.length,second=phone.tap('no');
+ await until2417(()=>laptop.backend.liveReads.length>reads,'positive control: the laptop receives the second record');
+ await new Promise(resolve=>setTimeout(resolve,200));
+ assert.notEqual(laptop.ctx.state.considered?.[second],'no','while the editor is open the record waits');
+ laptop.shim.document.activeElement=null;laptop.shim.document.dispatchEvent({type:'focusout'});
+ await until2417(()=>laptop.ctx.state.considered?.[second]==='no','when the editor closes it applies');
+});
+
+test('RISK change records: records never cross accounts, and after an account switch the previous account’s unsent records are not sent',{timeout:180000},async t=>{
+ const device=await answeringDevice2408(t,{saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {clock,faults,backend}=device,offline=Object.assign(Error('offline'),{code:'unavailable'});
+ faults.serverOffline=true;faults.push=offline;
+ for(const act of ['no','cant']){device.tap(act);await clock.advance(1500);}
+ await clock.advance(5000);
+ const written=recordsWritten2417(device);
+ // The owner signs out and another account signs in, then the device reconnects.
+ backend.emitAuth(null);await clock.advance(1000);
+ backend.emitAuth({uid:'other',email:'other@example.com'});
+ delete faults.serverOffline;delete faults.push;device.shim.window.dispatchEvent({type:'online'});
+ await clock.settle();
+ assert.equal(device.backend.CS.user,'other@example.com','positive control: the other account is signed in');
+ const records=device.backend.docWrites.filter(write=>write.type==='set'&&/\/changeRecords\//.test(write.path));
+ assert.equal(records.length,written,'no record of the first account goes up after the switch');
+ assert.ok(!records.some(write=>write.path.startsWith('users/other/')),'and none under the other account');
+});
+
+// #2417 review B1 and N4: the account can change while a record's device row
+// is still saving. That record then goes under no account, and an answer
+// made under the new account meanwhile still goes up, under that account.
+test('RISK change records: a record whose device row is still saving when the account switches goes under no account, and an answer made under the new account meanwhile still goes up',{timeout:180000},async t=>{
+ const device=await answeringDevice2408(t,{saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {clock,backend,ctx,docs}=device,store=ctx.window.ScannerDeviceStore,put=store.putChangeRecord,gate=deferredSyncFixture();
+ let saving=0;
+ store.putChangeRecord=async options=>{if(saving++===0)await gate.promise;return put(options);};
+ device.tap('no');await clock.advance(0);
+ assert.equal(saving,1,'positive control: the first answer’s device row is still saving');
+ // The owner signs out and another account signs in; the page reads its cloud.
+ backend.emitAuth(null);await clock.advance(1000);
+ backend.emitAuth({uid:'other',email:'other@example.com'});
+ await clock.settle();
+ assert.equal(backend.CS.user,'other@example.com','positive control: the other account is signed in');
+ // An answer of the other account's own, while the first row still saves.
+ for(const title of ['Other account first task','Other account second task'])ctx.addTask(title,false);
+ await clock.advance(3000);
+ ctx.onAction('start-scan',{dataset:{}});await clock.advance(1000);
+ assert.ok(ctx.state.candidateId,'positive control: the other account’s board offers a candidate');
+ device.tap('no');await clock.advance(3000);
+ assert.equal(saving,2,'positive control: the other account’s answer is saved on the device too');
+ gate.resolve();
+ await clock.advance(10000);
+ const [first,second]=device.counters.taps.map(tap=>tap.candidate);
+ const sent=backend.docWrites.filter(write=>write.type==='set'&&/\/changeRecords\//.test(write.path)).map(write=>write.path);
+ const about=(path,candidate)=>JSON.parse(docs.get(path)?.parts??'{"after":{}}').after.decisionEvents?.some(event=>event.candidateId===candidate);
+ assert.ok(!sent.some(path=>about(path,first)),'the first account’s answer goes under no account: '+JSON.stringify(sent));
+ assert.deepEqual(sent.filter(path=>about(path,second)).map(path=>path.split('/').slice(0,2).join('/')),['users/other'],'the other account’s answer goes up, under that account: '+JSON.stringify(sent));
+ await clock.settle();
+});
+
+// The change-record events of a device's support report, as outcome:seq.
+const recordEvents2417=device=>device.report().events.filter(event=>event.stage==='change-record')
+ .map(event=>event.metadata?.recordOutcome+(Number.isSafeInteger(event.metadata?.recordSeq)?':'+event.metadata.recordSeq:''));
+test('RISK change records: the support report records each record sent, received, applied, held back or replaced by the full copy, as metadata only',{timeout:240000},async t=>{
+ const {phone,laptop}=await twoOpenDevices2417(t,answeringBoard2408({tasks:20,padBytes:0}));
+ holdFullCopy2417(t,phone);
+ const candidate=phone.tap('no');
+ await until2417(()=>laptop.ctx.state.considered?.[candidate]==='no','positive control: the laptop applies the phone’s record');
+ await syncSettled(laptop.ctx,{within:30000});
+ assert.deepEqual(recordEvents2417(phone),['sent:1'],'the phone records the record it sent, with its number');
+ assert.deepEqual(recordEvents2417(laptop),['received:1','applied:1'],'the laptop records it received and applied it');
+ for(const device of [phone,laptop]){
+  const report=device.ctx.supportDiagnosticsText();
+  assert.ok(!report.includes(candidate)&&!report.includes('Synthetic task'),'the report names no task: metadata only');
+ }
+ // A device save that refuses the record holds it back.
+ const store=phone.ctx.window.ScannerDeviceStore,put=store.putChangeRecord;
+ store.putChangeRecord=async()=>({error:true,code:'quota-exhausted'});
+ await new Promise(resolve=>setTimeout(resolve,300));
+ phone.tap('no');
+ await until2417(()=>recordEvents2417(phone).includes('held'),'a record whose device save is refused is recorded as held back');
+ store.putChangeRecord=put;
+ // Rules without records: the full copy carries the answer instead.
+ phone.faults.changeRecords=Object.assign(Error('rules without change records'),{code:'permission-denied'});
+ await new Promise(resolve=>setTimeout(resolve,300));
+ phone.tap('no');
+ await until2417(()=>recordEvents2417(phone).includes('replaced'),'a record the rules refuse is recorded as replaced by the full copy');
+ assert.notEqual(phone.backend.CS.status,'error','and no error shows');
+});
+
+test('RISK change records: Settled (sync) counts sending a record and applying one as sync work',{timeout:180000},async t=>{
+ const {phone,laptop}=await twoOpenDevices2417(t,answeringBoard2408({tasks:20,padBytes:0}));
+ holdFullCopy2417(t,phone);
+ const work=device=>[...vm.runInContext('syncSession',device.ctx).snapshot().work].map(item=>item.kind);
+ // Every kind of sync work a device's session reports from now on.
+ const kindsSeen=device=>{
+  const session=vm.runInContext('syncSession',device.ctx),kinds=new Set(),note=()=>{for(const item of session.snapshot().work)kinds.add(item.kind);};
+  note();t.after(session.onChange(note));return kinds;
+ };
+ // The phone's record is held at the cloud, so its send stays open.
+ const entered=deferredSyncFixture(),gate=deferredSyncFixture(),append=phone.backend.CS.appendChangeRecord;
+ phone.backend.CS.appendChangeRecord=async record=>{entered.resolve();await gate.promise;return append(record);};
+ const laptopKinds=kindsSeen(laptop),candidate=phone.tap('no');
+ await fixtureDeadline(entered.promise,'positive control: the phone sends its record');
+ assert.ok(work(phone).includes('record-send'),'while its record is being sent, the phone counts it as sync work');
+ gate.resolve();
+ await until2417(()=>!work(phone).includes('record-send'),'once the record has gone up, that work ends');
+ await until2417(()=>laptop.ctx.state.considered?.[candidate]==='no','positive control: the laptop applies the record');
+ assert.ok(laptopKinds.has('record-apply'),'the laptop counts applying the record as sync work');
+ await syncSettled(laptop.ctx,{within:30000});
+});
+
+// #2417: #2287's server-only repair rebuilds the board from retained full
+// copies. Those need not include the change records the damaged copy did, so
+// the repaired copy names none, and every record the cloud keeps is applied
+// over it again rather than skipped or removed.
+test('RISK change records: a server-only repair of a damaged full copy publishes a copy that names no change records',{timeout:120000},async t=>{
+ const {backend,originalRoot}=await damagedAcknowledgedApp187(t);
+ assert.ok(Number.isSafeInteger(originalRoot.includedSeq),'positive control: the damaged full copy names the change records it includes');
+ const result=await fixtureDeadline(backend.CS.repairCloudSources(),'the server-only repair finishes');
+ assert.equal(result?.ok,true,'the repair publishes: '+JSON.stringify(result));
+ const repaired=backend.docs.get('users/owner');
+ assert.ok(repaired.rev>originalRoot.rev,'positive control: the repaired copy is the active root');
+ assert.equal(Object.hasOwn(repaired,'includedSeq'),false,'the repaired copy names no change records');
+});
+
+// #2417 specialist review B1: an answer that leaves the sender's board
+// unprojectable (#2395: a task added during a started pass, then an answer)
+// goes as no change record, as its full copy does not go; the other device
+// shows no error and keeps syncing.
+test('RISK change records: an answer whose board the sender could not push goes as no record, and the other device keeps syncing',{timeout:240000},async t=>{
+ const docs=new Map();
+ const phone=await answeringDevice2408(t,{board:answeringBoard2408({tasks:3,padBytes:0}),docs,saveMs:0,dropDatabase:true});
+ phone.ctx.onAction('start-scan',{dataset:{}});
+ await syncSettled(phone.ctx,{within:60000});
+ const laptop=await answeringDevice2408(t,{docs,storage:sharedScannerStorage(),saveMs:0,dropDatabase:true});
+ await settledTogether([phone,laptop],[],{within:60000});
+ holdFullCopy2417(t,phone);
+ const written=recordsWritten2417(phone);
+ phone.ctx.addTask('Added during the started pass');
+ await new Promise(resolve=>setTimeout(resolve,300));
+ phone.tap('cant');
+ await until2417(()=>vm.runInContext('decisionEvidenceIssue(state,window.CloudSync.user)',phone.ctx)!==null,'positive control: the answer leaves the phone’s board unprojectable (#2395)');
+ await new Promise(resolve=>setTimeout(resolve,1500));
+ assert.equal(recordsWritten2417(phone),written,'the phone sends no record of it');
+ await syncSettled(laptop.ctx,{within:30000});
+ assert.notEqual(laptop.backend.CS.status,'error','the laptop shows no cloud error');
+ laptop.ctx.addTask('Added on the laptop afterwards');
+ await syncSettled(laptop.ctx,{within:60000,synced:true});
+ assert.ok((await cloudCopy2408(docs)).tasks.some(task=>task.title==='Added on the laptop afterwards'),'and its own edits still reach the cloud');
+});
+
+// #2417 specialist review B1: a record the receiving board cannot hold (here
+// a decision naming a learning baseline no board has) is skipped whole: none
+// of it is applied, the support report says so, and sync goes on.
+test('RISK change records: a record the receiving board cannot hold is skipped whole, reported, and sync goes on',{timeout:240000},async t=>{
+ const {phone,laptop,docs}=await twoOpenDevices2417(t,answeringBoard2408({tasks:20,padBytes:0}));
+ holdFullCopy2417(t,phone);
+ const [first,second]=laptop.ctx.state.tasks.filter(task=>!task.done&&!laptop.ctx.state.considered?.[task.id]&&task.id!==laptop.ctx.state.candidateId).map(task=>task.id);
+ const change={v:1,before:{considered:{}},after:{considered:{[first]:'no'},decisionEvents:[{v:1,id:'crafted-unholdable-event',kind:'no',at:Date.now(),
+  account:'e@example.com',candidateId:first,benchmarkId:second,baselineId:'no-such-learning-baseline'}]}};
+ laptop.ctx.__crafted2417=change;
+ assert.ok(vm.runInContext('(()=>{const board=JSON.parse(JSON.stringify(state));applyChangeRecordTo(board,JSON.parse(JSON.stringify(__crafted2417)));return decisionEvidenceIssue(board,window.CloudSync.user);})()',laptop.ctx),
+  'positive control: a board holding the record could not be pushed');
+ const before=laptop.ctx.cloudPayload(),reads=laptop.backend.liveReads.length;
+ assert.equal((await phone.backend.CS.appendChangeRecord({id:'crafted-unholdable-record',parts:JSON.stringify(change)})).ok,true,'positive control: the record is in the cloud');
+ await until2417(()=>laptop.backend.liveReads.length>reads,'positive control: the laptop receives it');
+ await new Promise(resolve=>setTimeout(resolve,300));
+ await syncSettled(laptop.ctx,{within:30000});
+ assert.equal(laptop.ctx.cloudPayload(),before,'none of the record is applied');
+ assert.ok(recordEvents2417(laptop).some(event=>event.startsWith('skipped:')),'the support report records it as skipped: '+JSON.stringify(recordEvents2417(laptop)));
+ assert.notEqual(laptop.backend.CS.status,'error','no cloud error');
+ const candidate=phone.tap('no');
+ await until2417(()=>laptop.ctx.state.considered?.[candidate]==='no','a later record still applies');
+ laptop.ctx.addTask('Added on the laptop after the skipped record');
+ await syncSettled(laptop.ctx,{within:60000,synced:true});
+ assert.ok((await cloudCopy2408(docs)).tasks.some(task=>task.title==='Added on the laptop after the skipped record'),'and the laptop’s own edits reach the cloud');
+});
+
+// #2417 specialist review B2 and second review B3: Undo of an answer before
+// its whole-board device save, then the app closes. The answer's device row
+// must not bring it back on reopening, for every scanner answer (some Undos
+// remove or rewrite rows: Worked on it's History, Dislodge's ratings), whether
+// its record had gone to the cloud or not: the reopened board is the board
+// the Undo left, and the cloud copy it sends carries it.
+test('RISK change records: an answer undone before its whole-board device save stays undone when the app reopens, whether or not its record went',{timeout:900000},async t=>{
+ // Board content compared whatever the order of its fields, and of a task's
+ // postpone operations, which a merge with the cloud's copy sorts; the save
+ // time aside.
+ const canonical=value=>JSON.stringify(value,function(key,item){
+  if(key==='postponeOps'&&Array.isArray(item))return item.map(row=>JSON.stringify(row,Object.keys(row).sort())).sort().map(row=>JSON.parse(row));
+  return item&&typeof item==='object'&&!Array.isArray(item)?Object.fromEntries(Object.keys(item).sort().map(name=>[name,item[name]])):item;});
+ const content=board=>{const {updatedAt,...rest}=typeof board==='string'?JSON.parse(board):board;return canonical(rest);};
+ // Every case runs, and the test names each one that fails.
+ const failed=[];
+ for(const act of ['yes','no','cant','cand-done','cand-worked','postpone','dislodge','worked','bench-done','bench-cant','bench-postpone'])for(const sent of [false,true]){
+  const label=act+(sent?', its record in the cloud':', its record not sent');
+  const device=await answeringDevice2408(t,{saveMs:0,dropDatabase:false});
+  await startAnswering2408(device);
+  // From here a whole-board device save takes a minute (a Yes or Done asks for
+  // one at once), so none finishes before the app closes.
+  device.saveMs=60000;
+  const {ctx,clock,counters,backend}=device,commits=counters.commits.length,before=content(ctx.cloudPayload());
+  const gate=deferredSyncFixture(),append=backend.CS.appendChangeRecord;
+  if(!sent)backend.CS.appendChangeRecord=async record=>{await gate.promise;return append(record);};
+  device.tap(act);
+  await clock.advance(100);
+  assert.notEqual(content(ctx.cloudPayload()),before,label+': positive control: the answer is taken');
+  assert.equal(cloudRecords2417(device.docs).length,sent?1:0,label+': positive control: the record has '+(sent?'':'not ')+'gone');
+  assert.equal(await ctx.onAction('undo',{}),true,label+': positive control: Undo runs');
+  await clock.advance(50);
+  // The board the Undo left, as an opening reads it back (which can reorder rows).
+  const undone=content(vm.runInContext('(()=>{const board=JSON.parse(cloudPayload());hydrateState(board);return cloudPayloadFor(board);})()',ctx));
+  // A benchmark Done's Undo during a started pass leaves a board no push may
+  // send (as #2395's Add does): the reopened page then holds it, as this one would.
+  const pushable=vm.runInContext('decisionEvidenceIssue(state,window.CloudSync.user)===null',ctx);
+  assert.ok(counters.commits.slice(commits).every(commit=>commit.endedAt===undefined),label+': positive control: no whole-board save has finished');
+  await device.close();gate.resolve();
+  const reopened=await answeringDevice2408(t,{docs:device.docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,dropDatabase:true});
+  try{await syncSettled(reopened.ctx,{within:30000,synced:pushable});}
+  catch(error){failed.push(label+': the reopened app does not get synced: '+String(error.message).slice(0,160));await reopened.close();continue;}
+  if(content(reopened.ctx.cloudPayload())!==undone)failed.push(label+': the reopened app does not hold the board the Undo left');
+  if(recordsWritten2417(reopened)!==0)failed.push(label+': it sends a record of the undone answer');
+  if(!sent&&cloudRecords2417(device.docs).length!==0)failed.push(label+': a record went');
+  // The Undo goes on to other devices with the reopened board's full copy.
+  if(pushable&&content(await cloudCopy2408(device.docs))!==undone)failed.push(label+': the cloud copy does not carry the Undo');
+  await reopened.close();
+ }
+ assert.deepEqual(failed,[],'every undone answer stays undone after reopening');
+});
+
+// #2417 specialist review N1/N3: a refusal not proved to come from rules
+// without change records (a contended counter read, which the emulator can
+// answer with permission-denied) neither turns records off for the page nor
+// loses the record, in a send or in a full copy's publication.
+test('RISK change records: a refused counter read that rules without records did not cause turns no records off, and the record still goes',{timeout:240000},async t=>{
+ const {phone,laptop}=await twoOpenDevices2417(t,answeringBoard2408({tasks:20,padBytes:0}));
+ const release=holdFullCopy2417(t,phone);
+ let refusals=0;
+ const refuseOnce=()=>{refusals=0;phone.faults.transactionRead=async path=>{if(refusals<1&&/changeLog\/head$/.test(path)){refusals++;throw Object.assign(Error('contended'),{code:'permission-denied'});}};};
+ refuseOnce();
+ const first=phone.tap('no');
+ await until2417(()=>laptop.ctx.state.considered?.[first]==='no','a send whose counter read was refused once still reaches the laptop before the full copy',10000);
+ assert.equal(refusals,1,'positive control: the send’s counter read was refused once');
+ // The full copy's publication reads the counter too.
+ refuseOnce();release();
+ await settledTogether([phone,laptop],[],{within:120000});
+ assert.equal(refusals,1,'positive control: the publication’s counter read was refused once');
+ delete phone.faults.transactionRead;
+ await new Promise(resolve=>setTimeout(resolve,300));
+ const written=recordsWritten2417(phone),second=phone.tap('no');
+ await until2417(()=>laptop.ctx.state.considered?.[second]==='no'&&recordsWritten2417(phone)>written,'a later answer still goes as a record',10000);
+ assert.notEqual(vm.runInContext('window.CloudSync.changeRecords',phone.ctx),'unavailable','records stay on for the page');
+});
+
+// #2417 review N1: every scanner answer the Help and changelog name travels
+// as a change record: Yes, No, Can't, Done, Worked on it, Postpone and
+// Dislodge, on the candidate and on the benchmark. Each goes as one record,
+// and the other device holds the sender's board before its full copy lands.
+test('RISK change records: Yes, No, Can’t, Done, Worked on it, Postpone and Dislodge each go as one record that the other device holds before the full copy',{timeout:900000},async t=>{
+ // Values compared whatever the order of their fields, which a record applied
+ // on the other device can leave different.
+ const canonical=value=>JSON.stringify(value,function(key,item){return item&&typeof item==='object'&&!Array.isArray(item)?Object.fromEntries(Object.keys(item).sort().map(name=>[name,item[name]])):item;});
+ const differing=(a,b)=>[...new Set([...Object.keys(a),...Object.keys(b)])].filter(key=>key!=='updatedAt'&&canonical(a[key])!==canonical(b[key]));
+ for(const act of ['yes','no','cant','cand-done','cand-worked','postpone','dislodge','worked','bench-done','bench-cant','bench-postpone']){
+  const {phone,laptop,docs}=await twoOpenDevices2417(t,answeringBoard2408({tasks:20,padBytes:0}));
+  holdFullCopy2417(t,phone);
+  const records=cloudRecords2417(docs).length,revision=docs.get('users/owner').rev,before=phone.ctx.cloudPayload();
+  phone.tap(act);
+  assert.notEqual(phone.ctx.cloudPayload(),before,act+': positive control: the phone takes the answer');
+  await until2417(()=>cloudRecords2417(docs).length>records,act+': its record goes up');
+  await until2417(()=>differing(JSON.parse(phone.ctx.cloudPayload()),JSON.parse(laptop.ctx.cloudPayload())).length===0,act+': the laptop comes to hold the phone’s board',15000);
+  await syncSettled(laptop.ctx,{within:30000});
+  assert.equal(cloudRecords2417(docs).length-records,1,act+': as one record');
+  assert.equal(docs.get('users/owner').rev,revision,act+': positive control: the phone’s full copy has not landed');
+  assert.deepEqual(differing(JSON.parse(phone.ctx.cloudPayload()),JSON.parse(laptop.ctx.cloudPayload())),[],act+': the laptop holds the phone’s board');
+ }
+});
+
+// #2417 review N5: an answer recorded while a device save waits (the only
+// wait before that save takes its board's text is the read of another tab's
+// newer copy). The answer's device row goes only with a saved board holding it.
+test('RISK change records: an answer made while a device save waits on another tab’s copy keeps its device row until a saved board holds it',{timeout:180000},async t=>{
+ const device=await answeringDevice2408(t,{saveMs:0});
+ await startAnswering2408(device);
+ const {ctx,clock,storage,counters}=device,store=ctx.window.ScannerDeviceStore;
+ // An older tab writes its own copy of the board.
+ const older=JSON.parse(storage.getItem(SYNC_STORE_KEY));older.tasks.at(-1).title+=' (older tab)';storage.setItem(SYNC_STORE_KEY,JSON.stringify(older));
+ const read=store.readHead,gate=deferredSyncFixture();let held=0;
+ store.readHead=async(...args)=>{if(held++===0)await gate.promise;return read.apply(store,args);};
+ // An edit whose save reads the older tab's copy first.
+ ctx.state.tasks.at(-2).title+=' (edited here)';ctx.save();
+ await clock.advance(400);
+ assert.equal(held,1,'positive control: the save waits on the older tab’s copy');
+ const commits=counters.commits.length,candidate=device.tap('no');
+ await clock.advance(100);
+ const rowsAbout=async()=>(await store.listChangeRecords('owner')).filter(row=>JSON.parse(row.parts).after?.considered?.[candidate]==='no');
+ assert.equal((await rowsAbout()).length,1,'positive control: the answer’s row is saved on the device');
+ gate.resolve();
+ await clock.settle();
+ assert.ok(counters.commits.length>commits,'positive control: the waiting save went on and committed');
+ const head=JSON.parse((await store.readHead()).payload);
+ assert.ok(head.considered?.[candidate]==='no'||(await rowsAbout()).length===1,'the row goes only with a saved board that holds the answer');
+});
+
+// #2417 third review B4: answer, Undo, the same answer again, and the device
+// saves finish before the app closes: the saved board holds the Undo, so its
+// row must not replay over the answer given again, before or after the full
+// copy lands. Once a save holds the Undo, no full Undo row stays on the device.
+test('RISK change records: an answer given again after its Undo survives reopening, and no full Undo row outlives the save that holds the Undo',{timeout:900000},async t=>{
+ const canonical=value=>JSON.stringify(value,function(key,item){
+  if(key==='postponeOps'&&Array.isArray(item))return item.map(row=>JSON.stringify(row,Object.keys(row).sort())).sort().map(row=>JSON.parse(row));
+  return item&&typeof item==='object'&&!Array.isArray(item)?Object.fromEntries(Object.keys(item).sort().map(name=>[name,item[name]])):item;});
+ // The save time and the time the scanner last showed its candidate aside:
+ // a full copy read on opening can carry an earlier showing of the same one.
+ const content=board=>{const {updatedAt,presentedAt,...rest}=typeof board==='string'?JSON.parse(board):board;return canonical(rest);};
+ const reread=ctx=>content(vm.runInContext('(()=>{const board=JSON.parse(cloudPayload());hydrateState(board);return cloudPayloadFor(board);})()',ctx));
+ const failed=[];
+ for(const act of ['no','cant','cand-worked','dislodge','bench-cant','worked'])for(const landed of [false,true]){
+  const label=act+(landed?', after the full copy lands':', before the full copy lands');
+  const device=await answeringDevice2408(t,{saveMs:0,dropDatabase:false});
+  await startAnswering2408(device);
+  const {ctx,clock,counters,backend}=device;
+  let release=()=>{};
+  if(!landed){let open;device.faults.publishPending=new Promise(resolve=>{open=resolve;});release=open;}
+  device.tap(act);await clock.advance(100);
+  assert.equal(await ctx.onAction('undo',{}),true,label+': positive control: Undo runs');
+  // The scanner ignores a tap within 200 ms of drawing its tasks again.
+  await clock.advance(400);
+  const undone=reread(ctx);
+  device.tap(act);await clock.advance(100);
+  assert.notEqual(reread(ctx),undone,label+': positive control: the answer is given again');
+  // Every device save finishes; with the full copy held, it does not land.
+  const commits=counters.commits.length;
+  await clock.advance(30000);
+  if(landed)await clock.settle();
+  assert.ok(counters.commits.length>commits&&counters.commits.every(commit=>commit.endedAt!==undefined),label+': positive control: the device saves have finished');
+  // What reopening must show: the saved board, as an opening reads it.
+  ctx.__savedHead2417=(await ctx.window.ScannerDeviceStore.readHead()).payload;
+  const expected=content(vm.runInContext('(()=>{const board=JSON.parse(__savedHead2417);hydrateState(board);return cloudPayloadFor(board);})()',ctx));
+  assert.notEqual(expected,undone,label+': positive control: the saved board holds the answer given again');
+  const rows=await ctx.window.ScannerDeviceStore.listChangeRecords('owner');
+  const fullUndoRows=rows.filter(row=>row.id.startsWith('local:undo:')&&JSON.parse(row.parts).localUndo);
+  if(fullUndoRows.length)failed.push(label+': a full Undo row outlives the save that holds the Undo ('+fullUndoRows.map(row=>row.parts.length).join(',')+' characters)');
+  await device.close();release();
+  const reopened=await answeringDevice2408(t,{docs:device.docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,dropDatabase:true});
+  try{await syncSettled(reopened.ctx,{within:30000,synced:true});}
+  catch(error){failed.push(label+': the reopened app does not get synced: '+String(error.message).slice(0,160));await reopened.close();continue;}
+  if(reread(reopened.ctx)!==expected)failed.push(label+': the answer given again does not survive reopening');
+  if(reopened.backend.CS.status==='error')failed.push(label+': the reopened app shows a cloud error');
+  if(content(await cloudCopy2408(device.docs))!==expected)failed.push(label+': the cloud copy does not hold the answer given again');
+  await reopened.close();
+ }
+ assert.deepEqual(failed,[],'an answer given again after its Undo survives reopening');
+});
+
+// #2417 third reviews N11 and N12: an Undo whose full row this device could
+// not keep (refused, as by a full device) leaves a marker, so its answer's
+// own row is not replayed and the saved board never holds the answer. The
+// cloud still keeps the answer's record, and nothing else on this board makes
+// it a no-op: only the marker, which every opening reads into the undone
+// answers, stops it applying. It must survive a save made while the listener
+// has heard nothing (opened signed out), since the cloud's records are then
+// unknown, not gone.
+test('RISK change records: the cloud’s record of an answer this device undid never applies on reopening, also after a save made while signed out',{timeout:900000},async t=>{
+ const values=board=>JSON.stringify({ratings:board.tasks.map(task=>[task.id,task.mu,task.sigma]),considered:board.considered||{},cantAt:board.cantAt||{},
+  workedAt:board.workedAt||{},history:(board.workLog||[]).length});
+ const failed=[];
+ for(const act of ['no','cant','cand-worked','dislodge','bench-cant','worked']){
+  const device=await answeringDevice2408(t,{saveMs:0,dropDatabase:false});
+  await startAnswering2408(device);
+  const {ctx,clock,counters,docs}=device,store=ctx.window.ScannerDeviceStore;
+  // The full copy is held, so the cloud keeps the answer's record throughout,
+  // and from here no whole-board device save finishes before the app closes.
+  let release;device.faults.publishPending=new Promise(resolve=>{release=resolve;});t.after(()=>release());
+  device.saveMs=60000;
+  // The device refuses the Undo's full row: a marker is saved instead.
+  const put=store.putChangeRecord;
+  store.putChangeRecord=async row=>row.id.startsWith('local:undo:')&&JSON.parse(row.parts).localUndo?{ok:false,reason:'quota'}:put.call(store,row);
+  const before=values(ctx.state),commits=counters.commits.length;
+  device.tap(act);await clock.advance(100);
+  assert.notEqual(values(ctx.state),before,act+': positive control: the answer changes the board');
+  assert.equal(cloudRecords2417(docs).length,1,act+': positive control: the answer goes as a record');
+  assert.equal(await ctx.onAction('undo',{}),true,act+': positive control: Undo runs');
+  await clock.advance(400);
+  const expected=values(ctx.state);
+  assert.ok((await store.listChangeRecords('owner')).some(row=>row.id.startsWith('local:undo:')&&JSON.parse(row.parts).localUndo===null),act+': positive control: the Undo is kept as a marker');
+  assert.ok(counters.commits.slice(commits).every(commit=>commit.endedAt===undefined),act+': positive control: no whole-board save has finished');
+  await device.close();
+  // Reopened signed out: an edit is saved before the listener hears anything.
+  const first=await answeringDevice2408(t,{docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,signedIn:false});
+  await syncSettled(first.ctx,{within:30000});
+  assert.equal(values(first.ctx.state),expected,act+': positive control: the reopened board is the one the Undo left');
+  const saves=first.counters.commits.length;
+  first.ctx.state.tasks.at(-2).title+=' (edited while signed out)';first.ctx.save();
+  await syncSettled(first.ctx,{within:30000});
+  assert.ok(first.counters.commits.length>saves&&first.counters.commits.every(commit=>commit.endedAt!==undefined),act+': positive control: a save finishes while signed out');
+  await first.close();
+  assert.equal(cloudRecords2417(docs).length,1,act+': positive control: the cloud still keeps the answer’s record');
+  // Reopened signed in: the record is heard and the board synced.
+  const second=await answeringDevice2408(t,{docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,dropDatabase:true});
+  try{await syncSettled(second.ctx,{within:30000,synced:true});}
+  catch(error){failed.push(act+': the reopened app does not get synced: '+String(error.message).slice(0,160));await second.close();continue;}
+  if(values(second.ctx.state)!==expected)failed.push(act+': the undone answer comes back on reopening');
+  if(second.backend.CS.status==='error')failed.push(act+': the reopened app shows a cloud error');
+  if(values(await cloudCopy2408(docs))!==expected)failed.push(act+': the cloud copy it sends holds the undone answer');
+  await second.close();
+ }
+ assert.deepEqual(failed,[],'the cloud’s record of an answer this device undid never applies on reopening');
+});
+
+// #2417 third review B4, the answer's own row: Undo while the answer's record
+// is being sent, its Undo's whole-board save finishes, and the app closes
+// before the send does. The answer's own row is still on the device (unsent),
+// so the Undo's row must outlast that save, as a marker, or reopening sends a
+// record of the undone answer.
+test('RISK change records: an answer undone while its record was being sent is never sent after reopening, though its Undo’s save finished first',{timeout:900000},async t=>{
+ const values=board=>JSON.stringify({ratings:board.tasks.map(task=>[task.id,task.mu,task.sigma]),considered:board.considered||{},cantAt:board.cantAt||{},
+  workedAt:board.workedAt||{},history:(board.workLog||[]).length});
+ const failed=[];
+ for(const act of ['no','cant','cand-worked','dislodge','bench-cant','worked']){
+  const device=await answeringDevice2408(t,{saveMs:0,dropDatabase:false});
+  await startAnswering2408(device);
+  const {ctx,clock,counters,docs}=device;
+  // The send reaches the cloud's counter and waits there until the app has closed.
+  let open,started=false;const gate=new Promise(resolve=>{open=resolve;});t.after(()=>open());
+  device.faults.transactionRead=async path=>{if(/\/changeLog\//.test(path)){started=true;await gate;}};
+  device.tap(act);await clock.advance(100);
+  assert.ok(started&&cloudRecords2417(docs).length===0,act+': positive control: the record is being sent');
+  assert.equal(await ctx.onAction('undo',{}),true,act+': positive control: Undo runs');
+  const commits=counters.commits.length;
+  await clock.advance(3000);
+  const expected=values(ctx.state);
+  assert.ok(counters.commits.length>commits&&counters.commits.every(commit=>commit.endedAt!==undefined),act+': positive control: the Undo’s whole-board save has finished');
+  await device.close();
+  const reopened=await answeringDevice2408(t,{docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,dropDatabase:true});
+  try{await syncSettled(reopened.ctx,{within:30000,synced:true});}
+  catch(error){failed.push(act+': the reopened app does not get synced: '+String(error.message).slice(0,160));await reopened.close();continue;}
+  if(recordsWritten2417(reopened)!==0)failed.push(act+': the reopened app sends a record of the undone answer');
+  if(values(reopened.ctx.state)!==expected)failed.push(act+': the reopened app does not hold the board the Undo left');
+  if(reopened.backend.CS.status==='error')failed.push(act+': the reopened app shows a cloud error');
+  await reopened.close();
+ }
+ assert.deepEqual(failed,[],'an answer undone while its record was being sent is never sent after reopening');
+});
