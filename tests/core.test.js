@@ -29936,6 +29936,56 @@ test('Firestore rules: v2 chunks are owner-only, immutable, sealed before publis
 // #2417: change records (users/{uid}/changeRecords) and their counter
 // (users/{uid}/changeLog/head), as the rules allow them. Each check names what
 // it refuses; a refused request is permission-denied, anything else fails it.
+// #2426: two devices that read the root at one revision both publish over
+// it. Firestore checks each commit against the rules as the root then stands,
+// and the rules (v2Update) read the root's revision, so the second commit is
+// refused with permission-denied, which the SDK never retries. The app held
+// that as a sync error on the second device until Retry sync; the board it
+// had not sent stayed on it. The cloud store now reads the root again and,
+// when its revision has moved past the one the push began from, answers the
+// revision guard's conflict, so the device pulls, merges and publishes again.
+test('Firestore rules: two devices publishing full copies over one revision at once: the second meets the revision guard, shows no error and publishes next, while a refused account still holds',{skip:!process.env.FIRESTORE_EMULATOR_HOST},async()=>{
+ const {initializeTestEnvironment}=await import('@firebase/rules-unit-testing'),F=await import('firebase/firestore');
+ const candidate={...decisionCandidate146(),rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')};
+ const board=label=>JSON.stringify({tasks:[{id:'kept',title:'Kept '+label,done:false}]});
+ for(let trial=0;trial<3;trial++){
+  const env=await initializeTestEnvironment({projectId:'demo-concurrent-publication-2426-'+trial,firestore:{rules:candidate.rules}}),handles=[];
+  try{
+   const seed=await decisionBackend146(candidate,env.authenticatedContext('owner').firestore(),F);handles.push(seed);
+   assert.equal((await seed.CS.push(board('seed'),1,0)).ok,true,'positive control: the cloud holds revision 1');
+   // Each device's first publication waits, its reads done, until both are there.
+   let arrived=0,bothRead;const together=new Promise(resolve=>{bothRead=resolve;});
+   const attempts={phone:0,tablet:0},hold=name=>async()=>{if(++attempts[name]>1)return;if(++arrived===2)bothRead();await together;};
+   const phone=await decisionBackend146(candidate,env.authenticatedContext('owner').firestore(),F,'owner',{beforePublication:hold('phone')});
+   const tablet=await decisionBackend146(candidate,env.authenticatedContext('owner').firestore(),F,'owner',{beforePublication:hold('tablet')});
+   handles.push(phone,tablet);
+   const results=await Promise.all([phone.CS.push(board('phone'),2,1),tablet.CS.push(board('tablet'),3,1)]);
+   const label='trial '+trial+': '+JSON.stringify(results);
+   const winner=results.findIndex(result=>result?.ok),loser=1-winner,devices=[phone,tablet];
+   assert.notEqual(winner,-1,label+': one copy publishes');
+   assert.equal(results[winner].rev,2,label+': as revision 2');
+   assert.equal(results[loser].conflict,true,label+': the other meets the revision guard');
+   assert.equal(results[loser].rev,2,label+': which names the revision the first device published');
+   assert.notEqual(devices[loser].CS.status,'error',label+': and its device shows no sync error');
+   assert.deepEqual(attempts,{phone:1,tablet:1},label+': positive control: each publication committed or was refused once, as the SDK does not retry a refusal');
+   const read=await devices[loser].CS.pull();
+   assert.equal(read.rev,2,label+': the second device reads the first one’s copy');
+   const next=await devices[loser].CS.push(board('merged'),4,read.rev);
+   assert.equal(next.ok,true,label+': and publishes its own over it under the revision guard');
+   assert.equal(next.rev,3,label+': as revision 3');
+   // A refusal the root does not explain still holds: a device whose
+   // credentials are another account's cannot read the root or publish.
+   const refused=await decisionBackend146(candidate,env.authenticatedContext('intruder').firestore(),F,'owner');handles.push(refused);
+   const denied=await refused.CS.push(board('intruder'),5,3);
+   assert.equal(denied.error,true,label+': a refused account’s push fails');
+   assert.equal(denied.conflict,undefined,label+': and is never taken for a conflict');
+   assert.equal(refused.CS.status,'error',label+': its device holds the error');
+   let root=null;await env.withSecurityRulesDisabled(async context=>{root=(await F.getDoc(F.doc(context.firestore(),'users/owner'))).data();});
+   assert.equal(root.rev,3,label+': the cloud stays at the second device’s revision');
+  }finally{for(const handle of handles)await handle.drain().catch(()=>{});await env.cleanup();}
+ }
+});
+
 test('Firestore rules: change records are owner-only, append-only and immutable, numbered one by one by the counter, and removable only once the active full copy includes them', {skip:!process.env.FIRESTORE_EMULATOR_HOST}, async()=>{
  const {initializeTestEnvironment}=await import('@firebase/rules-unit-testing');
  const {doc,getDoc,getDocs,collection,setDoc,updateDoc,deleteDoc,writeBatch,serverTimestamp}=await import('firebase/firestore');
@@ -30493,9 +30543,14 @@ test('RISK BACKWARD COMPATIBILITY: change records keep the supported floor and t
  const candidate={...decisionCandidate146(),rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')};
  const board=label=>JSON.stringify({tasks:[{id:'kept',title:'Kept '+label,done:false}],future:{keep:'unknown data'}});
  const parts='{"v":1,"before":{},"after":{}}';
- let index=0;
- for(const sha of [...new Set([SUPPORTED_RELEASE,base])]){
-  const released=readReleasedClient(__dirname,sha);
+ // #2426: once #2423 shipped, the release base's rules know records, so the
+ // last release before them stays in the matrix to keep the fallback covered.
+ // The floor has no records either today; the pin keeps the fallback covered
+ // once the floor moves past the releases without them.
+ const LAST_RELEASE_WITHOUT_RECORDS='49f5d11bb234f897eb6c5d64584216ab0481b4ad';
+ let index=0,fallbackCovered=false;
+ for(const sha of [...new Set([SUPPORTED_RELEASE,LAST_RELEASE_WITHOUT_RECORDS,base])]){
+  const released=readReleasedClient(__dirname,sha),rulesKnowRecords=/match \/changeRecords\//.test(released.rules);
   for(const direction of ['old-client/new-rules','new-client/old-rules']){
    const label=sha.slice(0,7)+' '+direction,handles=[];
    const env=await initializeTestEnvironment({projectId:'demo-change-records-compat-'+(index++),firestore:{rules:direction==='old-client/new-rules'?candidate.rules:released.rules}});
@@ -30504,7 +30559,15 @@ test('RISK BACKWARD COMPATIBILITY: change records keep the supported floor and t
     handles.push(next,old);
     await assertRoundTrip(next.CS,board('newer'),0,label+': the newer version publishes');
     const appended=await next.CS.appendChangeRecord({id:'answer-'+index,parts});
+    if(direction==='new-client/old-rules'&&rulesKnowRecords){
+     // A release whose rules know records accepts this version's record.
+     assert.equal(appended.ok,true,label+': rules that know records accept them');
+     await assertRoundTrip(old.CS,board('older'),1,label+': and the released version publishes its full copy over it');
+     assert.equal((await next.CS.pull()).payload,board('older'),label+': the newer version reads the released one’s copy');
+     continue;
+    }
     if(direction==='new-client/old-rules'){
+     fallbackCovered=true;
      assert.equal(appended.unsupported,true,label+': rules without records refuse them');
      assert.notEqual(next.CS.status,'error',label+': and the newer version shows no error');
      await assertRoundTrip(next.CS,board('newer again'),1,label+': it goes on syncing by full copies');
@@ -30539,6 +30602,7 @@ test('RISK BACKWARD COMPATIBILITY: change records keep the supported floor and t
    }finally{for(const handle of handles)await handle.drain();await env.cleanup();}
   }
  }
+ assert.equal(fallbackCovered,true,'positive control: some released rules without records were exercised');
 });
 
 test('RISK BACKWARD COMPATIBILITY: released clients and candidate interoperate across both rule versions',{skip:!process.env.FIRESTORE_EMULATOR_HOST},async()=>{
@@ -42078,6 +42142,18 @@ test('Changelog #2420: one bullet says Yes No and Cant are back inside the scann
  assert.equal(bullets.length,1,'one bullet covers the move: '+release);
  assert.match(bullets[0],/Yes, No and Can’t are back inside the scanner box, under the question, instead of pinned to the bottom of the screen/);
  assert.match(bullets[0],/scroll with the page and move a little with each task’s title length/);
+});
+
+test('Changelog #2426: one bullet says two devices saving at the same moment no longer leave a sync error',async()=>{
+ const notes=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ assert.ok(notes.indexOf('<h3>November 19, 2026</h3>')<notes.indexOf('<h3>November 17, 2026</h3>')&&notes.includes('<h3>November 19, 2026</h3>'),'the newest release comes first');
+ const release=notes.split('<h3>November 19, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ const bullets=release.split('<li>').slice(1).filter(item=>/at the same moment/.test(item));
+ assert.equal(bullets.length,1,'one bullet covers the fix: '+release);
+ assert.match(bullets[0],/With sync on, when two devices save at the same moment/);
+ assert.match(bullets[0],/combines the other’s changes with its own and saves again by itself, instead of showing a sync error until Retry sync/);
+ assert.match(bullets[0],/app copy from before this update/,'the limit stays in the bullet');
+ assert.doesNotMatch(bullets[0],/permission|revision|transaction|Firestore/i,'it says what the person sees, not how it works');
 });
 
 test('Help answers how the steady scanner, backup list, Debug log link and rank column now behave',async t=>{

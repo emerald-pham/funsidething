@@ -16180,7 +16180,8 @@ async function answeringDevice2408(t,{board=answeringBoard2408(),docs=new Map(),
  const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage,cryptoProvider:crypto});
  const {ctx,shim}=app;
  const faults={authPending:true};
- const backend=await loadCloudBackendV2({runtimeWindow:ctx.window,sharedDocs:docs,failures:faults,timeoutMs:5000,recordSyncError:ctx.recordSyncError,cryptoProvider:crypto});
+ // #2426: devices that share docs share the server's clock, the host's.
+ const backend=await loadCloudBackendV2({runtimeWindow:ctx.window,sharedDocs:docs,failures:faults,timeoutMs:5000,recordSyncError:ctx.recordSyncError,cryptoProvider:crypto,serverClock:Date.now});
  ctx.window.cloudPull=ctx.cloudPull;ctx.window.CLOUD_PUSH_DELAY_MS=20;ctx.closeModal();
  const clock=answerClock2408(ctx,counters),store=ctx.window.ScannerDeviceStore;
  // Every device-store call is real work in flight. A whole-board commit is a
@@ -17286,15 +17287,132 @@ test('RISK change records: independent answers from two devices are both kept on
  assert.deepEqual(tabletFirst.decisions,['current-choice:'+tabletFirst.benchmark,'no:'+tabletFirst.candidate].sort(),'the tablet first: the laptop holds both decisions once each');
 });
 
+// #2426: Firestore stamps an upload's createdAt with its own commit time, so a
+// device that publishes a moment after another device began an upload finds
+// that upload seconds old, inside the collector's seven-day resume grace. The
+// shared fake stamped every server time 1234 (1970), so every upload in flight
+// looked a week old and a peer's collector marked it deleting; the upload's
+// seal then failed, a failure the app does not retry, and the board stayed
+// unsent until some later trigger. A real cloud can reach that only for an
+// upload that was in flight longer than the grace, as the server's clock runs.
+test('RISK change records: a device that publishes while another is still sending its full copy leaves that copy alone, and the sender meets the revision guard',{timeout:60000},async t=>{
+ const docs=new Map(),board=title=>JSON.stringify(syncState({v:2,tasks:[syncTask('upload-2426',title)],syncAccount:'e@example.com',syncIdentity:'owner'}));
+ const seeder=await loadCloudBackendV2({sharedDocs:docs,timeoutMs:5000,serverClock:Date.now});t.after(()=>seeder.CS.suspend());
+ assert.equal((await seeder.CS.push(board('Seed'),1792323000000,0)).ok,true,'positive control: the cloud holds a first copy');
+ // The tablet stops once its chunks are written, just before it seals them:
+ // its second read of its generation is the seal's.
+ const generationPath=/^users\/owner\/generations\/[^/]+$/;let generationReads=0,arrive,resume;
+ const atSeal=new Promise(resolve=>{arrive=resolve;}),held=new Promise(resolve=>{resume=resolve;});t.after(()=>resume());
+ const tabletFaults={transactionRead:async path=>{if(generationPath.test(path)&&++generationReads===2){arrive(path);await held;}}};
+ const tablet=await loadCloudBackendV2({sharedDocs:docs,timeoutMs:60000,failures:tabletFaults,serverClock:Date.now});t.after(()=>tablet.CS.suspend());
+ const sending=tablet.CS.push(board('Tablet answer'),1792323000002,1);
+ const tabletGeneration=(await atSeal).split('/').at(-1);
+ assert.equal(docs.get('users/owner/generations/'+tabletGeneration)?.state,'staging','positive control: the tablet’s copy is in flight');
+ // The phone publishes over the same revision, and its cleanup runs.
+ const phoneFaults={},listed=new Promise(resolve=>{phoneFaults.serverRead=async path=>{if(path==='users/owner/generations')resolve();};});
+ const phone=await loadCloudBackendV2({sharedDocs:docs,timeoutMs:5000,failures:phoneFaults,serverClock:Date.now});t.after(()=>phone.CS.suspend());
+ assert.equal((await phone.CS.push(board('Phone answer'),1792323000001,1)).ok,true,'positive control: the phone publishes');
+ await listed;
+ // The cleanup works on the fake's promises alone; give it time to finish.
+ await new Promise(resolve=>setTimeout(resolve,200));
+ const afterCleanup=docs.get('users/owner/generations/'+tabletGeneration)?.state??'removed';
+ resume();
+ const result=await sending;
+ assert.notEqual(result.code,'seal-failed','the tablet’s copy is sealed: '+JSON.stringify(result));
+ assert.equal(afterCleanup,'staging','the phone’s cleanup left the copy the tablet was still sending alone');
+ assert.equal(result.conflict,true,'and it meets the revision guard, as the phone published first: '+JSON.stringify(result));
+ assert.equal(result.rev,docs.get('users/owner').rev,'at the revision the phone published');
+});
+
+// #2426: a Firestore transaction commits only over the documents it read as
+// they still are, and otherwise runs again. The shared fake did that only for
+// the change-record counter, so two devices that read the root at the same
+// revision both published over it: each was told its copy was that revision,
+// one copy replaced the other, and the device whose copy was lost thought it
+// had nothing left to send.
+test('RISK change records: two devices publishing full copies over the same revision at once: one publishes, the other meets the revision guard',{timeout:60000},async t=>{
+ const docs=new Map(),board=title=>JSON.stringify(syncState({v:2,tasks:[syncTask('publish-2426',title)],syncAccount:'e@example.com',syncIdentity:'owner'}));
+ const seeder=await loadCloudBackendV2({sharedDocs:docs,timeoutMs:5000,serverClock:Date.now});t.after(()=>seeder.CS.suspend());
+ assert.equal((await seeder.CS.push(board('Seed'),1792323000000,0)).ok,true,'positive control: the cloud holds a first copy');
+ // Each device stops at its publication's read of the root until both are there.
+ let release;const bothRead=new Promise(resolve=>{release=resolve;});t.after(()=>release());
+ const arrived=[],device=async name=>{
+  let reached;const atRoot=new Promise(resolve=>{reached=resolve;});
+  const faults={transactionRead:async path=>{if(path==='users/owner'&&!arrived.includes(name)){arrived.push(name);reached();await bothRead;}}};
+  const backend=await loadCloudBackendV2({sharedDocs:docs,timeoutMs:60000,failures:faults,serverClock:Date.now});t.after(()=>backend.CS.suspend());
+  return {backend,atRoot};
+ };
+ const phone=await device('phone'),tablet=await device('tablet');
+ const sending=[phone.backend.CS.push(board('Phone answer'),1792323000001,1),tablet.backend.CS.push(board('Tablet answer'),1792323000002,1)];
+ await Promise.all([phone.atRoot,tablet.atRoot]);
+ release();
+ const results=await Promise.all(sending);
+ const published=results.filter(result=>result.ok),guarded=results.filter(result=>result.conflict);
+ assert.equal(published.length,1,'exactly one copy publishes: '+JSON.stringify(results));
+ assert.equal(guarded.length,1,'the other meets the revision guard: '+JSON.stringify(results));
+ assert.equal(published[0].rev,2,'as the next revision');
+ assert.equal(guarded[0].rev,2,'and the guard names the revision the other device published');
+ assert.equal(docs.get('users/owner').rev,2,'the cloud is at that revision');
+});
+
+// #2426: a publication refused with permission-denied is taken for the
+// revision guard only when a fresh read of the root shows it has moved past
+// the revision the push began from. A refusal the root does not explain, or
+// one whose root this account cannot read, is a real refusal and still holds.
+test('RISK change records: a publication the rules refuse over an unmoved root, or whose root its account cannot read again, still holds its sync error',{timeout:60000},async t=>{
+ const docs=new Map(),board=title=>JSON.stringify(syncState({v:2,tasks:[syncTask('refused-2426',title)],syncAccount:'e@example.com',syncIdentity:'owner'}));
+ const denied=()=>Object.assign(Error('rules refuse'),{code:'permission-denied'});
+ const seeder=await loadCloudBackendV2({sharedDocs:docs,timeoutMs:5000,serverClock:Date.now});t.after(()=>seeder.CS.suspend());
+ assert.equal((await seeder.CS.push(board('Seed'),1792323000000,0)).ok,true,'positive control: the cloud holds a first copy');
+ // The publication's read of the root is refused, and nothing has moved it.
+ const unmoved=await loadCloudBackendV2({sharedDocs:docs,timeoutMs:5000,serverClock:Date.now,failures:{transactionRead:async path=>{if(path==='users/owner')throw denied();}}});
+ t.after(()=>unmoved.CS.suspend());
+ const held=await unmoved.CS.push(board('Unmoved'),1792323000001,1);
+ assert.equal(held.phase,'publication','positive control: the refusal is the publication’s: '+JSON.stringify(held));
+ assert.equal(held.code,'permission-denied','over an unmoved root the refusal stays a refusal: '+JSON.stringify(held));
+ assert.notEqual(held.conflict,true,'and is not taken for the revision guard');
+ assert.equal(unmoved.CS.status,'error','its device holds the error');
+ assert.equal(docs.get('users/owner').rev,1,'positive control: the root did not move');
+ // Another device publishes while this one's publication is refused, but
+ // this account cannot read the root again either.
+ const faults={transactionRead:async path=>{if(path!=='users/owner')return;
+  assert.equal((await seeder.CS.push(board('Other'),1792323000002,1)).ok,true,'positive control: another device publishes');
+  faults.serverRead=async readPath=>{if(readPath==='users/owner')throw denied();};throw denied();}};
+ const unreadable=await loadCloudBackendV2({sharedDocs:docs,timeoutMs:5000,serverClock:Date.now,failures:faults});t.after(()=>unreadable.CS.suspend());
+ const stillHeld=await unreadable.CS.push(board('Unreadable'),1792323000003,1);
+ assert.equal(docs.get('users/owner').rev,2,'positive control: the root moved past this push’s revision');
+ assert.equal(stillHeld.phase,'publication','positive control: the refusal is the publication’s: '+JSON.stringify(stillHeld));
+ assert.equal(stillHeld.code,'permission-denied','a root it cannot read again proves nothing, so the refusal holds: '+JSON.stringify(stillHeld));
+ assert.equal(unreadable.CS.status,'error','its device holds the error');
+});
+
 test('RISK change records: a decision conflict between two devices resolves on a third exactly as it does between two full copies, whatever the devices’ clocks',{timeout:300000},async t=>{
  const denied=()=>Object.assign(Error('rules without change records'),{code:'permission-denied'});
  const outcome=async records=>{
   const {phone,laptop,tablet}=await threeOpenDevices2417(t,answeringBoard2408({tasks:20,padBytes:0}));
+  // #2426: the conflict is about one pass, and a clock that reaches the 2 AM
+  // date marker begins a new pass at its next draw, which clears the scan
+  // marks. A phone an hour ahead of the real clock reached it whenever the
+  // scan began between 1 and 2 AM local time, and its No was cleared. So
+  // every clock first goes two hours behind the real one, which none of them
+  // then passes.
+  for(const device of [phone,laptop,tablet])vm.runInContext('Date.now=(now=>()=>now()-7200000)(Date.now)',device.ctx);
   // The phone's clock runs an hour fast and the tablet's an hour slow.
   vm.runInContext('Date.now=(now=>()=>now()+3600000)(Date.now)',phone.ctx);
   vm.runInContext('Date.now=(now=>()=>now()-3600000)(Date.now)',tablet.ctx);
+  for(const [name,device] of Object.entries({phone,laptop,tablet}))assert.ok(vm.runInContext('Date.now()<passResetCutoff(state.passStartedAt)',device.ctx),
+   'positive control: the '+name+'’s clock has not reached the 2 AM date marker that ends the pass the scan began');
   if(!records)for(const device of [phone,laptop,tablet])device.faults.changeRecords=denied();
   const releases=records?[holdFullCopy2417(t,phone),holdFullCopy2417(t,tablet)]:[];
+  // #2426: without records, both full copies read the root at one revision
+  // before either commits, as two devices answering at once do, so the one
+  // that commits second always meets the revision guard. On Firestore that
+  // commit is refused with permission-denied (the rules read the root), which
+  // left the loser holding a sync error while the fake reran it into a plain
+  // conflict, and the oracle passed only when the two did not overlap.
+  let openPublications=()=>{};
+  if(!records){const together=new Promise(resolve=>{openPublications=resolve;});t.after(()=>openPublications());
+   for(const device of [phone,tablet])device.faults.publishPending=together;}
   const candidate=phone.tap('no');tablet.tap('cant');
   assert.equal(phone.ctx.state.considered?.[candidate],'no','positive control: the phone answers No');
   assert.equal(tablet.ctx.state.considered?.[candidate],'cant','positive control: the tablet answers Can’t on the same candidate');
@@ -17302,6 +17420,9 @@ test('RISK change records: a decision conflict between two devices resolves on a
    await until2417(()=>decisionsAbout2417(laptop.ctx.state,[candidate]).length===2,'with records: the laptop holds both answers before either full copy lands');
    await syncSettled(laptop.ctx,{within:30000});
   }else{
+   await until2417(()=>phone.faults.publicationStarted===true&&tablet.faults.publicationStarted===true,
+    'full copies: positive control: both devices publish over the same revision at once',60000);
+   openPublications();
    await settledTogether([phone,tablet],[],{within:120000});
    // Settled alone can leave an answer waiting to go up after a conflict;
    // the oracle reads the cloud once neither device has anything unsent.

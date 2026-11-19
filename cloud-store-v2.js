@@ -131,6 +131,7 @@
       catch(error){return {error:true,code:"invalid-payload",generationId};}
       const header={schemaVersion:SCHEMA_VERSION,state:"staging",encoding:encoded.encoding,
         chunkCount:encoded.chunkCount,byteLength:encoded.byteLength,hash:encoded.hash,baseRev,createdAt:Date.now()};
+      let publishing=false;
       try{
         const existing=await adapter.beginGeneration(uid,generationId,header);
         if(!current(stillCurrent)) return {cancelled:true,generationId};
@@ -158,6 +159,7 @@
         const sealed=["sealed","published"].includes(existing.state) ? existing : await adapter.sealGeneration(uid,generationId,header);
         if(!sealed||!["sealed","published"].includes(sealed.state)) return {error:true,code:"seal-failed",generationId};
         if(!current(stillCurrent)) return {cancelled:true,generationId};
+        publishing=true;
         const result=await adapter.publishGeneration(uid,generationId,{baseRev,updatedAt,hash:encoded.hash,expectedHeader:header,stillCurrent,decisionCapability:needsDecisionCapability(payload)?1:undefined,
           ...(Number.isSafeInteger(includedSeq)&&includedSeq>=0?{includedSeq}:{})});
         if(!current(stillCurrent)) return {cancelled:true,generationId};
@@ -165,8 +167,30 @@
         // published copy on a later pull without downloading it.
         return result?.ok?{...result,generationId,hash:encoded.hash}:{...result,generationId};
       }catch(error){
-        return {error:true,code:safeFailureCode(error),generationId};
+        const code=safeFailureCode(error);
+        // #2426: Firestore checks a publication against the rules as the
+        // root stands at its commit, and the rules read the root's revision.
+        // When another device published over the same revision between this
+        // publication's read and its commit, the commit is refused with
+        // permission-denied, which the SDK never retries, rather than meeting
+        // the revision guard inside the transaction. Only a fresh read showing
+        // the root past this push's revision makes it that conflict, so the
+        // caller pulls, merges and publishes again under the guard. Any other
+        // refusal, or a root this account cannot read, stays the refusal.
+        if(publishing&&code==="permission-denied"){
+          const moved=await rootPastRevision(uid,baseRev);
+          if(!current(stillCurrent)) return {cancelled:true,generationId};
+          if(moved) return {conflict:true,rev:moved.rev,generationId};
+        }
+        return {error:true,code,generationId};
       }
+    }
+
+    async function rootPastRevision(uid,baseRev){
+      try{
+        const latest=await adapter.readRoot(uid);
+        return latest?.schemaVersion===SCHEMA_VERSION&&Number.isSafeInteger(latest.rev)&&latest.rev>baseRev?latest:null;
+      }catch(error){return null;}
     }
 
     async function collectGarbage(uid,{pendingGenerationIds=[]}={}){
