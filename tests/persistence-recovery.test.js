@@ -16165,7 +16165,7 @@ function answerClock2408(ctx,counters){
   }};
  return clock;
 }
-async function answeringDevice2408(t,{board=answeringBoard2408(),docs=new Map(),indexedDB,dbName,storage,saveMs,signedIn=true,dropDatabase=false}={}){
+async function answeringDevice2408(t,{board=answeringBoard2408(),docs=new Map(),indexedDB,dbName,storage,saveMs,signedIn=true,dropDatabase=false,worker=null}={}){
  // #2405: every caller states how long a device save takes. A phone's saves
  // take 0.7 to 3 s; 0 is an instant save, for a test whose subject is not
  // save timing.
@@ -16179,6 +16179,8 @@ async function answeringDevice2408(t,{board=answeringBoard2408(),docs=new Map(),
  const crypto={getRandomValues:webcrypto.getRandomValues.bind(webcrypto),randomUUID:webcrypto.randomUUID.bind(webcrypto),subtle};
  const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage,cryptoProvider:crypto});
  const {ctx,shim}=app;
+ // A page's Worker, where a test gives one: no push has made one yet.
+ if(worker)ctx.Worker=worker;
  const faults={authPending:true};
  // #2426: devices that share docs share the server's clock, the host's.
  const backend=await loadCloudBackendV2({runtimeWindow:ctx.window,sharedDocs:docs,failures:faults,timeoutMs:5000,recordSyncError:ctx.recordSyncError,cryptoProvider:crypto,serverClock:Date.now});
@@ -18350,6 +18352,60 @@ test('RISK push work: a push’s acknowledgement survives a cold reopen: the boa
   }
   await reopened.close();
  }
+});
+
+// #2427 review: the push names its decision base in a Worker, but the
+// acknowledgement must never wait for that Worker. The cloud's ok is recorded
+// (revision, decision base, the device save) the moment it arrives, exactly
+// as before the Worker existed; a Worker that never answers only means the
+// identity is made on the main thread. While the ok was held behind the
+// Worker, a page closed or a cloud read started right after the ok found the
+// board one revision behind the copy it had just published.
+class SilentWorker2427{constructor(){this.onmessage=null;this.onerror=null;}postMessage(){}terminate(){}}
+async function acknowledgedSilently2427(t,label){
+ const board=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
+  tasks:Array.from({length:20},(_,i)=>({...syncTask('silent-2427-'+label+'-'+i,'Silent task '+i),ctx:['home'],createdAt:1000+i}))});
+ const device=await answeringDevice2408(t,{board,saveMs:0,worker:SilentWorker2427});
+ await startAnswering2408(device);
+ const {ctx,clock,counters}=device;
+ await clock.settle();
+ const revision=ctx.state.syncRev,uploads=counters.uploads.length;
+ const candidate=device.tap('no');
+ // Up to the upload, then one second on: far less than the Worker's wait.
+ for(let waited=0;counters.uploads.length===uploads;waited+=250){
+  assert.ok(waited<=PUSH_DEBOUNCE2408+5000,label+': positive control: the No is pushed');
+  await clock.advance(250);
+ }
+ await clock.advance(1000);
+ assert.equal((await device.cloud()).rev,revision+1,label+': positive control: the cloud accepted the push');
+ return {device,candidate,revision:revision+1};
+}
+test('RISK push work: a Worker that never answers delays neither the acknowledged revision nor its decision base, and a close or cloud read right after the ok keeps the acknowledgement',{timeout:180000},async t=>{
+ // The acknowledgement is recorded at once.
+ const first=await acknowledgedSilently2427(t,'close');
+ const {ctx}=first.device;
+ assert.equal(ctx.state.syncRev,first.revision,'the board records the acknowledged revision within a second of the ok');
+ assert.equal(ctx.state.decisionBase?.revision,first.revision,'with that revision’s decision base');
+ assert.equal(ctx.validDecisionBase(ctx.state.decisionBase,ctx.state.syncAccount,ctx.state.syncRev),true,'which verifies, made on the main thread');
+ // A close right after the ok keeps it: the reopened board is on that revision.
+ await first.device.close();
+ const reopened=await answeringDevice2408(t,{docs:first.device.docs,indexedDB:first.device.indexedDB,dbName:first.device.dbName,storage:first.device.storage,saveMs:0,signedIn:true,worker:SilentWorker2427});
+ assert.equal(reopened.ctx.state.considered?.[first.candidate],'no','the reopened board holds the answer');
+ assert.equal(reopened.ctx.state.syncRev,first.revision,'a close right after the ok keeps the acknowledged revision');
+ const pulls=reopened.report().events.filter(event=>event.stage==='cloud-pull');
+ assert.equal(pulls.at(-1)?.status,'unchanged','and the reopened device’s first cloud read finds the copy it has: '+JSON.stringify(pulls.map(event=>event.status)));
+ await reopened.close();
+ // A cloud read right after the ok finds the copy this device just published.
+ const second=await acknowledgedSilently2427(t,'pull');
+ const pulled=second.device.ctx;
+ const before=second.device.report().events.filter(event=>event.stage==='cloud-pull').length;
+ await pulled.cloudPull();
+ await second.device.clock.advance(1000);
+ const read=second.device.report().events.filter(event=>event.stage==='cloud-pull').slice(before);
+ assert.ok(read.length>=1,'positive control: the cloud read ran');
+ assert.equal(read.at(-1).status,'unchanged','a cloud read right after the ok finds the copy it has: '+JSON.stringify(read.map(event=>event.status)));
+ assert.equal(pulled.state.syncRev,second.revision,'and the board stays on the acknowledged revision');
+ assert.equal(pulled.state.syncDirty,false,'with nothing left to push');
 });
 
 // #2427: the push makes its device text and its cloud copy from one

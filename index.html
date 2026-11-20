@@ -7530,12 +7530,16 @@ async function sendPush(){
     // applied over it again, which changes nothing it already holds.
     // #2427: the decision base this push's acknowledgement binds is named off
     // the main thread while the upload runs (decisionBaseIdentityOffThread);
-    // a revision is one more than the one the write builds on.
+    // a revision is one more than the one the write builds on. Nothing waits
+    // for it: the cloud's ok is recorded the moment it arrives, as before the
+    // Worker existed, because a page closed or a cloud read started while the
+    // ok waited found the board a revision behind the copy it had just
+    // published. A Worker that has not answered by then only means the bind
+    // makes the identity on the main thread, as it always did.
     const publishedOver=recovery?.adoptOverRevision??base;
     if(Number.isSafeInteger(publishedOver))decisionBaseIdentityOffThread(pushAccount,publishedOver+1,payload);
     const pushAttempt=await supportDiagnosticsCloudPush(payload,pushedUpdatedAt||Date.now(),publishedOver,recovery?.context,
       pushBackend,null,diagnosticRequestGeneration,recovery?undefined:{includedSeq:pushedRecords}),res=pushAttempt.result,pushTicket=pushAttempt.ticket;
-    if(res?.ok===true&&Number.isSafeInteger(res.rev))await decisionBaseIdentityOffThread(pushAccount,res.rev,payload);
     const acknowledgedRecords=Number.isSafeInteger(res?.includedSeq)&&res.includedSeq>=0?res.includedSeq:0;
       activeDiagnosticPushTicket=pushTicket;adoptionPublished=adoptionPushed&&res?.ok===true;
       if(!pushStillCurrent()){supportDiagnosticsSettleCloudPush(pushTicket,"stale");holdChangedPush();return;}
