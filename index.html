@@ -11148,8 +11148,8 @@ const answerCatchUp=(()=>{
   function store(answer){storeCommit(answer.save,answer.immediate,null,answer.frame);}
   function draw(answer){
     if(queue.length>1)return;
-    listRanksDeferred=answer.deferRanks;
-    try{render();}finally{listRanksDeferred=false;}
+    listRanksDeferred=answer.deferRanks;listRowsReuse="answer"; // #2428
+    try{render();}finally{listRanksDeferred=false;listRowsReuse=null;}
   }
   // After the decision: capture what History reads now, mark the board
   // unsaved, pick the next candidate and draw, then queue the rest. These are
@@ -11163,8 +11163,10 @@ const answerCatchUp=(()=>{
     if(!work)work=trackSyncWork("answer-catch-up");
     settleCommit();
     if(doSave!==false)markBoardEdited();
-    listRanksDeferred=deferRanks;
-    try{render();}finally{listRanksDeferred=false;}
+    // #2428: All Tasks rebuilds only the rows this answer changed.
+    listRowBuilds.answered(answer.kind,answer.ids);
+    listRanksDeferred=deferRanks;listRowsReuse="answer";
+    try{render();}finally{listRanksDeferred=false;listRowsReuse=null;}
     schedule();
   }
   function runStep(){
@@ -15053,13 +15055,46 @@ const LIST_RANK_REFRESH_MS=1000;
 let listRanksDeferred=false,listRankRefreshTimer=null;
 function refreshListRanks(){
   listRankRefreshTimer=null;
-  if(state?.listOpen&&!openingRecoveryHeld)renderList();
+  if(!state?.listOpen||openingRecoveryHeld)return;
+  listRowsReuse="ranks";
+  try{renderList();}finally{listRowsReuse=null;}
 }
-function drawListRows(body,wanted,selecting,deferRanks,emptyHTML){
-  if(!deferRanks&&listRankRefreshTimer!==null){clearTimeout(listRankRefreshTimer);listRankRefreshTimer=null;}
+/* #2428: building a row's markup (its eligibility, blockers, chips and skip
+   label) for every task on every answer and on every rank refresh grew with
+   the board. Each row's built markup is kept with what it was built from. A
+   scanner Yes or No changes the rows of its candidate and the benchmark only
+   (listRowBuilds.answered), so its drawings rebuild those rows and keep the
+   rest, and a rank refresh keeps each kept row's markup and puts only its new
+   rank in. Any other drawing builds every row again, as before, and so does
+   the first drawing in each minute of the clock, for the chips and labels
+   that count minutes down. */
+let listRowsReuse=null; // "answer" while a scanner answer draws, "ranks" while a rank refresh does
+const listRowBuilds=(()=>{
+  let built=null;const changed=new Set();
+  return Object.freeze({
+    answered(kind,ids){
+      if(!built)return;
+      if(kind==="yes"||kind==="no")for(const id of ids)changed.add(id);else built=null;
+    },
+    reusable(key,board){return built&&built.key===key&&built.board===board?{rows:built.rows,changed}:null;},
+    forget(){built=null;changed.clear();},
+    keep(key,board,wanted,prior){
+      const rows=new Map();
+      for(const row of wanted){
+        if(row.html&&row.fields)rows.set(row.id,{rest:row.rest,fields:row.fields,html:row.html,spark:row.spark,summary:row.summary});
+        else{const kept=prior?.rows.get(row.id);if(kept&&kept.rest===row.rest)rows.set(row.id,kept);}
+      }
+      built={key,board,rows};changed.clear();
+    }
+  });
+})();
+function drawListRows(body,wanted,selecting,deferRanks,emptyHTML,keptRanks=false){
+  if(!deferRanks&&!keptRanks&&listRankRefreshTimer!==null){clearTimeout(listRankRefreshTimer);listRankRefreshTimer=null;}
   if(!wanted.length||!listRowsStillDrawn(body,selecting)){
     body.innerHTML=wanted.map(row=>row.html).join("")||emptyHTML;
     rememberListRows(body,wanted,selecting);
+    // #2428: rows an answer kept still show their earlier rank.
+    if(keptRanks&&listRankRefreshTimer===null)listRankRefreshTimer=setTimeout(refreshListRanks,LIST_RANK_REFRESH_MS);
     return;
   }
   const rows=listRowsDrawn.rows,ids=new Set(wanted.map(row=>row.id)),parser=document.createElement("template");
@@ -15105,7 +15140,7 @@ function renderList(){
   const savedScroll = body.scrollTop;   // redrawing can replace or reorder rows — without this, an
   body.hidden = !state.listOpen;        // unrelated action (dotting, toggling a context) can snap it to the top
   toolbar.hidden = !state.listOpen;
-  if(!state.listOpen){ body.innerHTML=""; toolbar.innerHTML=""; listRowsDrawn=null; return; }
+  if(!state.listOpen){ body.innerHTML=""; toolbar.innerHTML=""; listRowsDrawn=null; listRowBuilds.forget(); return; }
 
   const listMetric=state.settings.listMetric;
   const selectionStats=listMetric==="chance"?chanceDisplayStats():null;
@@ -15144,14 +15179,24 @@ function renderList(){
   const showRank = showSparklines||showTopK;
   // An answer changes a few rows; rank noise changes all of them (#2313).
   const deferRanks = listRanksDeferred&&listRowsStillDrawn(body,selecting);
+  // #2428: what every row's markup reads that an answer could change, and
+  // the minute of the clock (listRowBuilds). A new pass clears every row's
+  // skip label.
+  const rowKey=[rankColumns,listMetric,[...act].join("\n"),nextDotted?.id??"",normalizeDateFormat(state.settings.dateFormat),String(state.passId??""),Math.floor(Date.now()/60000)].join("\u0001");
+  const built=listRowsReuse&&!selecting?listRowBuilds.reusable(rowKey,state):null;
+  let keptRanks=false;
   const wanted = [];
   for(const t of rows){
-    const facts=boardPresentation.rowFacts(state,t,{inChain,act,byId,nextDotted});
+    const kept=built&&!built.changed.has(t.id)?built.rows.get(t.id):undefined;
+    if(kept&&listRowsReuse==="answer"){
+      wanted.push({id:t.id,rest:kept.rest,fields:kept.fields,html:kept.html,spark:kept.spark,summary:kept.summary,unchanged:true});keptRanks=true;continue;
+    }
     const selected=selectedIds.has(t.id),rankTag=selecting?'span':'div';
     const selectionAttrs=' data-act="bulk-toggle" data-id="'+esc(t.id)+'" aria-pressed="'+selected+'" aria-label="'+(selected?'Deselect ':'Select ')+esc(t.title)+'"';
-    const fields={task:t,rankColumns,...facts,
+    // A rank refresh puts the new rank into a kept row's markup.
+    const fields=kept?kept.fields:{task:t,rankColumns,...boardPresentation.rowFacts(state,t,{inChain,act,byId,nextDotted}),
       titleAttrs:selecting&&!showRank?selectionAttrs:' data-act="edit" data-id="'+esc(t.id)+'"',url:safeUrl(t.url),chips:chipHTML(t)};
-    const rest=boardPresentation.taskRow(fields);
+    const rest=kept?kept.rest:boardPresentation.taskRow(fields);
     if(deferRanks&&listRowsDrawn.rows.get(t.id)?.rest===rest){wanted.push({id:t.id,rest,unchanged:true});continue;}
     const summary=showTopK?taskSelectionSummary(t,selectionStats,listMetric):null;
     const spark=showSparklines ? sparkParts(t.id, 88, 22) : null;
@@ -15162,12 +15207,13 @@ function renderList(){
         ? '<button type="button" class="rank-summary bulk-rank-toggle"'+selectionAttrs+'><span class="bulk-rank-original" aria-hidden="'+selected+'">'+rankContent+'</span>'+(selected?'<span class="tk bulk-rank-selected"><span class="tkl">Selected</span></span>':'')+'</button>'
         : '<div class="rank-summary">'+rankContent+'</div>'
       : '';
-    wanted.push({id:t.id,html:boardPresentation.taskRow({...fields,rankSummary}),rest,spark,summary});
+    wanted.push({id:t.id,html:boardPresentation.taskRow({...fields,rankSummary}),rest,spark,summary,fields});
   }
+  if(selecting)listRowBuilds.forget();else listRowBuilds.keep(rowKey,state,wanted,built);
   // "nothing here" and "nothing matching" are different problems with different fixes
   drawListRows(body,wanted,selecting,deferRanks,open.length
     ? '<div class="emptystate">No tasks match.<div style="margin-top:12px"><button class="btn subtle" data-act="clear-list-filters">Clear filters</button></div></div>'
-    : '<div class="emptystate">No open tasks.</div>');
+    : '<div class="emptystate">No open tasks.</div>',keptRanks);
   // Separate from the task scroller so actions remain at the pane bottom at any row.
   window.SavedAppearance?.schedule(state.syncAccount||null);
   toolbar.innerHTML = '<div class="ltags"><button type="button" class="ltag" data-act="bulk-select" aria-pressed="'+selecting+'">Select</button><button type="button" class="ltag" data-act="bulk-select-all"'+(shown.length?'':' disabled')+'>Select all</button><button type="button" class="ltag" data-act="bulk-edit"'+(selectedIds.size?'':' disabled')+'>Edit</button>'+(selecting?'<span class="kv" role="status">'+selectedIds.size+' selected</span><button type="button" class="ltag" data-act="bulk-cancel">Cancel selection</button>':'')+'</div><p class="kv">Select all includes only the current filtered list. Changing filters removes hidden selections.</p>'+bulkResultHTML(view.bulkResult);

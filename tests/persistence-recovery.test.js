@@ -17973,6 +17973,11 @@ async function oneCountedNo2428(t,label,board,{before=[]}={}){
  const {ctx,clock,counters}=device;
  for(const act of before){device.tap(act);await clock.advance(1500);}
  await clock.advance(3000);
+ // All Tasks builds every row again in each new minute of the clock, for
+ // chips that count minutes down. A No at the start of a minute does that;
+ // the No after it, in the same minute, is counted.
+ await clock.advance(60000-vm.runInContext('Date.now()',ctx)%60000+100);
+ device.tap('no');await clock.advance(1500);
  const seeded=Buffer.byteLength(JSON.stringify(board),'utf8');
  const work=answerWork2428(device,Math.min(seeded,Buffer.byteLength(ctx.cloudPayload(),'utf8')));
  const commits=counters.commits.length,uploads=counters.uploads.length,records=recordsWritten2417(device);
@@ -17984,6 +17989,10 @@ async function oneCountedNo2428(t,label,board,{before=[]}={}){
  assert.equal(counters.commits.length-commits,1,label+': positive control: the answer is saved on the device once');
  assert.equal(recordsWritten2417(device)-records,1,label+': positive control: and sent as its change record');
  assert.equal(counters.uploads.length,uploads,label+': positive control: its push has not started');
+ // All Tasks shows the answer on the candidate's row, and every other row still.
+ const rows=device.shim.document.getElementById('listBody').innerHTML.split('<div class="trow ').slice(1);
+ assert.equal(rows.length,ctx.state.tasks.filter(task=>!task.done).length,label+': All Tasks shows every open task');
+ assert.match(rows.find(row=>row.includes('data-row="'+candidate+'"'))||'',/class="skipped"/,label+': and the candidate’s row shows the No');
  return {counted,sites:work.sites(),device};
 }
 test('RISK answer work: one No with sync on costs the same whole-board work on a 20-task board as on the large board',{timeout:300000},async t=>{
@@ -18049,4 +18058,41 @@ test('RISK answer work: the device save still keeps a task or rating History row
   assert.ok(task(touched.id).ratingHistory.some(row=>row.id===touchedRow),label+' keeps the answered task’s History row');
   assert.equal(board.considered?.[candidate],'no',label+' holds the answer');
  }
+});
+
+// #2428: ten No answers faster than a phone's device save, with sync on. Each
+// lands in tap order on the device and in the cloud, All Tasks shows each on
+// its row though it rebuilds only the rows an answer changed, Undo reverses
+// only the last, and a cold reopen shows the other nine.
+test('RISK answer work: ten quick answers land in order on the device and in the cloud, All Tasks shows each, Undo reverses only the last and a cold reopen shows the rest',{timeout:180000},async t=>{
+ const board=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
+  tasks:Array.from({length:20},(_,i)=>({...syncTask('quick-2428-'+i,'Quick task '+i),ctx:['home'],createdAt:1000+i}))});
+ const device=await answeringDevice2408(t,{board,saveMs:1500});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,asked=[];
+ for(let i=0;i<10;i++){asked.push(device.tap('no'));await clock.advance(300);}
+ await clock.settle();
+ assert.equal(new Set(asked).size,10,'positive control: each answer reaches its own candidate');
+ const noOrder=board=>(board.decisionEvents||[]).filter(event=>event.kind==='no'&&asked.includes(event.candidateId)).map(event=>event.candidateId);
+ const head=JSON.parse((await ctx.window.ScannerDeviceStore.readHead()).payload);
+ assert.deepEqual(noOrder(head),asked,'the device holds the ten answers in tap order');
+ assert.deepEqual(noOrder((await device.cloud()).board),asked,'and so does the cloud');
+ const listRows=app=>app.shim.document.getElementById('listBody').innerHTML.split('<div class="trow ').slice(1);
+ const shownNo=app=>asked.filter(id=>/class="skipped"/.test(listRows(app).find(row=>row.includes('data-row="'+id+'"'))||''));
+ assert.deepEqual(shownNo(device),asked,'All Tasks shows each answer on its row');
+ assert.equal(await ctx.onAction('undo',{}),true,'positive control: Undo runs');
+ const kept=asked.slice(0,-1),last=asked.at(-1);
+ assert.equal(ctx.state.considered?.[last],undefined,'Undo reverses the last answer');
+ assert.deepEqual(kept.filter(id=>ctx.state.considered?.[id]==='no'),kept,'and only the last');
+ await clock.settle();
+ assert.deepEqual(shownNo(device),kept,'All Tasks shows the Undo');
+ const cloud=(await device.cloud()).board;
+ assert.deepEqual(kept.filter(id=>cloud.considered?.[id]==='no'),kept,'the cloud holds the nine answers');
+ assert.equal(cloud.considered?.[last],undefined,'and the Undo');
+ await device.close();
+ const reopened=await answeringDevice2408(t,{docs:device.docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,signedIn:false});
+ await syncSettled(reopened.ctx,{within:20000});
+ assert.deepEqual(kept.filter(id=>reopened.ctx.state.considered?.[id]==='no'),kept,'a cold reopen shows the nine answers');
+ assert.equal(reopened.ctx.state.considered?.[last],undefined,'without the undone one');
+ assert.deepEqual(shownNo(reopened),kept,'on their rows in All Tasks');
 });
