@@ -76,11 +76,20 @@
   function readSunMemory(key){
     try{const record=JSON.parse(storage?.getItem(SUN_MEMORY_KEY)||'null');return record?.v===1&&record.key===key?record.sun:null;}catch{return null;}
   }
+  // For a few minutes after a release, this script can run with the previous
+  // release's cached landscape-timeline.js, whose timelines cannot report or
+  // hand over their sun. Then nothing is kept, as before, and nothing throws
+  // from the opening paint, the sky timer, pagehide or visibilitychange.
+  const keepsSun=()=>typeof timeline?.sunComputations==='function'&&typeof timeline.sunMemory==='function';
   function keepSun(){
-    if(!timeline||timeline.sunComputations()===keptSunComputations)return;
+    if(!keepsSun()||timeline.sunComputations()===keptSunComputations)return;
     keptSunComputations=timeline.sunComputations();
     try{const sun=timeline.sunMemory(Date.now());if(sun)storage?.setItem(SUN_MEMORY_KEY,JSON.stringify({v:1,key:timelineKey,sun}));}
     catch{try{storage?.removeItem(SUN_MEMORY_KEY);}catch{}}
+  }
+  // A new UTC day's plan worked out while open is kept for the next opening.
+  function keepNewDaySun(){
+    if(keepsSun()&&timeline.sunComputations()-keptSunComputations>=60)keepSun();
   }
   let rooftopRoofs=[],rooftopParty=null,clocktowerVisit=null,partyTimer=0;
   let sceneSeason=S.readSceneSeason(sceneStorage)||LandscapeMood.season(new Date(),globalThis.LivingLocation?.current()).name,treeOrigins=[];
@@ -1627,8 +1636,7 @@
         });
       }
       scheduleSky();
-      // A new UTC day's plan worked out while open is kept for the next opening.
-      if(timeline&&timeline.sunComputations()-keptSunComputations>=60)keepSun();
+      keepNewDaySun();
     },Math.max(1,Math.min(...delays)));
   }
   function start(){

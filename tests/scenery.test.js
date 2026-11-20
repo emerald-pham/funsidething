@@ -2117,3 +2117,40 @@ test('RISK opening scenery plan: a kept day sun restores the released scenes wit
  }}));
  assert.notDeepEqual(scenes(unchecked.LandscapeTimeline.create(options(unchecked,tokyo,{sunMemory:kept}))),tokyoExpected,'negative control: without the live check, the wrong place\'s kept sun changes the scenes');
 });
+
+// #2430 review: landscape.js and landscape-timeline.js load as separate
+// scripts, so for a few minutes after a release a page can run the new
+// landscape.js with the previous release's cached landscape-timeline.js
+// (split-script cache pairing). Its timelines have no sunComputations or
+// sunMemory. The day sun's keeping must then do nothing, as before #2430,
+// rather than throw from the opening paint, the sky timer, pagehide or
+// visibilitychange. Each of those runs keepSun or keepNewDaySun, taken here
+// from landscape.js as it is, over a timeline from the base release's file
+// and, as the positive control, over one from the current file.
+test('RISK opening scenery plan mixed pair: the new landscape.js keeps no day sun and throws nothing over the previous release’s cached timeline script',()=>{
+ const base=spawnSync('git',['show','f588e1401380be46e7658cb24ed0025c322cac4f:landscape-timeline.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(base.status,0,base.stderr);
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const from=source.indexOf("  const SUN_MEMORY_KEY="),to=source.indexOf("  let rooftopRoofs=");
+ assert.ok(from>0&&to>from,'the day sun\'s keeping is found in landscape.js');
+ const keeping=source.slice(from,to);
+ assert.match(keeping,/function keepNewDaySun\(\)/,'the sky timer\'s keeping step is found in landscape.js');
+ const orlando={latitude:28.5383,longitude:-81.3792,timezone:'America/New_York',elevation:20},noon=Date.parse('2026-11-19T17:00:00Z');
+ const run=scenes=>{
+  const saved=new Map(),storage={getItem:key=>saved.get(key)??null,setItem:(key,value)=>saved.set(key,String(value)),removeItem:key=>saved.delete(key)};
+  const timeline=scenes.LandscapeTimeline.create({seed:scenes.LandscapeTimeline.DEFAULT_SEED,season:'autumn',location:orlando,
+   sunAt:at=>scenes.LivingSky.sunAt(new Date(at),orlando)});
+  timeline.at(noon);
+  const page=vm.createContext({storage,Date:{now:()=>noon},JSON,Number,Math});
+  vm.runInContext(keeping+'\nglobalThis.steps={keepSun,keepNewDaySun,readSunMemory,set(t,key){timeline=t;timelineKey=key;}};',page);
+  page.steps.set(timeline,'mixed-pair-key');
+  const thrown=[];
+  for(const step of ['keepNewDaySun','keepSun'])try{page.steps[step]();}catch(error){thrown.push(step+': '+error.message);}
+  return {thrown,kept:page.steps.readSunMemory('mixed-pair-key')};
+ };
+ const current=run(sceneTimeline());
+ assert.deepEqual(current.thrown,[],'positive control: the current pair keeps the day sun without throwing');
+ assert.ok(current.kept&&typeof current.kept.codes==='string','positive control: the current pair keeps the day sun');
+ const mixed=run(sceneTimeline({'landscape-timeline.js':()=>base.stdout}));
+ assert.deepEqual(mixed.thrown,[],'over the cached timeline script, keeping the day sun throws nothing');
+ assert.equal(mixed.kept,null,'and keeps nothing, as before the day sun was kept');
+});
