@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { execFile } from "node:child_process";
 import { createServer } from "node:http";
+import { Blob as NodeBlob, resolveObjectURL } from "node:buffer";
 import { servedShellReader } from "../scripts/shell-fingerprints.mjs";
 import { applyPreparedPorts } from "../scripts/agent-tools/worktree-ports.mjs";
 
@@ -1216,6 +1217,30 @@ function makeDomShim({ prefersDark = false, sharedStorage = null } = {}) {
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
+// #2427: a browser worker for the app, made from a blob URL as the app makes
+// one. Its script runs in a context of its own that shares nothing with the
+// app's; messages are structured clones delivered on later turns, as a
+// worker's are. (In Node it runs on the same thread; in a browser it does not.)
+class HarnessWorker{
+ constructor(url){
+  this.onmessage=null;this.onerror=null;this.closed=false;
+  const blob=resolveObjectURL(String(url));
+  if(!blob)throw new TypeError('HarnessWorker: unknown script URL');
+  this.ready=blob.text().then(source=>{
+   const scope=vm.createContext({postMessage:data=>{const copy=structuredClone(data);setImmediate(()=>{if(!this.closed)this.onmessage?.({data:copy});});}});
+   vm.runInContext(source,scope,{filename:'worker'});
+   return scope;
+  });
+ }
+ postMessage(data){
+  const copy=structuredClone(data);
+  this.ready.then(scope=>setImmediate(()=>{
+   if(this.closed)return;
+   try{scope.onmessage?.({data:copy});}catch(error){this.onerror?.({message:String(error?.message||error)});}
+  }),error=>{if(!this.closed)this.onerror?.({message:String(error?.message||error)});});
+ }
+ terminate(){this.closed=true;}
+}
 async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, sharedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady, navigatorProvider, cryptoProvider = webcrypto, indexedDBProvider, deviceDbName, deviceOpenTimeoutMs, withSceneModules = false, sceneModulesAfterDomReady = false, locationHref, fetchProvider, budgetClock } = {}) {
   const shim = makeDomShim({ prefersDark, sharedStorage });
   const ownedTimers=new Set();let disposed=false,sandbox;
@@ -1272,6 +1297,8 @@ async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactor
     TextDecoder,
     Uint8Array,
     structuredClone,
+    Blob:NodeBlob,
+    Worker:HarnessWorker,
     AbortController,
     performance,
     // NOTE: deliberately NOT injecting the outer process's `Date` here — it's

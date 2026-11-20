@@ -18270,14 +18270,22 @@ async function oneCountedPush2427(t,label,board,{before=[]}={}){
  await clock.advance(1500);
  const uploads=counters.uploads.length,revision=ctx.state.syncRev;
  work.reset();
+ // The work up to the upload: the push's own checks, texts and device save.
+ let atUpload=null;const push=device.backend.CS.push;
+ device.backend.CS.push=(...args)=>{atUpload??=work.now();return push(...args);};
+ // Diagnostic only, never asserted: the process's CPU time over the window,
+ // the harness's fake storage and cloud included.
+ const cpu=process.cpuUsage();
  await clock.settle();
- const counted=work.now();
+ const counted=work.now(),spent=process.cpuUsage(cpu);
+ t.diagnostic(label+': push window CPU ms '+Math.round((spent.user+spent.system)/1000));
  assert.equal(counters.uploads.length-uploads,1,label+': positive control: one push uploads');
  assert.equal(ctx.state.syncRev,revision+1,label+': positive control: the push is acknowledged');
  assert.equal(ctx.state.syncDirty,false,label+': positive control: and nothing is left to push');
- return {counted,sites:work.sites(),device};
+ device.backend.CS.push=push;
+ return {counted,atUpload,sites:work.sites(),device};
 }
-test('RISK push work: with sync on, one push serializes the board once, validates it at most once, hashes no whole board in JavaScript and records its acknowledgement without a whole-board device save, the same on a 20-task board as on the large board',{timeout:300000},async t=>{
+test('RISK push work: with sync on, one push validates the board at most once, hashes no whole board in JavaScript and serializes it once up to its upload, the same on a 20-task board as on the large board',{timeout:300000},async t=>{
  // The 20-task board as #2428 builds it: the large board's settings and
  // context, tasks padded with a future field so its whole-board texts stand
  // out from its decision log, and a Yes first so the No moves a benchmark.
@@ -18287,13 +18295,88 @@ test('RISK push work: with sync on, one push serializes the board once, validate
  await small.device.close();
  const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
  const large=await oneCountedPush2427(t,'large board',JSON.parse(fixture.payload));
- t.diagnostic(JSON.stringify({small:small.counted,large:large.counted}));
+ t.diagnostic(JSON.stringify({small:small.counted,large:large.counted,smallAtUpload:small.atUpload,largeAtUpload:large.atUpload}));
  t.diagnostic(JSON.stringify({smallSites:small.sites,largeSites:large.sites}));
- for(const [label,{counted}] of [['20 tasks',small],['large board',large]]){
-  assert.equal(counted.serializations,1,label+': the push serializes the board once: '+JSON.stringify(counted));
-  assert.ok(counted.validations<=1,label+': and validates its decision evidence at most once: '+JSON.stringify(counted));
+ for(const [label,{counted,atUpload}] of [['20 tasks',small],['large board',large]]){
+  assert.ok(atUpload,label+': positive control: the upload was seen');
+  assert.equal(atUpload.serializations,1,label+': up to its upload, the push serializes the board once: '+JSON.stringify(atUpload));
+  assert.equal(atUpload.deviceSaves,0,label+': and proves the answer’s device save holds it without saving again: '+JSON.stringify(atUpload));
+  assert.ok(counted.validations<=1,label+': the push validates the board’s decision evidence at most once: '+JSON.stringify(counted));
   assert.equal(counted.hashes,0,label+': no whole board is hashed in JavaScript: '+JSON.stringify(counted));
-  assert.equal(counted.deviceSaves,0,label+': the acknowledgement is recorded without a whole-board device save: '+JSON.stringify(counted));
+  // The acknowledgement is still recorded by one whole-board device save:
+  // the saved head holds the acknowledged board, as recovery reads it.
+  assert.ok(counted.deviceSaves<=1,label+': the acknowledgement costs at most its one device save: '+JSON.stringify(counted));
  }
+ assert.deepEqual(large.atUpload,small.atUpload,'up to its upload, one push costs the same whole-board work on the large board as on a 20-task board');
  assert.deepEqual(large.counted,small.counted,'one push costs the same whole-board work on the large board as on a 20-task board');
+});
+
+// #2427: the acknowledgement a push records stays as durable as the
+// whole-board save that recorded it before: a cold reopen, with sync on or
+// off, opens the board on the acknowledged revision with that revision's
+// decision base, and the reopened device's first cloud read finds the copy it
+// already has.
+test('RISK push work: a push’s acknowledgement survives a cold reopen: the board opens on the acknowledged revision and decision base, and its first cloud read finds nothing new',{timeout:180000},async t=>{
+ const board=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
+  tasks:Array.from({length:20},(_,i)=>({...syncTask('durable-2427-'+i,'Durable task '+i),ctx:['home'],createdAt:1000+i}))});
+ const device=await answeringDevice2408(t,{board,saveMs:0});
+ await startAnswering2408(device);
+ const {ctx,clock,counters}=device;
+ await clock.settle();
+ const candidate=device.tap('no');
+ await clock.advance(1500);
+ const uploads=counters.uploads.length,revision=ctx.state.syncRev;
+ await clock.settle();
+ assert.equal(counters.uploads.length-uploads,1,'positive control: the No is pushed');
+ assert.equal(ctx.state.syncRev,revision+1,'positive control: and acknowledged');
+ const acknowledged={rev:ctx.state.syncRev,base:ctx.state.decisionBase.id,payload:ctx.state.decisionBase.payload,copy:ctx.state.decisionBase.copy};
+ assert.equal((await device.cloud()).rev,acknowledged.rev,'positive control: the cloud holds the acknowledged revision');
+ await device.close();
+ for(const signedIn of [false,true]){
+  const label=signedIn?'sync on':'sync off';
+  const reopened=await answeringDevice2408(t,{docs:device.docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,signedIn});
+  const state=reopened.ctx.state;
+  assert.equal(state.considered?.[candidate],'no',label+': the reopened board holds the answer');
+  assert.equal(state.syncRev,acknowledged.rev,label+': and opens on the acknowledged revision');
+  assert.equal(state.syncAccount,ACCOUNT2408.email,label+': for its account');
+  assert.equal(state.decisionBase?.id,acknowledged.base,label+': with that revision’s decision base');
+  assert.equal(state.decisionBase?.payload,acknowledged.payload,label+': holding the acknowledged copy');
+  assert.equal(JSON.stringify(state.decisionBase?.copy),JSON.stringify(acknowledged.copy),label+': and naming the copy the cloud published');
+  assert.equal(reopened.ctx.validDecisionBase(state.decisionBase,state.syncAccount,state.syncRev),true,label+': which still verifies');
+  if(signedIn){
+   const pulls=reopened.report().events.filter(event=>event.stage==='cloud-pull');
+   assert.equal(pulls.at(-1)?.status,'unchanged',label+': the first cloud read finds the copy it has: '+JSON.stringify(pulls.map(event=>event.status)));
+   assert.equal(state.syncDirty,false,label+': and nothing left to push');
+  }
+  await reopened.close();
+ }
+});
+
+// #2427: the push makes its device text and its cloud copy from one
+// serialization of the board; each is byte for byte the text the app's own
+// serializers make (JSON.stringify of the board, cloudPayloadFor), including
+// where the cloud copy projects a value differently: a duplicated deletion log
+// entry, a task whose released prerequisite link is staged, device-only keys,
+// a decision base whose text is kept, and keys whose values JSON leaves out.
+test('RISK push work: the push’s texts are byte for byte the board’s device text and cloud copy',async()=>{
+ const {ctx}=await loadApp();
+ const exact=deletionEvidence('push-op','gone-task','task',recentDeletionAt,{future:'kept'});
+ const board=syncState({
+  tasks:[{...syncTask('owner-2427','Owner   "quoted"'),prerequisiteIds:['root-2427']},syncTask('root-2427','Root'),{...syncTask('plain-2427','Plain'),note:undefined}],
+  deletionLog:[exact,JSON.parse(JSON.stringify(exact))],syncRev:3,syncDirty:false,syncAccount:'e@example.com',updatedAt:1000,
+ });
+ ctx.hydrateState(board);
+ board.deletionLog=[exact,JSON.parse(JSON.stringify(exact))];
+ board.tasks[0].prerequisiteId=null;board.tasks[0].prerequisiteMirror=null;
+ board.decisionBase={v:1,id:'db1:'+'0'.repeat(32),account:'e@example.com',revision:3,payload:JSON.stringify({tasks:[]})};
+ board.skipped=undefined;board.drop=()=>1;
+ const texts=ctx.boardPushTexts(board);
+ assert.equal(texts.text,JSON.stringify(board),'the device text');
+ const cloud=ctx.cloudPayloadFor(board);
+ assert.notEqual(JSON.parse(cloud).deletionLog.length,board.deletionLog.length,'positive control: the cloud copy unions the deletion log');
+ assert.equal(JSON.parse(cloud).tasks[0].prerequisiteId,'root-2427','positive control: and stages the released prerequisite link');
+ assert.equal(texts.cloud,cloud,'the cloud copy');
+ // The kept decision base text is the base's own: a new base gets its own.
+ board.decisionBase={...board.decisionBase,revision:4};
+ assert.equal(ctx.boardPushTexts(board).text,JSON.stringify(board),'a replaced decision base');
 });

@@ -1252,6 +1252,8 @@ let openingPreviewCheckedTexts = [];
 let openingCheckedDeviceBoard = null;
 // #2429: the signature text of copies legacyBoardCopies returned as last seen.
 const legacyBoardSignatures = new WeakMap();
+// #2427: the copies last signed, by their exact texts, with their signature.
+let legacySignatureMemo = null;
 let lastDeviceSaveIssue = null;
 function deviceStorageActive(){ return deviceStorageAuthority; }
 // #2323: how many of a failed save's conflict repairs met this tab's own
@@ -3548,7 +3550,13 @@ function legacyBoardCopies(readAttempt=null){
     // exactly the ones last seen therefore still pass, without parsing and
     // checking the whole board again on every save and cloud read.
     if(!readAttempt&&present.length&&typeof deviceLegacySeenSignature==="string"){
-      const signature=JSON.stringify(present);
+      // #2427: copies whose texts are exactly the ones last signed have that
+      // signature. Comparing the texts reads them once, where signing them
+      // again serialized two copies of the board on every save and push.
+      const memo=legacySignatureMemo,same=!!memo&&memo.copies.length===present.length&&
+        memo.copies.every((copy,index)=>copy.key===present[index].key&&copy.raw===present[index].raw);
+      const signature=same?memo.signature:JSON.stringify(present);
+      if(!same)legacySignatureMemo={copies:present.map(({key,raw})=>({key,raw})),signature};
       if(signature===deviceLegacySeenSignature){legacyBoardSignatures.set(present,signature);return present;}
     }
     // Both keys usually hold one text: check it once.
@@ -4724,6 +4732,52 @@ function boardSaveText(){
   if(at<0||text.indexOf(marker,at+1)>=0)return {text:JSON.stringify(state),rows:null,ids:null};
   return {text:text.slice(0,at)+"["+rows.join(",")+"]"+text.slice(at+marker.length),rows,ids};
 }
+/* #2427: a push serializes its board once, into the two texts it needs: the
+   device save's text, byte for byte JSON.stringify(board) with the task rows
+   boardSaveText keeps, which the push's own device save compares with the
+   saved board or writes, and the cloud copy, byte for byte
+   cloudPayloadFor(board). Each top-level value is serialized once and both
+   texts are joined from those pieces. The cloud copy leaves out the
+   device-only keys; a value it projects differently (the deletion log's exact
+   union, a task whose released prerequisite link is staged) is serialized for
+   it alone. The decision base's text, which holds a whole cloud copy, is kept
+   with the base object it was made from: a base is replaced, never changed
+   in place (bindDecisionBase). Before, a push serialized the board for its
+   cloud copy, again for its device save and again to tell whether an edit
+   came while it ran. */
+const decisionBaseTexts=new WeakMap();
+function boardPushTexts(board){
+  if(!board||typeof board!=="object"||Array.isArray(board)||!Array.isArray(board.tasks)||typeof board.toJSON==="function")return null;
+  const tasks=board.tasks,rows=new Array(tasks.length),ids=new Array(tasks.length);
+  for(let i=0;i<tasks.length;i++){rows[i]=JSON.stringify(tasks[i])??"null";ids[i]=tasks[i]?.id;}
+  const keys=Object.keys(board),pieces=new Map(),device=[],cloud=[];
+  for(const key of keys){
+    const value=board[key];let piece;
+    if(key==="tasks")piece="["+rows.join(",")+"]";
+    else if(key==="decisionBase"&&value&&typeof value==="object"){
+      piece=decisionBaseTexts.get(value);
+      if(piece===undefined){piece=JSON.stringify(value);if(typeof piece==="string")decisionBaseTexts.set(value,piece);}
+    }else piece=JSON.stringify(value);
+    pieces.set(key,piece);
+    if(piece!==undefined)device.push(JSON.stringify(key)+":"+piece);
+  }
+  // As cloudPayloadFor builds its copy, without serializing it.
+  const out={};
+  for(const key of keys)if(!DEVICE_LOCAL_KEYS.includes(key))out[key]=key==="deletionLog"?exactDeletionLogUnion(board[key]):board[key];
+  projectLegacyPrerequisites(out,true);
+  for(const key of Object.keys(out)){
+    const value=out[key];let piece;
+    if(key==="tasks"&&Array.isArray(value)&&value.length===tasks.length)
+      piece="["+value.map((task,i)=>task===tasks[i]?rows[i]:JSON.stringify(task)??"null").join(",")+"]";
+    else piece=pieces.has(key)&&value===board[key]?pieces.get(key):JSON.stringify(value);
+    if(piece!==undefined)cloud.push(JSON.stringify(key)+":"+piece);
+  }
+  return {text:"{"+device.join(",")+"}",rows,ids,cloud:"{"+cloud.join(",")+"}"};
+}
+// #2427: the push's texts, offered to the device save it starts at once
+// (persist); set only around that request, so a save that starts later makes
+// its own text from the board as it is then.
+let preparedPushText=null;
 // The ids of tasks whose rows the last committed board and these pieces hold
 // exactly alike, or null when that cannot be told (the last saved board is not
 // one this tab committed, or a task id appears twice).
@@ -6321,6 +6375,8 @@ async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry
   // #2408 review: a lane save serializes the board once. When the save-loop
   // check needs the board's text, it takes it here and the save reuses it.
   if(lane){lane.text=null;lane.pieces=null;lane.saved=null;}
+  // #2427: a push's own save takes the text the push made of this board.
+  if(lane&&preparedPushText?.board===state&&preparedPushText.generation===saveRequestGeneration){lane.pieces=preparedPushText.pieces;lane.text=lane.pieces.text;}
   // A device retry belongs to the run that started it.
   let cloudStep=null;
   if(!(Number.isSafeInteger(deviceRetry)&&deviceRetry>0)){
@@ -6458,7 +6514,8 @@ const deviceSaveLane=(()=>{
   }
   // requests(): lane requests made so far; waiting(): whether a lane save is
   // waiting to start; slowestMs(): the longest a lane save of this tab took.
-  return Object.freeze({request,requests:()=>requested,waiting:()=>waiting.length>0,slowestMs:()=>slowestMs});
+  // busy(): whether a lane save is running or waiting to start (#2427).
+  return Object.freeze({request,requests:()=>requested,waiting:()=>waiting.length>0,busy:()=>running.size>0||waiting.length>0,slowestMs:()=>slowestMs});
 })();
 function supportDiagnosticsSettleCloudPush(ticket,status,revision=null,code="unknown",pushDetails=null){
   try{
@@ -6820,6 +6877,10 @@ function absorbHeardRecordsHeld(){
   for(const record of records)if(!skipped(record))applyChangeRecordTo(composite,record.parts);
   const payload=cloudPayloadFor(composite),through=records.at(-1).seq;
   if(!syncSession.receive({payload,revision:remote.rev,through}))return false;
+  // #2427: over a copy this tab published, records this board holds leave a
+  // copy this board still holds whole.
+  const own=ownPublishedCopy;
+  if(own&&own.account===acct&&own.revision===remote.rev&&own.payload===remote.payload)ownPublishedCopy={...own,payload};
   renderSync();
   return true;
 }
@@ -7352,24 +7413,58 @@ async function sendPush(){
   };
   let activeDiagnosticPushTicket=null,adoptionPushed=false,adoptionPublished=false,trimAfterAcknowledgedPush=false;
   try{
-    const knownPayload=syncView().known.payload,knownCloud=validSavedPayload(knownPayload)?JSON.parse(knownPayload):null;
-    // Validate each source before a union can turn malformed or foreign facts
-    // into a different same-identity conflict or alter the only local copy.
-    const sourceIssue=decisionEvidenceIssue(state,pushAccount,false) || (knownCloud && decisionEvidenceIssue(knownCloud,pushAccount,false));
-    if(sourceIssue){cloudAdoptionHeld=true;reportCloudReconcileError(sourceIssue);return;}
-    if(knownCloud && conflictingDecisionEvidence(state,knownCloud)){
-      cloudAdoptionHeld=true;reportCloudReconcileError("conflicting-decision-evidence");return;
+    const known=syncView().known,knownPayload=known.payload;
+    // #2427: the cloud copy this page knows is the very copy this tab
+    // published, from a board whose decision evidence its push validated,
+    // with at most change records this board holds over it, and this board
+    // is still based on it (ownPublishedCopy). Each device save
+    // since kept what the last saved board held, back to the board that push
+    // saved before it uploaded, so this board holds everything that copy does
+    // that was not deleted: the union below has nothing to bring back, and
+    // that copy's evidence needs no second check. Only this board is
+    // validated, once. A task or History row of that copy the board lacks
+    // with no delete or clear behind it (a cheap check of ids) still goes the
+    // full way, so the push itself puts it back and says so, as before. Any
+    // other known copy (another device's, a read's) is checked and merged as
+    // before.
+    const own=ownPublishedCopy;
+    const knownIsOwn=!!own&&own.account===pushAccount&&known.account===pushAccount&&known.revision===own.revision&&
+      knownPayload===own.payload&&state.syncRev===own.revision&&ownPublishedCopyHeld(own);
+    if(knownIsOwn){
+      const decisionIssue=decisionEvidenceIssue(state,pushAccount);
+      if(decisionIssue){cloudAdoptionHeld=true;reportCloudReconcileError(decisionIssue);return;}
+    }else{
+      const knownCloud=validSavedPayload(knownPayload)?JSON.parse(knownPayload):null;
+      // Validate each source before a union can turn malformed or foreign facts
+      // into a different same-identity conflict or alter the only local copy.
+      const sourceIssue=decisionEvidenceIssue(state,pushAccount,false) || (knownCloud && decisionEvidenceIssue(knownCloud,pushAccount,false));
+      if(sourceIssue){cloudAdoptionHeld=true;reportCloudReconcileError(sourceIssue);return;}
+      if(knownCloud && conflictingDecisionEvidence(state,knownCloud)){
+        cloudAdoptionHeld=true;reportCloudReconcileError("conflicting-decision-evidence");return;
+      }
+      const sourceProjectionIssue=decisionProjectionIssue(state) || (knownCloud && decisionProjectionIssue(knownCloud));
+      if(sourceProjectionIssue){cloudAdoptionHeld=true;reportCloudReconcileError(sourceProjectionIssue);return;}
+      // #2427: the board's evidence passed both checks above, which together
+      // are its full check; only a union that changed the board checks it again.
+      // knownCloud was parsed for this push alone, so the union takes it as it is.
+      if(knownCloud && keepMissingTasks(knownCloud,"cloud-push","A missing task was kept before cloud sync.",{sourceOwned:true})){
+        state.updatedAt=Date.now(); recomputeRanks(); render();
+        const decisionIssue=decisionEvidenceIssue(state,pushAccount);
+        if(decisionIssue){cloudAdoptionHeld=true;reportCloudReconcileError(decisionIssue);return;}
+      }
     }
-    const sourceProjectionIssue=decisionProjectionIssue(state) || (knownCloud && decisionProjectionIssue(knownCloud));
-    if(sourceProjectionIssue){cloudAdoptionHeld=true;reportCloudReconcileError(sourceProjectionIssue);return;}
-    if(knownCloud && keepMissingTasks(knownCloud,"cloud-push","A missing task was kept before cloud sync.")){
-      state.updatedAt=Date.now(); recomputeRanks(); render();
-    }
-    const decisionIssue=decisionEvidenceIssue(state,pushAccount);
-    if(decisionIssue){cloudAdoptionHeld=true;reportCloudReconcileError(decisionIssue);return;}
+    // #2427: every answer given so far, with its History, is in the board
+    // these texts are made of.
+    answerCatchUp.flush();
     const diagnosticRequestGeneration=saveRequestGeneration;
-    let payload = cloudPayload();
+    const texts=boardPushTexts(state);
+    let payload = texts ? texts.cloud : cloudPayload();
     if(payload === lastPushed){notePushedThrough(diagnosticRequestGeneration);return;}      // nothing actually changed
+    // #2427: the live board this payload was made of, and the save request it
+    // holds through: while no save is asked for and the board is the same
+    // object, the board still holds exactly this payload.
+    let payloadFromLive={board:state,generation:diagnosticRequestGeneration,
+      held:{taskIds:texts?texts.ids:(state.tasks||[]).map(task=>task?.id),historyKeys:(Array.isArray(state.workLog)?state.workLog:[]).map(historyEntryKey)}};
     // A cloud write is not allowed to outrun its device-local safety copy.
     // This also covers membership repaired from the last cloud read above.
     // #2408: the push's save goes through the device-save lane: it waits for a
@@ -7386,11 +7481,17 @@ async function sendPush(){
       ?Math.max(knownCopy.through,boardRecordsThrough(state)):boardRecordsThrough(state);
     let pushRecoveryIds=Array.isArray(state.protectedBackupIds) ? [...state.protectedBackupIds] : [];
     if(!savedAdoption){
-      const save=deviceSaveLane.request(),saved=save.lane;
+      preparedPushText=texts?{board:state,generation:diagnosticRequestGeneration,pieces:texts}:null;
+      let save;try{save=deviceSaveLane.request();}finally{preparedPushText=null;}
+      const saved=save.lane;
       if(await save.done!==true)return;
       if(!pushStillCurrent()){holdChangedPush();return;}
       if(!reconciled() || pulling){ pendingPush=true; return; }
-      if(payload !== cloudPayload()){
+      // #2427: no save asked for since the payload was made, the same board,
+      // and the save made durable the text made with the payload: the board
+      // still holds the payload, and its text need not be made again.
+      const unchanged=!!texts&&state===pushedBoard&&saveRequestGeneration===diagnosticRequestGeneration&&saved.saved===texts.text;
+      if(!unchanged&&payload !== cloudPayload()){
         // If an edit arrived while the save was in flight, retry with its exact
         // payload so a cloud write never outruns that edit's local safety copy.
         // #2408: that retry is the one follow-up the newer answer asked for,
@@ -7406,7 +7507,7 @@ async function sendPush(){
         if(!durable||(durable.syncAccount??null)!==(state.syncAccount??null)||decisionEvidenceIssue(durable,pushAccount)||decisionProjectionIssue(durable)){
           supportDiagnosticsDropSupersededPush(); joinPushFollowUp(); return;
         }
-        payload=cloudPayloadFor(durable);pushedThrough=saved.generation;pushedUpdatedAt=durable.updatedAt;pushedRecords=boardRecordsThrough(durable);
+        payload=cloudPayloadFor(durable);pushedThrough=saved.generation;pushedUpdatedAt=durable.updatedAt;pushedRecords=boardRecordsThrough(durable);payloadFromLive=null;
         pushRecoveryIds=Array.isArray(durable.protectedBackupIds) ? [...durable.protectedBackupIds] : [];
       }
     }
@@ -7427,8 +7528,14 @@ async function sendPush(){
     adoptionPushed=recovery?.adoptOverRevision!==undefined;
     // A recovery's publication names no records: whatever they carry is
     // applied over it again, which changes nothing it already holds.
-    const pushAttempt=await supportDiagnosticsCloudPush(payload,pushedUpdatedAt||Date.now(),recovery?.adoptOverRevision??base,recovery?.context,
+    // #2427: the decision base this push's acknowledgement binds is named off
+    // the main thread while the upload runs (decisionBaseIdentityOffThread);
+    // a revision is one more than the one the write builds on.
+    const publishedOver=recovery?.adoptOverRevision??base;
+    if(Number.isSafeInteger(publishedOver))decisionBaseIdentityOffThread(pushAccount,publishedOver+1,payload);
+    const pushAttempt=await supportDiagnosticsCloudPush(payload,pushedUpdatedAt||Date.now(),publishedOver,recovery?.context,
       pushBackend,null,diagnosticRequestGeneration,recovery?undefined:{includedSeq:pushedRecords}),res=pushAttempt.result,pushTicket=pushAttempt.ticket;
+    if(res?.ok===true&&Number.isSafeInteger(res.rev))await decisionBaseIdentityOffThread(pushAccount,res.rev,payload);
     const acknowledgedRecords=Number.isSafeInteger(res?.includedSeq)&&res.includedSeq>=0?res.includedSeq:0;
       activeDiagnosticPushTicket=pushTicket;adoptionPublished=adoptionPushed&&res?.ok===true;
       if(!pushStillCurrent()){supportDiagnosticsSettleCloudPush(pushTicket,"stale");holdChangedPush();return;}
@@ -7445,8 +7552,13 @@ async function sendPush(){
         state.syncRecords = {revision:res.rev,through:acknowledgedRecords};
         changeRecordOutbox.fullCopyAcknowledged();
         bindDecisionBase(pushAccount,res.rev,payload,res); // #2354: res names the copy it published
+        // #2427: the copy this tab published from a board it validated.
+        ownPublishedCopy=payloadFromLive?{account:pushAccount,revision:res.rev,payload,...payloadFromLive.held}:null;
         // An edit made while this write was in flight is still unsynced.
-        state.syncDirty = payload!==cloudPayload();
+        // #2427: with no save asked for since the payload was made and the
+        // same board, nothing was edited; otherwise the texts are compared.
+        const unedited=!!payloadFromLive&&state===payloadFromLive.board&&saveRequestGeneration===payloadFromLive.generation;
+        state.syncDirty = unedited ? false : payload!==cloudPayload();
         if(!state.syncDirty)clearCloudRetry({preserveAutomaticSource:true});
         if(Number.isFinite(res.serverUpdatedAt)) state.lastCloudServerAt=res.serverUpdatedAt;
         /* BUG FIX: this used to stop at the assignment, leaving the new
@@ -7548,6 +7660,20 @@ async function sendPush(){
     if(automaticCloudSourceResumeRequested)maybeResumeAutomaticCloudSources();
   }
   }finally{pushesRunning--;syncWork.end();}
+}
+/* #2427: the copy this tab last published and the cloud acknowledged, from a
+   board whose decision evidence its push validated, {account, revision,
+   payload}, or that copy with change records this board holds applied over
+   it as the cloud delivered them back (absorbHeardRecordsHeld). A later push
+   from a board still based on that copy needs neither that copy's check nor
+   its union again (sendPush). */
+let ownPublishedCopy=null;
+// Whether the live board still holds every task and History row of that
+// copy, or a delete or clear stands behind the one it lacks.
+function ownPublishedCopyHeld(own){
+  const tasks=new Set((state.tasks||[]).map(task=>task?.id)),history=new Set((Array.isArray(state.workLog)?state.workLog:[]).map(historyEntryKey));
+  return Array.isArray(own.taskIds)&&Array.isArray(own.historyKeys)&&
+    own.taskIds.every(id=>tasks.has(id)||!!state.deletedTaskIds?.[id])&&own.historyKeys.every(key=>history.has(key)||!!state.clearedHistoryIds?.[key]);
 }
 /* Device-only revision, account, unsynced-edit, and protected-recovery evidence
    never belongs in a shared list or export. In particular, syncing syncRev
@@ -8162,6 +8288,89 @@ function decisionBaseIdentity(account,revision,payload){
   }
   return id;
 }
+/* #2427: the decision base identity of a push's acknowledgement hashes a
+   whole cloud copy. That hash runs in a worker, off the main thread, and its
+   result goes into the same cache decisionBaseIdentity reads, so the base is
+   bound and later checked exactly as before (same id, same format). The
+   worker runs the very hash below; where no worker can run, or it does not
+   answer, the identity is made on the main thread when the base is bound, as
+   before. The worker's hash is chanceHash, line for line, under another name. */
+const DECISION_BASE_WORKER_SOURCE=`"use strict";
+function sameHashAsChanceHash(text){
+  let h = 2166136261;
+  for(let i=0;i<text.length;i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+  h ^= h >>> 16; h = Math.imul(h, 0x7feb352d); h ^= h >>> 15;
+  h = Math.imul(h, 0x846ca68b); h ^= h >>> 16;
+  return h >>> 0;
+}
+onmessage=event=>{
+  const {n,account,revision,payload}=event.data||{};let id=null;
+  try{
+    const fact=JSON.stringify([account,revision,payload]);
+    id="db1:"+[0,1,2,3].map(index=>sameHashAsChanceHash("decision-base-v1:"+index+":"+fact).toString(16).padStart(8,"0")).join("");
+  }catch(e){id=null;}
+  postMessage({n,id});
+};`;
+const DECISION_BASE_WORKER_WAIT_MS=10000;
+let decisionBaseWorker=null,decisionBaseWorkerUnavailable=false,decisionBaseWorkerSerial=0;
+const decisionBaseWorkerReplies=new Map(),decisionBaseIdentityPending=[];
+function decisionBaseWorkerFailed(){
+  decisionBaseWorkerUnavailable=true;
+  try{decisionBaseWorker?.terminate();}catch{}
+  decisionBaseWorker=null;
+  for(const reply of [...decisionBaseWorkerReplies.values()])reply(null);
+  decisionBaseWorkerReplies.clear();
+}
+function decisionBaseWorkerReady(){
+  if(decisionBaseWorker)return true;
+  if(decisionBaseWorkerUnavailable||typeof Worker!=="function"||typeof Blob!=="function"||typeof URL?.createObjectURL!=="function")return false;
+  try{
+    const url=URL.createObjectURL(new Blob([DECISION_BASE_WORKER_SOURCE],{type:"text/javascript"}));
+    decisionBaseWorker=new Worker(url);
+    // The script's URL goes once the worker has answered, so it has loaded.
+    let loaded=false;
+    decisionBaseWorker.onmessage=event=>{
+      if(!loaded){loaded=true;try{URL.revokeObjectURL?.(url);}catch{}}
+      const {n,id}=event?.data||{};const reply=decisionBaseWorkerReplies.get(n);if(reply){decisionBaseWorkerReplies.delete(n);reply(id);}
+    };
+    decisionBaseWorker.onerror=()=>decisionBaseWorkerFailed();
+    return true;
+  }catch{decisionBaseWorkerFailed();return false;}
+}
+function rememberDecisionBaseIdentity(account,revision,payload,id){
+  if(decisionBaseIdentityCache.some(row=>row.account===account&&row.revision===revision&&row.payload===payload))return;
+  decisionBaseIdentityCache.unshift({account,revision,payload,id});decisionBaseIdentityCache.length=Math.min(decisionBaseIdentityCache.length,2);
+}
+// Resolves once the identity of (account, revision, payload) is in the cache,
+// or with null when it could not be made off the main thread (or would not be
+// kept: the cache holds only inputs it can retain). Never rejects.
+function decisionBaseIdentityOffThread(account,revision,payload){
+  if(typeof account!=="string"||!account||!Number.isSafeInteger(revision)||revision<0||typeof payload!=="string"||account.length+payload.length>4*1024*1024)
+    return Promise.resolve(null);
+  const cached=decisionBaseIdentityCache.find(row=>row.account===account&&row.revision===revision&&row.payload===payload);
+  if(cached)return Promise.resolve(cached.id);
+  const pending=decisionBaseIdentityPending.find(row=>row.account===account&&row.revision===revision&&row.payload===payload);
+  if(pending)return pending.promise;
+  if(!decisionBaseWorkerReady())return Promise.resolve(null);
+  const row={account,revision,payload,promise:null};
+  row.promise=new Promise(resolve=>{
+    const n=++decisionBaseWorkerSerial;let timer=null;
+    const finish=id=>{
+      if(timer!==null){clearTimeout(timer);timer=null;}
+      const at=decisionBaseIdentityPending.indexOf(row);if(at>=0)decisionBaseIdentityPending.splice(at,1);
+      if(typeof id==="string"&&/^db1:[0-9a-f]{32}$/.test(id)){rememberDecisionBaseIdentity(account,revision,payload,id);resolve(id);}
+      else resolve(null);
+    };
+    decisionBaseWorkerReplies.set(n,finish);
+    timer=setTimeout(()=>{if(decisionBaseWorkerReplies.get(n)===finish){decisionBaseWorkerReplies.delete(n);finish(null);}},DECISION_BASE_WORKER_WAIT_MS);
+    try{decisionBaseWorker.postMessage({n,account,revision,payload});}
+    catch{decisionBaseWorkerReplies.delete(n);finish(null);decisionBaseWorkerFailed();}
+  });
+  decisionBaseIdentityPending.push(row);
+  // At most two are kept waiting, as the cache keeps two.
+  while(decisionBaseIdentityPending.length>2)decisionBaseIdentityPending.shift();
+  return row.promise;
+}
 function validDecisionBase(base,account,revision){
   if(!base || typeof base!=="object" || Array.isArray(base) || base.v!==1
     || typeof base.account!=="string" || !base.account || !Number.isSafeInteger(base.revision) || base.revision<0
@@ -8185,6 +8394,14 @@ function cloudCopyOf(copy){
   return typeof copy?.generationId==="string"&&copy.generationId&&typeof copy.hash==="string"&&/^[a-f0-9]{64}$/.test(copy.hash)
     ? {generationId:copy.generationId,hash:copy.hash} : null;
 }
+function sameDecisionBase(current,next){
+  const fields=["v","id","account","revision","payload","copy"];
+  if(!current||typeof current!=="object"||Array.isArray(current)||Object.keys(current).some(key=>!fields.includes(key))||
+    Object.keys(next).some(key=>!fields.includes(key)))return JSON.stringify(current)===JSON.stringify(next);
+  return Object.keys(current).join()===Object.keys(next).join()&&current.v===next.v&&current.id===next.id&&current.account===next.account&&
+    current.revision===next.revision&&current.payload===next.payload&&
+    (current.copy===undefined?next.copy===undefined:next.copy!==undefined&&JSON.stringify(current.copy)===JSON.stringify(next.copy));
+}
 function bindDecisionBase(account,revision,payload,copy=null){
   const made=makeDecisionBase(account,revision,payload);
   if(!made)return false;
@@ -8197,7 +8414,9 @@ function bindDecisionBase(account,revision,payload,copy=null){
   // after that upload is interrupted downloads in full and sees the damage
   // again. A read that finds the named copy damaged drops it first as well
   // (the sync session, #2377); keep both.
-  if(JSON.stringify(state.decisionBase)===JSON.stringify(next))return identityChanged;
+  // #2427: compared field by field: serializing both bases serialized two
+  // whole cloud copies. A base this app made has exactly these fields.
+  if(sameDecisionBase(state.decisionBase,next))return identityChanged;
   forgetUnreadableCloudSourceHold();
   state.decisionBase=next;
   return true;
