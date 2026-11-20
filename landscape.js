@@ -67,6 +67,21 @@
   const T=globalThis.LandscapeTimeline,sceneSeed=T.DEFAULT_SEED;
   const cityLights={next:7.5,windows:[],gardens:S.createGardenLights([],()=>.99)},woodland={events:[]};
   let timeline=null,timelineKey='',sceneSnapshot=null,lastCitySlot=null;
+  // The day's sun is kept on this device for the place and scene choices it
+  // was worked out for, so a relaunch on the same day reuses it instead of
+  // asking the astronomy library for every minute again (#2430). It is a few
+  // kilobytes; if it cannot be written it is removed, never left part-written.
+  const SUN_MEMORY_KEY='fvp:chain-scanner:scene-sun';
+  let keptSunComputations=-1;
+  function readSunMemory(key){
+    try{const record=JSON.parse(storage?.getItem(SUN_MEMORY_KEY)||'null');return record?.v===1&&record.key===key?record.sun:null;}catch{return null;}
+  }
+  function keepSun(){
+    if(!timeline||timeline.sunComputations()===keptSunComputations)return;
+    keptSunComputations=timeline.sunComputations();
+    try{const sun=timeline.sunMemory(Date.now());if(sun)storage?.setItem(SUN_MEMORY_KEY,JSON.stringify({v:1,key:timelineKey,sun}));}
+    catch{try{storage?.removeItem(SUN_MEMORY_KEY);}catch{}}
+  }
   let rooftopRoofs=[],rooftopParty=null,clocktowerVisit=null,partyTimer=0;
   let sceneSeason=S.readSceneSeason(sceneStorage)||LandscapeMood.season(new Date(),globalThis.LivingLocation?.current()).name,treeOrigins=[];
   let W=0,H=0,hy=0,dpr=1,frame=0,last=0,nextPaint=0,sky,p,world={elapsed:0,events:[]};
@@ -179,6 +194,13 @@
       gl.uniform1f(time,t*Math.max(.35,Number(wind)||1));gl.uniform2f(size,width,height);
       gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
       return canvas;
+    },
+    // The first mirror after opening paid for the GPU program and its first
+    // read back into the page, about 27 ms at 4x CPU, inside the opening's
+    // life step. Doing that once off screen first moves it to its own task.
+    warm(source){
+      const mirrored=this.render(source,0,1,false,source.width,source.height);
+      if(mirrored!==source){const scratch=document.createElement('canvas');scratch.width=scratch.height=1;scratch.getContext('2d')?.drawImage(mirrored,0,0,1,1);}
     }};
   }
   const waterDistortion=createWaterDistortion();
@@ -1530,7 +1552,8 @@
       timelineKey=key;
       const lock=S.readSceneTime(sceneStorage),lockedSun=new Map();
       const calendar=new Intl.DateTimeFormat('en-CA',{timeZone:location?.timezone||'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
-      timeline=T.create({seed:sceneSeed,season:sceneSeason,location,sunAt:at=>{
+      keptSunComputations=-1;
+      timeline=T.create({seed:sceneSeed,season:sceneSeason,location,sunMemory:readSunMemory(key),sunAt:at=>{
         const date=new Date(at),day=lock?calendar.format(date):null;
         if(day&&lockedSun.has(day))return lockedSun.get(day);
         const sun=S.sunAt(S.sceneDate(date,sceneStorage,location),location);
@@ -1604,6 +1627,8 @@
         });
       }
       scheduleSky();
+      // A new UTC day's plan worked out while open is kept for the next opening.
+      if(timeline&&timeline.sunComputations()-keptSunComputations>=60)keepSun();
     },Math.max(1,Math.min(...delays)));
   }
   function start(){
@@ -1745,7 +1770,9 @@
   });
   // A refresh that arrives while the opening paint is still owed computes the
   // scene and joins that paint instead of painting first.
-  function owedOpeningRefresh(){computeScene();openingPaint.due=true;if(timeDialog.open)refreshSolarTimes();}
+  // While the opening paint itself is under way, it computes the latest scene
+  // in its last step instead, so the published scene changes with that paint.
+  function owedOpeningRefresh(){if(!openingPaint.painting)computeScene();openingPaint.due=true;if(timeDialog.open)refreshSolarTimes();}
   // Until the first paint the page shows the computed sky colour, not the
   // stylesheet's fixed day placeholder, behind the board (#2194 review O1).
   // The colours are also kept for the inline step in index.html that shows
@@ -1757,6 +1784,9 @@
     try{localStorage.setItem('fvp:chain-scanner:scene-placeholder',JSON.stringify({v:1,at:Date.now(),sky:p.sky.slice(0,3)}));}catch{}
   }
   window.addEventListener('pagehide',stop);
+  // Leaving or hiding the app keeps any day plan sun worked out while open.
+  window.addEventListener('pagehide',()=>keepSun());
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)keepSun();});
   window.addEventListener('pageshow',()=>{preference=S.readMotion(storage);updateMotion();if(preference===null&&!dialog.open)openMotion();});
   openingPaint={opening:true,due:false};
   // A sized opaque canvas is black until painted (#2194 review F8).
@@ -1787,14 +1817,49 @@
     if(openingPaint)openingPaint.boardShown=true;
     showScenePlaceholder();
     requestAnimationFrame(()=>setTimeout(()=>{
-      const owed=openingPaint?.due;openingPaint=null;
-      if(nextPaint===Infinity)nextPaint=0;
+      if(!openingPaint?.due||document.hidden){finishOpening();return;}
+      // The opening paint runs as separate tasks, so a tap waits for one step
+      // rather than the whole landscape (#2430): the background first, then a
+      // first use of the water's GPU mirror off screen and the walkers' painted
+      // lifetimes, then the life and the reveal. The scenery canvas stays
+      // hidden until that last step, so no frame shows a partly painted
+      // landscape; the placeholder sky shows until then, as before.
+      openingPaint.painting=true;openingPaint.due=false;
       // Not redundant: the scene was computed at boot, and the background reads
-      // light states that must match this later instant (paintScene syncs only
-      // after painting the background).
-      if(owed&&!document.hidden){syncScene(Date.now());paintScene();}
+      // light states that must match this later instant.
+      syncScene(Date.now());paintBackground();back.style.visibility='hidden';
+      const painted=sky;
+      openingStep(()=>{
+        // Only preparation: whatever happens here, the last step still runs.
+        try{
+          if(!reduced&&!document.hidden)waterDistortion.warm(skyCity);
+          // Walkers' painted lifetimes are worked out once and kept for the life step.
+          visits.forPaint(world.events,geometry,reduced,{poseOther:scenePose});
+        }finally{
+          openingStep(()=>{
+            if(document.hidden){finishOpening();return;}
+            // A refresh owed meanwhile is computed now, and a newer sky repaints
+            // the background in this same step, so the reveal is never stale.
+            if(openingPaint?.due)computeScene();
+            if(sky!==painted)paintBackground();
+            syncScene(Date.now());paintLife(world.elapsed);back.style.visibility='';
+            finishOpening();
+          });
+        }
+      });
     }));
   };
+  // Runs one opening step as its own task, after input already queued. A
+  // message task, unlike a timer, is not clamped or held by a paused clock.
+  const openingChannel=typeof MessageChannel==='function'?new MessageChannel():null,openingSteps=[];
+  if(openingChannel)openingChannel.port1.onmessage=()=>openingSteps.shift()?.();
+  function openingStep(step){if(!openingChannel){setTimeout(step);return;}openingSteps.push(step);openingChannel.port2.postMessage(0);}
+  function finishOpening(){
+    openingPaint=null;
+    if(nextPaint===Infinity)nextPaint=0;
+    // Keep the opening's day plan sun in a later task, after it has painted.
+    setTimeout(keepSun);
+  }
   if(boardShown())releaseOpening();
   else{
     boardObserver=new MutationObserver(()=>{if(boardShown())releaseOpening();});
@@ -1809,6 +1874,6 @@
   }).then(markdown=>{
     LandscapeMood.setHumanText(markdown);
     // Text that arrives before the opening paint joins it instead of painting first.
-    if(openingPaint){computeScene();openingPaint.due=true;}else refreshSky();
+    if(openingPaint){if(!openingPaint.painting)computeScene();openingPaint.due=true;}else refreshSky();
   }).catch(()=>{});
 })();
