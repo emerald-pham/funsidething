@@ -18408,6 +18408,49 @@ test('RISK push work: a Worker that never answers delays neither the acknowledge
  assert.equal(pulled.state.syncDirty,false,'with nothing left to push');
 });
 
+// #2427 review: a push's acknowledgement marks the board synced only when
+// nothing changed the board since the push made its copy. A scanner answer
+// shows first and is saved by its catch-up a moment later (#2407): an answer
+// given while the push uploads, whose catch-up has not yet saved it when the
+// cloud's ok arrives, is an edit the acknowledged copy lacks. The board stays
+// unsynced and no sync retry is cleared before that catch-up saves it, and
+// the answer then reaches the cloud.
+test('RISK push work: an answer given while a push uploads, still in its catch-up when the ok arrives, keeps the board unsynced until it is saved and pushed',{timeout:180000},async t=>{
+ const board=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
+  tasks:Array.from({length:20},(_,i)=>({...syncTask('gap-2427-'+i,'Gap task '+i),ctx:['home'],createdAt:1000+i}))});
+ const device=await answeringDevice2408(t,{board,saveMs:0});
+ await startAnswering2408(device);
+ const {ctx,clock,counters}=device;
+ await clock.settle();
+ const cleared=[];ctx.__cleared2427=()=>cleared.push(clock.now);
+ vm.runInContext('(()=>{const clear=clearCloudRetry;clearCloudRetry=function(){__cleared2427();return clear.apply(this,arguments);};})()',ctx);
+ // The second answer is given while the first answer's push uploads; its
+ // catch-up runs on a later turn of the clock, after the ok.
+ let gap=null;const push=device.backend.CS.push;
+ device.backend.CS.push=async(...args)=>{
+  const result=await push(...args);
+  if(!gap){const candidate=device.tap('no');gap={candidate,cleared:cleared.length};}
+  return result;
+ };
+ const revision=ctx.state.syncRev;
+ device.tap('no');
+ for(let waited=0;!gap;waited+=250){
+  assert.ok(waited<=PUSH_DEBOUNCE2408+5000,'positive control: the first answer is pushed');
+  await clock.advance(250);
+ }
+ // The ok has been taken; the second answer's catch-up has not run (its step
+ // is queued on the fake clock, which has not moved).
+ await clock.quiet();
+ assert.equal(ctx.state.syncRev,revision+1,'positive control: the first push is acknowledged');
+ assert.equal(ctx.state.considered?.[gap.candidate],'no','positive control: the second answer shows');
+ assert.equal(ctx.state.syncDirty,true,'the acknowledgement leaves the board unsynced: it lacks the answer given during the upload');
+ assert.deepEqual(cleared.slice(gap.cleared),[],'and clears no sync retry before that answer is saved');
+ device.backend.CS.push=push;
+ await clock.settle();
+ assert.equal((await device.cloud()).board.considered?.[gap.candidate],'no','the answer given during the upload then reaches the cloud');
+ assert.equal(ctx.state.syncDirty,false,'and the board is synced');
+});
+
 // #2427: the push makes its device text and its cloud copy from one
 // serialization of the board; each is byte for byte the text the app's own
 // serializers make (JSON.stringify of the board, cloudPayloadFor), including

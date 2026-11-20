@@ -1225,6 +1225,17 @@ window.formatScannerCalendarDate = (date,timeZone) => {
 };
 let saveTimer = null;
 let saveRequestGeneration = 0;
+/* #2427 review: counts every change made to the live board in place, whether
+   or not a save has been asked for yet: an edit or answer (markBoardEdited,
+   which an answer calls before its catch-up asks for the save), a missing
+   task or History row kept from another copy (keepMissingTasks, which a
+   device save runs without asking for another save), and another device's
+   change records applied over the board. A push's acknowledgement marks the
+   board synced without comparing texts only when neither this count nor the
+   save requests moved since the push made its copy; otherwise it compares
+   them, as it always did. The save requests alone missed an answer still in
+   its catch-up and a device save's merge, and marked such a board synced. */
+let boardEditSerial=0;
 let persistedChanceSeed = null;
 let persistQueue = Promise.resolve();
 let lastPersistedRaw = null; // exact browser bytes this tab actually loaded or wrote
@@ -4702,6 +4713,7 @@ function deviceOwnSaveBase(head){
 function keepMissingTasks(source,keptFrom,message,{sourceOwned=false,sameTasks=null}={}){
   const live=new Set(state.tasks.map(task=>task.id));
   const changed=mergeUndeletedTasks(state,source,{otherOwned:sourceOwned,sameTasks});
+  if(changed)boardEditSerial++;
   const keptTasks=state.tasks.filter(task=>!live.has(task.id)).length;
   if(keptTasks){
     toast(message,6000);
@@ -5194,6 +5206,7 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
 // scanner answer marks it before its paint, so nothing shows the board saved
 // or synced before its catch-up saves it (#2407).
 function markBoardEdited(){
+  boardEditSerial++;
   state.updatedAt = Date.now();
   state.syncDirty = true;
 }
@@ -6829,7 +6842,7 @@ function applyHeardRecordsInPlace(){
     // checks a push makes but its whole-board replay, which follows the
     // drawing (below), so an answer applies at the same cost on any board.
     if(result&&!changeRecordHoldableBounded(state,account)){skipChangeRecord(account,record.row,undo);continue;}
-    if(result){brought.push(record.row);undos.push(undo);changed=true;}
+    if(result){brought.push(record.row);undos.push(undo);changed=true;boardEditSerial++;}
   }
   if(!handled)return false;
   state.syncRecords={revision:remote.rev,through:records[handled-1].row.seq};
@@ -7456,14 +7469,14 @@ async function sendPush(){
     // #2427: every answer given so far, with its History, is in the board
     // these texts are made of.
     answerCatchUp.flush();
-    const diagnosticRequestGeneration=saveRequestGeneration;
+    const diagnosticRequestGeneration=saveRequestGeneration,editsAtPayload=boardEditSerial;
     const texts=boardPushTexts(state);
     let payload = texts ? texts.cloud : cloudPayload();
     if(payload === lastPushed){notePushedThrough(diagnosticRequestGeneration);return;}      // nothing actually changed
     // #2427: the live board this payload was made of, and the save request it
     // holds through: while no save is asked for and the board is the same
     // object, the board still holds exactly this payload.
-    let payloadFromLive={board:state,generation:diagnosticRequestGeneration,
+    let payloadFromLive={board:state,generation:diagnosticRequestGeneration,edits:editsAtPayload,
       held:{taskIds:texts?texts.ids:(state.tasks||[]).map(task=>task?.id),historyKeys:(Array.isArray(state.workLog)?state.workLog:[]).map(historyEntryKey)}};
     // A cloud write is not allowed to outrun its device-local safety copy.
     // This also covers membership repaired from the last cloud read above.
@@ -7487,10 +7500,12 @@ async function sendPush(){
       if(await save.done!==true)return;
       if(!pushStillCurrent()){holdChangedPush();return;}
       if(!reconciled() || pulling){ pendingPush=true; return; }
-      // #2427: no save asked for since the payload was made, the same board,
-      // and the save made durable the text made with the payload: the board
-      // still holds the payload, and its text need not be made again.
-      const unchanged=!!texts&&state===pushedBoard&&saveRequestGeneration===diagnosticRequestGeneration&&saved.saved===texts.text;
+      // #2427: no save asked for and no change made in place since the
+      // payload was made (boardEditSerial), the same board, and the save made
+      // durable the text made with the payload: the board still holds the
+      // payload, and its text need not be made again.
+      const unchanged=!!texts&&state===pushedBoard&&saveRequestGeneration===diagnosticRequestGeneration&&
+        boardEditSerial===editsAtPayload&&saved.saved===texts.text;
       if(!unchanged&&payload !== cloudPayload()){
         // If an edit arrived while the save was in flight, retry with its exact
         // payload so a cloud write never outruns that edit's local safety copy.
@@ -7561,7 +7576,8 @@ async function sendPush(){
         // An edit made while this write was in flight is still unsynced.
         // #2427: with no save asked for since the payload was made and the
         // same board, nothing was edited; otherwise the texts are compared.
-        const unedited=!!payloadFromLive&&state===payloadFromLive.board&&saveRequestGeneration===payloadFromLive.generation;
+        const unedited=!!payloadFromLive&&state===payloadFromLive.board&&saveRequestGeneration===payloadFromLive.generation&&
+          boardEditSerial===payloadFromLive.edits;
         state.syncDirty = unedited ? false : payload!==cloudPayload();
         if(!state.syncDirty)clearCloudRetry({preserveAutomaticSource:true});
         if(Number.isFinite(res.serverUpdatedAt)) state.lastCloudServerAt=res.serverUpdatedAt;
@@ -8258,6 +8274,7 @@ async function replaySavedChangeRecords(){
       if(markers.has(row.id))continue;
       if(applyChangeRecordTo(state,parts))changed=true;
     }
+    if(changed)boardEditSerial++;
     changeRecordOutbox.resume(rows,identity);
     return changed;
   }finally{work.end();}
