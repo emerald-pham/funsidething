@@ -1242,6 +1242,16 @@ let automaticCloudFallbackBootBaseline = null;
 let automaticCloudFallbackBootCapturePending = false;
 const automaticRecoveryDeviceAuthorities=new WeakMap();
 let deviceLegacySeenSignature = null;
+// #2429: an opening reads and checks each saved copy once. The instant preview
+// checks the older browser copies in full first; their exact texts are kept
+// here until the board opens, so the device opening does not parse and check
+// them again. The preview's source check implies validSavedPayload.
+let openingPreviewCheckedTexts = [];
+// #2429: the device head this opening parsed and checked, which becomes the
+// board instead of parsing the same text a second time.
+let openingCheckedDeviceBoard = null;
+// #2429: the signature text of copies legacyBoardCopies returned as last seen.
+const legacyBoardSignatures = new WeakMap();
 let lastDeviceSaveIssue = null;
 function deviceStorageActive(){ return deviceStorageAuthority; }
 // #2323: how many of a failed save's conflict repairs met this tab's own
@@ -2957,7 +2967,7 @@ function retireAutomaticBackupForPrimarySave(expectedHead,expectedStore,preserve
     return false; // retain the newest stable automatic recovery copy
   }catch(e){ return false; }
 }
-function validSavedPayload(raw){return savedPayloadBoard(raw)!==null;}
+function validSavedPayload(raw){return openingPreviewCheckedTexts.includes(raw)||savedPayloadBoard(raw)!==null;}
 // The saved board a payload holds, checked as validSavedPayload checks it, or
 // null. A caller that needs the board as well parses it only once (#2408).
 function savedPayloadBoard(raw){
@@ -3527,15 +3537,29 @@ function markDeviceStorageAuthority(){
 function legacyBoardCopies(readAttempt=null){
   try{
     const head=localStorage.getItem(LOCAL_HEAD_KEY),shared=localStorage.getItem(STORE_KEY);
-    const valid=raw=>readAttempt?attemptRecoverySourceMemo(readAttempt,"savedPayloadVerdicts",raw,null,()=>validSavedPayload(raw)):validSavedPayload(raw);
-    return [[LOCAL_HEAD_KEY,head],[STORE_KEY,shared]]
-      .filter(([,raw])=>valid(raw)).map(([key,raw])=>({key,raw}));
+    const present=[[LOCAL_HEAD_KEY,head],[STORE_KEY,shared]].filter(([,raw])=>raw!==null).map(([key,raw])=>({key,raw}));
+    // #2429: deviceLegacySeenSignature is built only from copies that passed
+    // this check, and the check reads nothing but their text. Copies that are
+    // exactly the ones last seen therefore still pass, without parsing and
+    // checking the whole board again on every save and cloud read.
+    if(!readAttempt&&present.length&&typeof deviceLegacySeenSignature==="string"){
+      const signature=JSON.stringify(present);
+      if(signature===deviceLegacySeenSignature){legacyBoardSignatures.set(present,signature);return present;}
+    }
+    // Both keys usually hold one text: check it once.
+    let checked=null;
+    const valid=raw=>{
+      if(checked?.raw===raw)return checked.valid;
+      const verdict=readAttempt?attemptRecoverySourceMemo(readAttempt,"savedPayloadVerdicts",raw,null,()=>validSavedPayload(raw)):validSavedPayload(raw);
+      checked={raw,valid:verdict};return verdict;
+    };
+    return present.filter(copy=>valid(copy.raw));
   }catch(e){return [];}
 }
 function legacyBoardBytes(copies=legacyBoardCopies()){
   return copies.find(copy=>copy.key===LOCAL_HEAD_KEY)?.raw || copies[0]?.raw || null;
 }
-function legacyBoardSignature(copies=legacyBoardCopies()){return JSON.stringify(copies);}
+function legacyBoardSignature(copies=legacyBoardCopies()){return legacyBoardSignatures.get(copies)??JSON.stringify(copies);}
 function legacyMigrationRows(){
   let raw=null,rows=[];
   try{raw=localStorage.getItem(LOCAL_BACKUPS_KEY);const parsed=parseBackupIndex(raw);if(Array.isArray(parsed))rows=parsed.filter(readableBackupRow);}
@@ -3911,12 +3935,16 @@ async function initializeDeviceStorageWithinBudget(bootAttempt){
     }
     // A verified byte hash does not establish supported JSON/board authority.
     // Validate a detached copy before hydrating or reconciling legacy sources.
-    let checked;
-    try{checked=JSON.parse(head.payload);assertCompleteSavedCollections(checked);dropRemovedFields(checked);hydrateState(checked);}
+    // #2429: the checked copy is the board this opening opens, with what the
+    // opening's own check of it found, so the head is parsed and checked once.
+    // It is kept only while the head stays this exact text (its hash).
+    let checked=null;
+    try{
+      const board=JSON.parse(head.payload),hadScene=!!(board?.settings&&Object.hasOwn(board.settings,"scene"));
+      assertCompleteSavedCollections(board);dropRemovedFields(board);const repairedDeletionLog=hydrateState(board);
+      checked={hash:head.hash,board,hadScene,repairedDeletionLog};
+    }
     catch{head=await recoverLocalWorkingDeviceSource({bootAttempt});if(!head)throw Error("No supported local working source");}
-    // #2225: the check's copy is not the board; do not keep it alive across
-    // the reads below, while the board itself is parsed for opening.
-    checked=null;
     deviceRecoveryCloudHold=await deviceStore.getRecoveryCloudHold();
     if(deviceRecoveryCloudHold?.reason==="device-source-recovery"&&deviceRecoveryCloudHold.automaticRecovery===true){
       const raw=await deviceStore.readRawExportSnapshot();
@@ -3937,6 +3965,7 @@ async function initializeDeviceStorageWithinBudget(bootAttempt){
     }
     if(!localDeviceStartupCurrent(bootAttempt))return null;
     if(localWorkingRecoveryIntent(deviceRecoveryCloudHold))unacceptedDeviceSource={reason:"protected-local-working-source",workingWorkspace:true};
+    openingCheckedDeviceBoard=checked?.hash===head.hash?{...checked,payload:head.payload}:null;
     return head.payload;
   }catch(e){
     if(!localDeviceStartupCurrent(bootAttempt))return null;
@@ -4537,7 +4566,13 @@ async function loadState(){
   if(!storageOK){
     useLocal = true;
     const durable=await initializeDeviceStorage();
-    if(durable!==null){storageOK=true;lastPersistedRaw=durable;return JSON.parse(durable);}
+    if(durable!==null){
+      storageOK=true;lastPersistedRaw=durable;
+      // #2429: the device opening already parsed and checked this exact head.
+      const opened=openingCheckedDeviceBoard;
+      if(opened?.payload===durable)return opened.board;
+      openingCheckedDeviceBoard=null;return JSON.parse(durable);
+    }
     // Once a verified IndexedDB head has become authoritative, the retained
     // v1 bytes are recovery evidence for old shells, not a current board.
     // An unavailable/blocked database must fail closed instead of reviving
@@ -21193,7 +21228,9 @@ function showOpeningSavedBoard(){
   for(const key of [LOCAL_HEAD_KEY,STORE_KEY])try{
     const raw=localStorage.getItem(key);if(!raw||seen.has(raw))continue;seen.add(raw);
     // #2225: one parse checks completeness, finds the owner and validates.
-    const checked=cloudSourceRecoveryBoard(raw,null,{sourceOwned:true});if(checked.board)candidates.push({raw,board:checked.board});
+    const checked=cloudSourceRecoveryBoard(raw,null,{sourceOwned:true});
+    // #2429: the device opening reuses this full check of the exact text.
+    if(checked.board){candidates.push({raw,board:checked.board});openingPreviewCheckedTexts.push(raw);}
   }catch{ /* An unreadable copy cannot hide a separate complete display source. */ }
   // Rendering is not source consent. Divergent complete copies wait for the
   // existing guarded recovery instead of presenting an arbitrary choice.
@@ -21212,17 +21249,24 @@ window.addEventListener("hashchange",()=>{if(state&&debugLogLinkRequested()){deb
   // saved board so a cold reload paints the chosen sky on its first frame.
   if(document.readyState==="loading") await new Promise(resolve=>document.addEventListener("DOMContentLoaded",resolve,{once:true}));
   state = loaded || defaultState();
+  // #2429: a board the device opening already checked opens with what that
+  // check found; the preview's checked texts are no longer needed.
+  const checkedOpening=loaded&&openingCheckedDeviceBoard?.board===loaded?openingCheckedDeviceBoard:null;
+  openingCheckedDeviceBoard=null;openingPreviewCheckedTexts=[];
   // Keep DEFAULT_SETTINGS as the released fallback for existing boards,
   // imports, Reset and unreadable-data recovery. Only a verified empty
   // client receives the new starting preference; cloud adoption still wins.
   if(!loaded && freshClient){ state.settings.scanMode="halving";state.settings.showPostpone=false; }
-  const hadScene=!!(loaded?.settings && Object.hasOwn(loaded.settings,"scene"));
+  const hadScene=checkedOpening?checkedOpening.hadScene:!!(loaded?.settings && Object.hasOwn(loaded.settings,"scene"));
   const deviceScene=readDeviceScene();
   let rejectedSavedState = false, repairedDeletionLog = false, repairedCompletionAuthority=false;
   try{
-    assertCompleteSavedCollections(state);
-    dropRemovedFields(state);
-    repairedDeletionLog=hydrateState(state);
+    if(checkedOpening)repairedDeletionLog=checkedOpening.repairedDeletionLog;
+    else{
+      assertCompleteSavedCollections(state);
+      dropRemovedFields(state);
+      repairedDeletionLog=hydrateState(state);
+    }
     if(Array.isArray(state.decisionEvents)&&state.decisionEvents.some(event=>event?.kind==="undo"))projectDecisionEvents(state);
   }catch(e){
     // Keep the unreadable bytes in storage for recovery, but never let one
