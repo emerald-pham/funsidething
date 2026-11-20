@@ -18040,6 +18040,8 @@ test('RISK answer work: the device save still keeps a task or rating History row
  const commits=counters.commits.length;
  await clock.advance(1500);
  assert.ok(counters.commits.length>commits,'positive control: the answer is saved on the device');
+ // The save writes the live board's own text, byte for byte.
+ assert.equal(counters.commits.at(-1).payload,JSON.stringify(ctx.state),'the device holds exactly the live board');
  for(const [label,board] of [['the saved board',JSON.parse(counters.commits.at(-1).payload)],['the live board',ctx.state]]){
   const task=id=>board.tasks.find(row=>row.id===id);
   assert.ok(task(lost.id),label+' keeps the task the board lost');

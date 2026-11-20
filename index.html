@@ -3073,7 +3073,7 @@ function reopenTask(task,current=task){
    hold partial boards, so automatic adoption keeps unique task IDs unless a
    delete action left an explicit tombstone. The winning copy owns shared
    scan/layout state; this only repairs the task membership that was missing. */
-function mergeUndeletedTasks(winner, other, {otherOwned=false}={}){
+function mergeUndeletedTasks(winner, other, {otherOwned=false,sameTasks=null}={}){
   // Attest each original source before union: a peer's equal completion date
   // cannot prove this source already contained that peer's modern Done.
   // #2408: a caller that parsed other for this merge alone hands it over
@@ -3109,6 +3109,11 @@ function mergeUndeletedTasks(winner, other, {otherOwned=false}={}){
   for(const task of other.tasks){
     if(deleted[task.id]) continue;
     const current=present.get(task.id);
+    // #2428: a task the other copy holds exactly as the winner does (the
+    // caller compared their serialized rows) holds nothing the winner lacks,
+    // so its per-task merges are skipped. The board-wide evidence above and
+    // below still merges from the whole copy.
+    if(current&&sameTasks?.has(task.id)) continue;
     if(!current){
       const copy=JSON.parse(JSON.stringify(task));
       normalizeTaskPrerequisites(copy);winner.tasks.push(copy);present.set(copy.id,copy);changed=true;
@@ -4649,10 +4654,11 @@ function deviceOwnSaveBase(head){
 // Debug log record (count and source, never titles or IDs) follow tasks, not
 // History rows or other evidence the same merge restores (#2333 review).
 // sourceOwned: the caller parsed source for this check alone, so the merge may
-// use it as it is instead of copying it first (#2408).
-function keepMissingTasks(source,keptFrom,message,{sourceOwned=false}={}){
+// use it as it is instead of copying it first (#2408). sameTasks: ids of tasks
+// the source holds exactly as the live board does (#2428).
+function keepMissingTasks(source,keptFrom,message,{sourceOwned=false,sameTasks=null}={}){
   const live=new Set(state.tasks.map(task=>task.id));
-  const changed=mergeUndeletedTasks(state,source,{otherOwned:sourceOwned});
+  const changed=mergeUndeletedTasks(state,source,{otherOwned:sourceOwned,sameTasks});
   const keptTasks=state.tasks.filter(task=>!live.has(task.id)).length;
   if(keptTasks){
     toast(message,6000);
@@ -4660,6 +4666,43 @@ function keepMissingTasks(source,keptFrom,message,{sourceOwned=false}={}){
       null,null,null,null,null,null,null,null,null,{keptTasks,keptFrom});
   }
   return changed;
+}
+/* #2428: a device save serializes the board once, with each task's row made
+   on its own and set in place, so the text is byte for byte
+   JSON.stringify(state). The rows of the board this tab last committed stay
+   with its text, so the next save's missing-task check compares the two
+   boards' task rows: a task whose row is exactly the same in both holds
+   nothing the live board lacks, and only a task whose row changed or went is
+   merged from the last saved board. Before, that check merged every task's
+   History on every save, about half of an answer's device save on a large
+   board. */
+let savedBoardPieces=null; // {raw, rows, ids}: this tab's last committed board, its task rows and their ids, in order
+function boardSaveText(){
+  const tasks=state?.tasks;
+  if(!Array.isArray(tasks))return {text:JSON.stringify(state),rows:null,ids:null};
+  const rows=new Array(tasks.length),ids=new Array(tasks.length);
+  for(let i=0;i<tasks.length;i++){rows[i]=JSON.stringify(tasks[i])??"null";ids[i]=tasks[i]?.id;}
+  // The rows go where a marker no board holds stands for them; a marker that
+  // somehow appears twice falls back to the plain serialization.
+  const tag="\u0000tasks:"+uid(),marker=JSON.stringify(tag),text=JSON.stringify({...state,tasks:tag});
+  const at=text.indexOf(marker);
+  if(at<0||text.indexOf(marker,at+1)>=0)return {text:JSON.stringify(state),rows:null,ids:null};
+  return {text:text.slice(0,at)+"["+rows.join(",")+"]"+text.slice(at+marker.length),rows,ids};
+}
+// The ids of tasks whose rows the last committed board and these pieces hold
+// exactly alike, or null when that cannot be told (the last saved board is not
+// one this tab committed, or a task id appears twice).
+function savedTasksUnchanged(pieces){
+  const saved=savedBoardPieces;
+  if(!saved||!pieces?.rows||!saved.rows||saved.raw!==lastPersistedRaw)return null;
+  const live=new Map();
+  for(let i=0;i<pieces.rows.length;i++){if(live.has(pieces.ids[i]))return null;live.set(pieces.ids[i],pieces.rows[i]);}
+  const seen=new Set(),same=new Set();
+  for(let i=0;i<saved.rows.length;i++){
+    const id=saved.ids[i];if(seen.has(id))return null;seen.add(id);
+    if(live.get(id)===saved.rows[i])same.add(id);
+  }
+  return same;
 }
 /* The disk half of save(), on its own: writes what is in memory and does
    nothing else. save() also re-stamps updatedAt and schedules a cloud push,
@@ -4718,14 +4761,16 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
   // unless a step above changed the board (#2408 review).
   const laneText=lane?.text&&!projected&&!completionSourceBackup&&laneSnapshot.signature===deviceLegacySeenSignature&&laneSnapshot.raw===lastPersistedRaw&&
     laneSnapshot.hash===deviceHeadHash&&laneSnapshot.authority===deviceStorageAuthority&&laneSnapshot.board===state?lane.text:null;
-  let payload=laneText??JSON.stringify(state);
+  // #2428: the text comes with its pieces (boardSaveText).
+  let pieces=laneText!==null?lane.pieces??null:boardSaveText(),payload=laneText??pieces.text;
   // #2417: the change records whose change this save's board holds.
   const changeRecordsHeld=changeRecordOutbox.order();
   if(lane)lane.requests=deviceSaveLane.requests();
   if(lastPersistedRaw!==payload&&lastPersistedRaw){
     const last=savedPayloadBoard(lastPersistedRaw);
-    if(last&&sameListOwner(state,last)&&keepMissingTasks(last,"last-save","A missing task was kept in the saved board.",{sourceOwned:true})){
-      recomputeRanks();render();payload=JSON.stringify(state);
+    // #2428: tasks whose rows the two boards hold alike are not merged.
+    if(last&&sameListOwner(state,last)&&keepMissingTasks(last,"last-save","A missing task was kept in the saved board.",{sourceOwned:true,sameTasks:savedTasksUnchanged(pieces)})){
+      recomputeRanks();render();pieces=boardSaveText();payload=pieces.text;
     }
   }
   const chanceSeed = state.chance?.seed;
@@ -4912,6 +4957,7 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
         recomputeRanks();render();
       }
       deviceHeadHash=result.hash;lastPersistedRaw=committedPayload;changeRecordOutbox.saved(changeRecordsHeld);
+      savedBoardPieces=pieces?.rows&&committedPayload===payload?{raw:payload,rows:pieces.rows,ids:pieces.ids}:null; // #2428
       persistedChanceSeed=committedPayload===payload?chanceSeed??null:JSON.parse(committedPayload).chance?.seed??null; // #2408: no second parse of this save's own text
       rememberSavedBoardFacts(result.hash,committedPayload);
       await refreshDeviceBackupCache();
@@ -6239,11 +6285,12 @@ async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry
   const syncWork=trackSyncWork("device-save");try{
   // #2408 review: a lane save serializes the board once. When the save-loop
   // check needs the board's text, it takes it here and the save reuses it.
-  if(lane){lane.text=null;lane.saved=null;}
+  if(lane){lane.text=null;lane.pieces=null;lane.saved=null;}
   // A device retry belongs to the run that started it.
   let cloudStep=null;
   if(!(Number.isSafeInteger(deviceRetry)&&deviceRetry>0)){
-    const check=cloudSaveLoopCheck(lane?()=>lane.text??=JSON.stringify(state):undefined);if(!check.allowed)return false;cloudStep=check.cloudStep;
+    // #2428: the text comes with its pieces (boardSaveText).
+    const check=cloudSaveLoopCheck(lane?()=>{if(lane.text==null){lane.pieces=boardSaveText();lane.text=lane.pieces.text;}return lane.text;}:undefined);if(!check.allowed)return false;cloudStep=check.cloudStep;
   }
   const startedAt=supportDiagnosticsNow(),requestGeneration=saveRequestGeneration,priorIssue=lastDeviceSaveIssue;
   const observeCloudSave=status=>{if(cloudStep)supportDiagnosticsObserveCloudStep("cloud-save",status,startedAt,state?.syncRev,"unknown",{cloudStep});};
