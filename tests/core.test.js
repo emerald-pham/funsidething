@@ -7252,6 +7252,96 @@ test('RISK opening scenery plan browser: a warm relaunch on the same day and pla
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
 
+// #2430: the scenery's opening paint ran as one long task after the board
+// showed, so a tap in the first second waited for all of it. Its first canvas
+// draw busy-holds the main thread briefly here, so a trusted key typed into Add
+// is certainly pending, as on a slow phone. That key must be handled while the
+// opening paint is still under way, before the landscape is first shown, and
+// no frame may show a partly painted landscape. Only ordering is asserted.
+test('RISK opening scenery paint browser: a trusted key is handled during the scenery opening paint and no frame shows a partly painted landscape in Chromium and WebKit under both motion choices',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=30,HOLD_MS=250;
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('paint-'+i,'Paint board task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true}));
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const motion of ['normal','reduced']){
+    const label=`${engineName}/${motion}`,context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:motion==='reduced'?'reduce':'no-preference'});
+    try{
+     // The scenery waits at its first fetch until the board is usable and typing has begun.
+     let releaseRates;const ratesHeld=new Promise(resolve=>{releaseRates=resolve;});
+     await context.route('**/*',async route=>{
+      const url=new URL(route.request().url());if(url.origin!==origin)return route.abort();
+      if(url.pathname.endsWith('/SPAWN_RATES.md'))await ratesHeld;
+      return route.continue();
+     });
+     let shownSeen=false;await context.exposeBinding('__openingShown',()=>{shownSeen=true;});
+     await context.addInitScript(({board,motion,ROWS,HOLD_MS})=>{
+      Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+      // A valid saved choice, so the first-run motion prompt cannot confound the opening.
+      localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:motion,savedAt:Date.now()}));
+      if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+      const opening=window.__paint={log:[],started:false,lifeDrawn:false,complete:false};
+      opening.ready=()=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]')&&document.querySelectorAll('#listBody [data-row]').length===ROWS;
+      const scenery=()=>document.querySelector('#landscape [data-scenery]'),visible=()=>getComputedStyle(scenery()).visibility==='visible';
+      // The opening paint is complete once the opaque scenery canvas is
+      // visible and the life canvas has been drawn, checked as each happens.
+      const settle=()=>{if(opening.started&&!opening.complete&&opening.lifeDrawn&&visible()){opening.complete=true;opening.log.push({kind:'complete'});window.__openingShown();}};
+      document.addEventListener('DOMContentLoaded',()=>new MutationObserver(settle).observe(scenery(),{attributes:true,attributeFilter:['style']}));
+      // Every frame until then: a visible scenery canvas without its life is a partly painted landscape.
+      const raf=window.requestAnimationFrame.bind(window);
+      const observe=()=>{
+       if(opening.started&&!opening.complete)opening.log.push({kind:'frame',visible:visible(),lifeDrawn:opening.lifeDrawn});
+       if(!opening.complete)raf(observe);
+      };raf(observe);
+      for(const type of ['keydown','keyup'])document.addEventListener(type,event=>{if(event.isTrusted&&opening.started&&opening.log.length<400)opening.log.push({kind:'input',type});},true);
+      const context2d=CanvasRenderingContext2D.prototype;
+      for(const method of ['clearRect','fillRect','strokeRect','fill','stroke','drawImage','putImageData','fillText','strokeText']){
+       const original=context2d[method];
+       context2d[method]=function(...args){
+        const canvas=this.canvas;
+        if(canvas?.closest?.('#landscape')&&!opening.complete){
+         if(canvas.matches('[data-life]'))opening.lifeDrawn=true;
+         if(opening.log.at(-1)?.kind!=='draw')opening.log.push({kind:'draw',ready:opening.ready()});
+         if(!opening.started){opening.started=true;const until=performance.now()+HOLD_MS;while(performance.now()<until){}}
+         settle();
+        }
+        return original.apply(this,args);
+       };
+      }
+     },{board,motion,ROWS,HOLD_MS});
+     const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+     await page.waitForFunction(()=>window.__paint.ready(),null,{timeout:15000});
+     assert.equal(await page.evaluate(()=>__paint.started),false,`${label}: the scenery has not painted while held`);
+     await page.locator('#addInput').focus();
+     let typed=0;const deadline=Date.now()+20000;
+     // About a key per frame, as a fast typist: a flood of synthetic keys as fast
+     // as the driver allows starves Chromium's other tasks and stalls any opening.
+     while(!shownSeen&&Date.now()<deadline){await page.keyboard.press('KeyQ');if(++typed===3)releaseRates();await page.waitForTimeout(16);}
+     assert.ok(shownSeen,`${label}: the landscape is shown after opening ${JSON.stringify({typed,errors,log:await page.evaluate(()=>__paint.log.filter(entry=>entry.kind!=='input').slice(-12))})}`);
+     const result=await page.evaluate(()=>({log:__paint.log,value:document.getElementById('addInput').value,motion:document.documentElement.dataset.landscapeMotion}));
+     const {log}=result,first=log.findIndex(entry=>entry.kind==='draw'),complete=log.findIndex(entry=>entry.kind==='complete');
+     const firstInput=log.findIndex(entry=>entry.kind==='input'),partial=log.filter(entry=>entry.kind==='frame'&&entry.visible&&!entry.lifeDrawn).length;
+     const summary={label,first,firstInput,complete,partial,frames:log.filter(entry=>entry.kind==='frame').length,typed,motion:result.motion};observed.push(summary);
+     // Fixture preconditions: the board was usable when the scenery began painting, and every key reached Add.
+     assert.ok(first>=0&&log[first].ready,`${label}: the seeded board is usable before the scenery paints ${JSON.stringify(summary)}`);
+     assert.ok(firstInput>first,`${label}: a trusted key was typed after the opening paint began ${JSON.stringify(summary)}`);
+     assert.equal(result.motion,motion,`${label}: the saved motion choice applies`);
+     assert.equal(result.value,'q'.repeat(typed),`${label}: every trusted key reached Add`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+     // Behavior under test: ordering only.
+     if(!(firstInput>first&&firstInput<complete))failures.push(`${label}: the first trusted key after the opening paint began was handled only after the opening paint finished`);
+     if(partial)failures.push(`${label}: ${partial} frame(s) showed a partly painted landscape`);
+    }finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
 // #2203: the scenery's recurring refresh must not hold up input. The page's
 // Date is shifted so the scene's own minute boundary falls a few seconds after
 // opening; timers and frames stay real. When the refresh computes the scene at
