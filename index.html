@@ -3961,16 +3961,25 @@ async function initializeDeviceStorageWithinBudget(bootAttempt){
     // Validate a detached copy before hydrating or reconciling legacy sources.
     // #2429: the checked copy is the board this opening opens, with what the
     // opening's own check of it found, so the head is parsed and checked once.
-    // It is kept only while the head stays this exact text (its hash).
-    let checked=null;
+    // It is handed over at once (openingCheckedDeviceBoard) and kept only
+    // while the head stays this exact text (its hash).
+    openingCheckedDeviceBoard=null;
     try{
       const board=JSON.parse(head.payload),hadScene=!!(board?.settings&&Object.hasOwn(board.settings,"scene"));
       assertCompleteSavedCollections(board);dropRemovedFields(board);const repairedDeletionLog=hydrateState(board);
-      checked={hash:head.hash,board,hadScene,repairedDeletionLog};
+      openingCheckedDeviceBoard={hash:head.hash,payload:head.payload,board,hadScene,repairedDeletionLog};
     }
     catch{head=await recoverLocalWorkingDeviceSource({bootAttempt});if(!head)throw Error("No supported local working source");}
+    // #2225: a read below that loads whole saved copies (the recovery
+    // original's raw snapshot, the older browser copy's reconciliation) may
+    // replace the head, and the opening then parses the new head itself. The
+    // checked board is released before such a read, so it is not kept alive
+    // across it beside the copies that read loads and the board parsed after
+    // it. Otherwise it is the one parsed board the opening keeps.
+    const releaseCheckedBoard=()=>{openingCheckedDeviceBoard=null;};
     deviceRecoveryCloudHold=await deviceStore.getRecoveryCloudHold();
     if(deviceRecoveryCloudHold?.reason==="device-source-recovery"&&deviceRecoveryCloudHold.automaticRecovery===true){
+      releaseCheckedBoard();
       const raw=await deviceStore.readRawExportSnapshot();
       if(!await verifiedLocalWorkingRecoveryIntent(deviceRecoveryCloudHold,raw,deviceRecoveryCloudHold.account,
         deviceRecoveryCloudHold.identity,{allowUnresolved:true}))throw Error("The local recovery original could not be verified");
@@ -3984,12 +3993,13 @@ async function initializeDeviceStorageWithinBudget(bootAttempt){
     await refreshDeviceBackupCache(()=>true,{measureLimit:0});
     if(!localDeviceStartupCurrent(bootAttempt))return null;
     if(legacy&&!deviceLegacySeenSignature){
+      releaseCheckedBoard();
       if(!await reconcileDeviceLegacyCopy())return null;
       head=await deviceStore.readHead();
     }
     if(!localDeviceStartupCurrent(bootAttempt))return null;
     if(localWorkingRecoveryIntent(deviceRecoveryCloudHold))unacceptedDeviceSource={reason:"protected-local-working-source",workingWorkspace:true};
-    openingCheckedDeviceBoard=checked?.hash===head.hash?{...checked,payload:head.payload}:null;
+    if(openingCheckedDeviceBoard?.hash!==head.hash||openingCheckedDeviceBoard.payload!==head.payload)releaseCheckedBoard();
     return head.payload;
   }catch(e){
     if(!localDeviceStartupCurrent(bootAttempt))return null;
@@ -4597,6 +4607,8 @@ async function loadState(){
       if(opened?.payload===durable)return opened.board;
       openingCheckedDeviceBoard=null;return JSON.parse(durable);
     }
+    // No device head opens, so no checked board is kept for it.
+    openingCheckedDeviceBoard=null;
     // Once a verified IndexedDB head has become authoritative, the retained
     // v1 bytes are recovery evidence for old shells, not a current board.
     // An unavailable/blocked database must fail closed instead of reviving
