@@ -1833,10 +1833,15 @@
       // lifetimes, then the life and the reveal. The scenery canvas stays
       // hidden until that last step, so no frame shows a partly painted
       // landscape; the placeholder sky shows until then, as before.
+      // A landscape a direct refresh already showed (a warm reopen's pageshow
+      // once the board is up) stays shown: the new background replaces the old
+      // whole, under the old life, until the last step. Hiding it blinked out
+      // the sun, skyline and clock tower for a frame or two (#2430 review B1).
       openingPaint.painting=true;openingPaint.due=false;
+      const shown=back.style.visibility!=='hidden';
       // Not redundant: the scene was computed at boot, and the background reads
       // light states that must match this later instant.
-      syncScene(Date.now());paintBackground();back.style.visibility='hidden';
+      syncScene(Date.now());paintBackground();if(!shown)back.style.visibility='hidden';
       const painted=sky;
       openingStep(()=>{
         // Only preparation: whatever happens here, the last step still runs.

@@ -7342,6 +7342,119 @@ test('RISK opening scenery paint browser: a trusted key is handled during the sc
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
 
+// #2430 typography review B1: on a warm reopen the board is ready before the
+// scenery script runs, and a slow web font holds the page's load until after
+// it, so the pageshow that follows paints and shows the whole landscape while
+// the opening paint is still owed. Text that arrives just after then joins the
+// opening paint, whose first step hid the shown landscape again: for a frame or
+// two the sun, skyline and clock tower vanished. Once shown, the landscape must
+// stay shown, whole, in every frame. The font file is held until the scenery
+// script has started and the board shows, and the human-written hourly text,
+// read in full at once, is handed to the scenery's fetch only when the
+// landscape is first shown, so the order is fixed rather than raced. Only
+// visibility per frame is asserted.
+test('RISK opening scenery reopen browser: on a warm reopen a landscape shown before the opening paint stays shown and whole in every frame when late text joins that paint, in Chromium and WebKit under both motion choices',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=12,HOLD_MS=250,REOPENS=2,FRAMES=90;
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('reopen-'+i,'Reopen board task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true}));
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const motion of ['normal','reduced']){
+    const label=`${engineName}/${motion}`,context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:motion==='reduced'?'reduce':'no-preference'});
+    try{
+     let releaseFont=()=>{},fontHeld=Promise.resolve();
+     await context.exposeBinding('__fontMayLoad',()=>releaseFont());
+     await context.route('**/*',async route=>{
+      const url=new URL(route.request().url());
+      // A slow web font: its stylesheet answers, but the font file waits for the board and scenery script, then fails.
+      if(url.hostname==='fonts.googleapis.com')return route.fulfill({status:200,contentType:'text/css',body:"@font-face{font-family:'Spline Sans';src:url(https://fonts.gstatic.com/held.woff2) format('woff2')}"});
+      if(url.hostname==='fonts.gstatic.com'){await fontHeld;return route.abort();}
+      return url.origin===origin?route.continue():route.abort();
+     });
+     await context.addInitScript(({board,motion,HOLD_MS,FRAMES})=>{
+      // The plain page each reopen leaves from has no scenery to watch.
+      if(location.pathname.endsWith('.svg'))return;
+      Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+      // A valid saved choice, so the first-run motion prompt cannot confound the opening.
+      localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:motion,savedAt:Date.now()}));
+      if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+      const o=window.__reopen={frames:[],drawn:false,draws:0,lifeDrawn:false,shown:false,textLoaded:false,textLoadedAtShow:null,delivered:false,textPaintedAtOnce:null};
+      // The font is released once the scenery script has started and the board
+      // is shown, whichever is later; the main thread is held there so the
+      // released font lands before the opening continues.
+      let sceneryStarted=false,fontReleased=false;
+      const releaseFont=()=>{
+       if(fontReleased||!sceneryStarted||document.documentElement.dataset.appReady!=='true')return;
+       fontReleased=true;window.__fontMayLoad();const until=performance.now()+HOLD_MS;while(performance.now()<until){}
+      };
+      document.addEventListener('landscape-scene-time-ready',()=>{sceneryStarted=true;releaseFont();},true);
+      new MutationObserver(releaseFont).observe(document,{subtree:true,attributes:true,attributeFilter:['data-app-ready']});
+      // The hourly text file is read in full now; the scenery's own fetch of it
+      // resolves only when the landscape is first shown.
+      const realFetch=window.fetch.bind(window),textFile=realFetch('./HUMAN_WRITTEN_HOURLY_TAGS.md').then(response=>response.text()).then(markdown=>{o.textLoaded=true;return markdown;});
+      let handOver;const handedOver=new Promise(resolve=>{handOver=resolve;});
+      window.fetch=function(resource,...rest){return String(resource).endsWith('HUMAN_WRITTEN_HOURLY_TAGS.md')?handedOver:realFetch(resource,...rest);};
+      // Whether applying that text painted at once or joined the owed opening paint.
+      let mood;Object.defineProperty(globalThis,'LandscapeMood',{configurable:true,enumerable:true,get:()=>mood,set(value){
+       // The module's API is frozen, so the page sees a copy with this one call observed.
+       mood=Object.freeze({...value,setHumanText(...args){const before=o.draws;queueMicrotask(()=>{o.textPaintedAtOnce=o.draws!==before;});return value.setHumanText(...args);}});
+      }});
+      const context2d=CanvasRenderingContext2D.prototype;
+      for(const method of ['clearRect','fillRect','strokeRect','fill','stroke','drawImage','putImageData','fillText','strokeText']){
+       const original=context2d[method];
+       context2d[method]=function(...args){
+        const canvas=this.canvas;
+        if(canvas?.closest?.('#landscape')){o.draws++;if(canvas.matches('[data-life]'))o.lifeDrawn=true;else o.drawn=true;}
+        return original.apply(this,args);
+       };
+      }
+      const scenery=()=>document.querySelector('#landscape [data-scenery]'),visible=()=>getComputedStyle(scenery()).visibility==='visible';
+      document.addEventListener('DOMContentLoaded',()=>new MutationObserver(()=>{
+       if(o.shown||!o.lifeDrawn||!visible())return;
+       o.shown=true;o.textLoadedAtShow=o.textLoaded;
+       textFile.then(markdown=>{o.delivered=true;handOver({ok:true,status:200,text:()=>Promise.resolve(markdown)});});
+      }).observe(scenery(),{attributes:true,attributeFilter:['style']}));
+      // Every frame: whether the scenery canvas is shown, and whether it and the life canvas have been drawn.
+      const raf=window.requestAnimationFrame.bind(window);
+      const observe=()=>{o.frames.push({visible:visible(),drawn:o.drawn,life:o.lifeDrawn});if(o.frames.length<FRAMES)raf(observe);};
+      raf(observe);
+     },{board,motion,HOLD_MS,FRAMES});
+     const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     const launch=async stage=>{
+      if(page.url().startsWith(origin))await page.goto(origin+'/icon.svg');
+      fontHeld=new Promise(resolve=>{releaseFont=resolve;});
+      await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+      await page.waitForFunction(FRAMES=>document.documentElement.dataset.appReady==='true'&&window.__reopen.frames.length>=FRAMES,FRAMES,{timeout:20000});
+      const o=await page.evaluate(()=>({...__reopen,motion:document.documentElement.dataset.landscapeMotion}));
+      const firstShown=o.frames.findIndex(frame=>frame.visible&&frame.drawn&&frame.life);
+      const vanished=firstShown<0?0:o.frames.slice(firstShown).filter(frame=>!frame.visible).length;
+      const partial=o.frames.filter(frame=>frame.visible&&frame.drawn&&!frame.life).length;
+      const summary={label,stage,firstShown,vanished,partial,shown:o.shown,textLoadedAtShow:o.textLoadedAtShow,delivered:o.delivered,textPaintedAtOnce:o.textPaintedAtOnce,motion:o.motion};observed.push(summary);
+      assert.ok(firstShown>=0,`${label}: ${stage} showed the landscape ${JSON.stringify(summary)}`);
+      assert.equal(o.motion,motion,`${label}: the saved motion choice applies`);
+      return summary;
+     };
+     await launch('cold');
+     for(let reopen=1;reopen<=REOPENS;reopen++){
+      const warm=await launch('warm reopen '+reopen);
+      // Fixture preconditions: the landscape was shown before the text arrived, and the text joined the owed opening paint.
+      assert.ok(warm.textLoadedAtShow&&warm.delivered,`${label}: the hourly text was handed over when the landscape was first shown ${JSON.stringify(warm)}`);
+      assert.equal(warm.textPaintedAtOnce,false,`${label}: the late text joined an opening paint still owed ${JSON.stringify(warm)}`);
+      // Behavior under test.
+      if(warm.vanished)failures.push(`${label}: ${warm.stage}: ${warm.vanished} frame(s) hid the landscape after it was shown`);
+      if(warm.partial)failures.push(`${label}: ${warm.stage}: ${warm.partial} frame(s) showed a partly painted landscape`);
+     }
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
 // #2203: the scenery's recurring refresh must not hold up input. The page's
 // Date is shifted so the scene's own minute boundary falls a few seconds after
 // opening; timers and frames stay real. When the refresh computes the scene at
