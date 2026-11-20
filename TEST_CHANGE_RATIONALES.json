@@ -24798,7 +24798,7 @@
     ],
     "replacementTests": [
       "RISK push work: a Worker that never answers delays neither the acknowledged revision nor its decision base, and a close or cloud read right after the ok keeps the acknowledgement",
-      "RISK opening once: a warm relaunch of the large board with sync off parses, checks and hashes the board it opens once, the preview alone checks its older copy, and the preview shows the same board"
+      "RISK answer work: a Can’t row’s time left in All Tasks still counts down in each new minute while answers keep the other rows"
     ],
     "redEvidence": {
       "command": "node --max-old-space-size=8192 --test --test-name-pattern=\"Worker that never answers\" tests/persistence-recovery.test.js (on e79f939a with the new test and the worker option)",
