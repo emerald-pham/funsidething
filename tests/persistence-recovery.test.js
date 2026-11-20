@@ -17931,3 +17931,74 @@ test('RISK change records: an answer undone while its record was being sent is n
  }
  assert.deepEqual(failed,[],'an answer undone while its record was being sent is never sent after reopening');
 });
+
+// #2428: the work one scanner answer causes on this device, counted, never
+// timed, from the tap until its device save and change record are done and
+// before its push (the push path is #2427): a No pushes after the push
+// debounce, so the window ends before it. It is counted through the app's own
+// functions and its JSON:
+// - historyMerges and mergedTasks: rating History merges and the tasks they
+//   read, which the device save's missing-task check made for every task;
+// - rowsBuilt: All Tasks rows whose markup is built (each built row draws its
+//   chips once);
+// - boardText: JSON text of at least half the board, made or read. Half of
+//   the smaller of the saved board and the cloud copy, so the board's older
+//   browser copies count on a 20-task board as they do on the large one;
+// - undoCopies: whole-board Undo copies (text in pieces, one per row);
+// - projections: whole-board replays of the decision evidence.
+function answerWork2428(device,boardBytes){
+ const {ctx}=device,counts={historyMerges:0,mergedTasks:new Set(),rowsBuilt:0,boardText:0,undoCopies:0,projections:0};
+ const host=ctx.JSON,big=Math.max(1024,Math.floor(boardBytes/2)),sites=new Map();
+ // Where each whole-board text was made or read, for the diagnostic only.
+ const where=kind=>{const at=new Error().stack.split('\n').slice(3,7).map(line=>line.trim().replace(/^at /,'').replace(/ \(.*\)$/,'')).join(' < ');sites.set(kind+' '+at,(sites.get(kind+' '+at)||0)+1);};
+ ctx.JSON={[Symbol.toStringTag]:'JSON',
+  stringify(...args){const text=host.stringify(...args);if(typeof text==='string'&&text.length>=big){counts.boardText++;where('stringify');}return text;},
+  parse(text,...rest){if(typeof text==='string'&&text.length>=big){counts.boardText++;where('parse');}return host.parse(text,...rest);}};
+ ctx.__work2428=counts;
+ vm.runInContext(`(()=>{const c=__work2428;let listing=0;
+  const merge=mergeTaskRatingHistory;mergeTaskRatingHistory=function(winner){c.historyMerges++;c.mergedTasks.add(winner?.id);return merge.apply(this,arguments);};
+  const capture=captureUndoBoard;captureUndoBoard=function(){c.undoCopies++;return capture.apply(this,arguments);};
+  const project=decisionProjectionIssue;decisionProjectionIssue=function(){c.projections++;return project.apply(this,arguments);};
+  const list=renderList;renderList=function(){listing++;try{return list.apply(this,arguments);}finally{listing--;}};
+  const chips=chipHTML;chipHTML=function(){if(listing)c.rowsBuilt++;return chips.apply(this,arguments);};
+ })()`,ctx);
+ return {reset(){for(const key of Object.keys(counts))counts[key]=key==='mergedTasks'?new Set():0;sites.clear();},
+  now:()=>({...counts,mergedTasks:counts.mergedTasks.size}),sites:()=>Object.fromEntries(sites)};
+}
+// A signed-in device with sync on, scanning on the board, settled, with the
+// answer's own push held behind its debounce; one No is answered and counted.
+async function oneCountedNo2428(t,label,board){
+ const device=await answeringDevice2408(t,{board,saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock,counters}=device;
+ await clock.advance(3000);
+ const seeded=Buffer.byteLength(JSON.stringify(board),'utf8');
+ const work=answerWork2428(device,Math.min(seeded,Buffer.byteLength(ctx.cloudPayload(),'utf8')));
+ const commits=counters.commits.length,uploads=counters.uploads.length,records=recordsWritten2417(device);
+ work.reset();
+ const candidate=device.tap('no');
+ assert.equal(ctx.state.considered?.[candidate],'no',label+': positive control: the No is taken');
+ await clock.advance(1500);
+ const counted=work.now();
+ assert.equal(counters.commits.length-commits,1,label+': positive control: the answer is saved on the device once');
+ assert.equal(recordsWritten2417(device)-records,1,label+': positive control: and sent as its change record');
+ assert.equal(counters.uploads.length,uploads,label+': positive control: its push has not started');
+ return {counted,sites:work.sites(),device};
+}
+test('RISK answer work: one No with sync on costs the same whole-board work on a 20-task board as on the large board',{timeout:300000},async t=>{
+ // The 20-task board's tasks carry a future field of padding, so that its
+ // whole-board texts stand out from its decision log as the large board's do.
+ const twenty=answeringBoard2408({tasks:20,padBytes:0});
+ for(const task of twenty.tasks)task.futureNote='x'.repeat(15000);
+ const small=await oneCountedNo2428(t,'20 tasks',{...twenty,listOpen:true});
+ await small.device.close();
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const large=await oneCountedNo2428(t,'large board',JSON.parse(fixture.payload));
+ t.diagnostic(JSON.stringify({small:small.counted,large:large.counted}));
+ t.diagnostic(JSON.stringify({smallSites:small.sites,largeSites:large.sites}));
+ assert.ok(small.counted.rowsBuilt>0&&small.counted.boardText>0,'positive control: the counters see the list and the device save: '+JSON.stringify(small.counted));
+ // A No moves the ratings of its candidate and the benchmark; only those
+ // two tasks' History is merged, whatever the board holds.
+ assert.ok(large.counted.mergedTasks<=2,'the device save merges the History of the answered tasks only: '+JSON.stringify(large.counted));
+ assert.deepEqual(large.counted,small.counted,'one answer costs the same whole-board work on the large board as on a 20-task board');
+});
