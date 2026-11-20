@@ -1241,7 +1241,7 @@ class HarnessWorker{
  }
  terminate(){this.closed=true;}
 }
-async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, sharedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady, navigatorProvider, cryptoProvider = webcrypto, indexedDBProvider, deviceDbName, deviceOpenTimeoutMs, withSceneModules = false, sceneModulesAfterDomReady = false, locationHref, fetchProvider, budgetClock } = {}) {
+async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, sharedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady, navigatorProvider, cryptoProvider = webcrypto, indexedDBProvider, deviceDbName, deviceOpenTimeoutMs, withSceneModules = false, sceneModulesAfterDomReady = false, locationHref, fetchProvider, budgetClock, beforeAppScript = null } = {}) {
   const shim = makeDomShim({ prefersDark, sharedStorage });
   const ownedTimers=new Set();let disposed=false,sandbox;
   const fixture={async dispose(){
@@ -1351,7 +1351,7 @@ async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactor
   if (sceneModulesAfterDomReady) shim.document.readyState = "loading";
   // #2429: runs in the page before the app's own script, as an earlier
   // inline script does (the saved appearance) or an observer installed first.
-  arguments[0]?.beforeAppScript?.(sandbox, shim);
+  beforeAppScript?.(sandbox, shim);
   shim.document.currentScript={textContent:appSource,src:""};
   vm.runInContext(appSource, sandbox, { filename: "index.html#app" });
   shim.document.currentScript=null;
