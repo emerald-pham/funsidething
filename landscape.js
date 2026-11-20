@@ -1780,7 +1780,8 @@
   // scene and joins that paint instead of painting first.
   // While the opening paint itself is under way, it computes the latest scene
   // in its last step instead, so the published scene changes with that paint.
-  function owedOpeningRefresh(){if(!openingPaint.painting)computeScene();openingPaint.due=true;if(timeDialog.open)refreshSolarTimes();}
+  function oweOpeningPaint(){if(!openingPaint.painting)computeScene();openingPaint.due=true;}
+  function owedOpeningRefresh(){oweOpeningPaint();if(timeDialog.open)refreshSolarTimes();}
   // Until the first paint the page shows the computed sky colour, not the
   // stylesheet's fixed day placeholder, behind the board (#2194 review O1).
   // The colours are also kept for the inline step in index.html that shows
@@ -1882,6 +1883,6 @@
   }).then(markdown=>{
     LandscapeMood.setHumanText(markdown);
     // Text that arrives before the opening paint joins it instead of painting first.
-    if(openingPaint){if(!openingPaint.painting)computeScene();openingPaint.due=true;}else refreshSky();
+    if(openingPaint)oweOpeningPaint();else refreshSky();
   }).catch(()=>{});
 })();

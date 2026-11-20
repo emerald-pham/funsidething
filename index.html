@@ -4744,11 +4744,18 @@ function keepMissingTasks(source,keptFrom,message,{sourceOwned=false,sameTasks=n
    History on every save, about half of an answer's device save on a large
    board. */
 let savedBoardPieces=null; // {raw, rows, ids}: this tab's last committed board, its task rows and their ids, in order
+// Each task's own text and id, in board order. A device save and a push join
+// their board texts from these rows, so the next save can compare tasks by
+// their rows without serializing them again.
+function taskRowTexts(tasks){
+  const rows=new Array(tasks.length),ids=new Array(tasks.length);
+  for(let i=0;i<tasks.length;i++){rows[i]=JSON.stringify(tasks[i])??"null";ids[i]=tasks[i]?.id;}
+  return {rows,ids};
+}
 function boardSaveText(){
   const tasks=state?.tasks;
   if(!Array.isArray(tasks))return {text:JSON.stringify(state),rows:null,ids:null};
-  const rows=new Array(tasks.length),ids=new Array(tasks.length);
-  for(let i=0;i<tasks.length;i++){rows[i]=JSON.stringify(tasks[i])??"null";ids[i]=tasks[i]?.id;}
+  const {rows,ids}=taskRowTexts(tasks);
   // The rows go where a marker no board holds stands for them; a marker that
   // somehow appears twice falls back to the plain serialization.
   const tag="\u0000tasks:"+uid(),marker=JSON.stringify(tag),text=JSON.stringify({...state,tasks:tag});
@@ -4772,8 +4779,7 @@ function boardSaveText(){
 const decisionBaseTexts=new WeakMap();
 function boardPushTexts(board){
   if(!board||typeof board!=="object"||Array.isArray(board)||!Array.isArray(board.tasks)||typeof board.toJSON==="function")return null;
-  const tasks=board.tasks,rows=new Array(tasks.length),ids=new Array(tasks.length);
-  for(let i=0;i<tasks.length;i++){rows[i]=JSON.stringify(tasks[i])??"null";ids[i]=tasks[i]?.id;}
+  const tasks=board.tasks,{rows,ids}=taskRowTexts(tasks);
   const keys=Object.keys(board),pieces=new Map(),device=[],cloud=[];
   for(const key of keys){
     const value=board[key];let piece;
@@ -4785,10 +4791,8 @@ function boardPushTexts(board){
     pieces.set(key,piece);
     if(piece!==undefined)device.push(JSON.stringify(key)+":"+piece);
   }
-  // As cloudPayloadFor builds its copy, without serializing it.
-  const out={};
-  for(const key of keys)if(!DEVICE_LOCAL_KEYS.includes(key))out[key]=key==="deletionLog"?exactDeletionLogUnion(board[key]):board[key];
-  projectLegacyPrerequisites(out,true);
+  // The very copy cloudPayloadFor serializes, so the two texts cannot drift.
+  const out=cloudProjection(board);
   for(const key of Object.keys(out)){
     const value=out[key];let piece;
     if(key==="tasks"&&Array.isArray(value)&&value.length===tasks.length)
@@ -4798,10 +4802,10 @@ function boardPushTexts(board){
   }
   return {text:"{"+device.join(",")+"}",rows,ids,cloud:"{"+cloud.join(",")+"}"};
 }
-// #2427: the push's texts, offered to the device save it starts at once
-// (persist); set only around that request, so a save that starts later makes
-// its own text from the board as it is then.
-let preparedPushText=null;
+// #2427: the push's texts and task rows, offered to the device save it starts
+// at once (persist); set only around that request, so a save that starts
+// later makes its own text from the board as it is then.
+let preparedPushPieces=null;
 // The ids of tasks whose rows the last committed board and these pieces hold
 // exactly alike, or null when that cannot be told (the last saved board is not
 // one this tab committed, or a task id appears twice).
@@ -4893,7 +4897,8 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
   // unless a step above changed the board (#2408 review).
   const laneText=lane?.text&&!projected&&!completionSourceBackup&&laneSnapshot.signature===deviceLegacySeenSignature&&laneSnapshot.raw===lastPersistedRaw&&
     laneSnapshot.hash===deviceHeadHash&&laneSnapshot.authority===deviceStorageAuthority&&laneSnapshot.board===state?lane.text:null;
-  // #2428: the text comes with its pieces (boardSaveText).
+  // #2428: the text is kept with its task rows (boardSaveText), so the merge
+  // below can skip tasks whose rows the last saved board holds alike.
   let pieces=laneText!==null?lane.pieces??null:boardSaveText(),payload=laneText??pieces.text;
   // #2417: the change records whose change this save's board holds.
   const changeRecordsHeld=changeRecordOutbox.order();
@@ -5096,7 +5101,8 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
       }
       continueSavedBoardLineage(committedPayload===payload?mergedFrom:null,committedPayload);
       deviceHeadHash=result.hash;lastPersistedRaw=committedPayload;changeRecordOutbox.saved(changeRecordsHeld);
-      savedBoardPieces=pieces?.rows&&committedPayload===payload?{raw:payload,rows:pieces.rows,ids:pieces.ids}:null; // #2428
+      // #2428: the next save compares its task rows with this board's.
+      savedBoardPieces=pieces?.rows&&committedPayload===payload?{raw:payload,rows:pieces.rows,ids:pieces.ids}:null;
       persistedChanceSeed=committedPayload===payload?chanceSeed??null:JSON.parse(committedPayload).chance?.seed??null; // #2408: no second parse of this save's own text
       rememberSavedBoardFacts(result.hash,committedPayload);
       await refreshDeviceBackupCache();
@@ -6429,11 +6435,12 @@ async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry
   // check needs the board's text, it takes it here and the save reuses it.
   if(lane){lane.text=null;lane.pieces=null;lane.saved=null;}
   // #2427: a push's own save takes the text the push made of this board.
-  if(lane&&preparedPushText?.board===state&&preparedPushText.generation===saveRequestGeneration){lane.pieces=preparedPushText.pieces;lane.text=lane.pieces.text;}
+  if(lane&&preparedPushPieces?.board===state&&preparedPushPieces.generation===saveRequestGeneration){lane.pieces=preparedPushPieces.pieces;lane.text=lane.pieces.text;}
   // A device retry belongs to the run that started it.
   let cloudStep=null;
   if(!(Number.isSafeInteger(deviceRetry)&&deviceRetry>0)){
-    // #2428: the text comes with its pieces (boardSaveText).
+    // #2428: the loop check's text is the save's, made with its task rows so
+    // the save that follows reuses both.
     const check=cloudSaveLoopCheck(lane?()=>{if(lane.text==null){lane.pieces=boardSaveText();lane.text=lane.pieces.text;}return lane.text;}:undefined);if(!check.allowed)return false;cloudStep=check.cloudStep;
   }
   const startedAt=supportDiagnosticsNow(),requestGeneration=saveRequestGeneration,priorIssue=lastDeviceSaveIssue;
@@ -6567,8 +6574,7 @@ const deviceSaveLane=(()=>{
   }
   // requests(): lane requests made so far; waiting(): whether a lane save is
   // waiting to start; slowestMs(): the longest a lane save of this tab took.
-  // busy(): whether a lane save is running or waiting to start (#2427).
-  return Object.freeze({request,requests:()=>requested,waiting:()=>waiting.length>0,busy:()=>running.size>0||waiting.length>0,slowestMs:()=>slowestMs});
+  return Object.freeze({request,requests:()=>requested,waiting:()=>waiting.length>0,slowestMs:()=>slowestMs});
 })();
 function supportDiagnosticsSettleCloudPush(ticket,status,revision=null,code="unknown",pushDetails=null){
   try{
@@ -7517,8 +7523,8 @@ async function sendPush(){
     // #2427: the live board this payload was made of, and the save request it
     // holds through: while no save is asked for and the board is the same
     // object, the board still holds exactly this payload.
-    let payloadFromLive={board:state,generation:diagnosticRequestGeneration,edits:editsAtPayload,
-      held:{taskIds:texts?texts.ids:(state.tasks||[]).map(task=>task?.id),historyKeys:(Array.isArray(state.workLog)?state.workLog:[]).map(historyEntryKey)}};
+    let payloadSource={board:state,generation:diagnosticRequestGeneration,edits:editsAtPayload,
+      contents:{taskIds:texts?texts.ids:(state.tasks||[]).map(task=>task?.id),historyKeys:historyKeysOf(state)}};
     // A cloud write is not allowed to outrun its device-local safety copy.
     // This also covers membership repaired from the last cloud read above.
     // #2408: the push's save goes through the device-save lane: it waits for a
@@ -7535,8 +7541,8 @@ async function sendPush(){
       ?Math.max(knownCopy.through,boardRecordsThrough(state)):boardRecordsThrough(state);
     let pushRecoveryIds=Array.isArray(state.protectedBackupIds) ? [...state.protectedBackupIds] : [];
     if(!savedAdoption){
-      preparedPushText=texts?{board:state,generation:diagnosticRequestGeneration,pieces:texts}:null;
-      let save;try{save=deviceSaveLane.request();}finally{preparedPushText=null;}
+      preparedPushPieces=texts?{board:state,generation:diagnosticRequestGeneration,pieces:texts}:null;
+      let save;try{save=deviceSaveLane.request();}finally{preparedPushPieces=null;}
       const saved=save.lane;
       if(await save.done!==true)return;
       if(!pushStillCurrent()){holdChangedPush();return;}
@@ -7548,7 +7554,7 @@ async function sendPush(){
       const unchanged=!!texts&&state===pushedBoard&&saveRequestGeneration===diagnosticRequestGeneration&&
         boardEditSerial===editsAtPayload&&saved.saved===texts.text;
       // #2427 review: the saved board that holds exactly this payload's board.
-      if(unchanged&&payloadFromLive)payloadFromLive.lineage=savedLineageOf(saved.saved);
+      if(unchanged&&payloadSource)payloadSource.lineage=savedLineageOf(saved.saved);
       if(!unchanged&&payload !== cloudPayload()){
         // If an edit arrived while the save was in flight, retry with its exact
         // payload so a cloud write never outruns that edit's local safety copy.
@@ -7565,7 +7571,7 @@ async function sendPush(){
         if(!durable||(durable.syncAccount??null)!==(state.syncAccount??null)||decisionEvidenceIssue(durable,pushAccount)||decisionProjectionIssue(durable)){
           supportDiagnosticsDropSupersededPush(); joinPushFollowUp(); return;
         }
-        payload=cloudPayloadFor(durable);pushedThrough=saved.generation;pushedUpdatedAt=durable.updatedAt;pushedRecords=boardRecordsThrough(durable);payloadFromLive=null;
+        payload=cloudPayloadFor(durable);pushedThrough=saved.generation;pushedUpdatedAt=durable.updatedAt;pushedRecords=boardRecordsThrough(durable);payloadSource=null;
         pushRecoveryIds=Array.isArray(durable.protectedBackupIds) ? [...durable.protectedBackupIds] : [];
       }
     }
@@ -7615,13 +7621,13 @@ async function sendPush(){
         changeRecordOutbox.fullCopyAcknowledged();
         bindDecisionBase(pushAccount,res.rev,payload,res); // #2354: res names the copy it published
         // #2427: the copy this tab published from a board it validated.
-        ownPublishedCopy=payloadFromLive&&Number.isSafeInteger(payloadFromLive.lineage)?
-          {account:pushAccount,revision:res.rev,payload,lineage:payloadFromLive.lineage,...payloadFromLive.held}:null;
+        ownPublishedCopy=payloadSource&&Number.isSafeInteger(payloadSource.lineage)?
+          {account:pushAccount,revision:res.rev,payload,lineage:payloadSource.lineage,...payloadSource.contents}:null;
         // An edit made while this write was in flight is still unsynced.
         // #2427: with no save asked for since the payload was made and the
         // same board, nothing was edited; otherwise the texts are compared.
-        const unedited=!!payloadFromLive&&state===payloadFromLive.board&&saveRequestGeneration===payloadFromLive.generation&&
-          boardEditSerial===payloadFromLive.edits;
+        const unedited=!!payloadSource&&state===payloadSource.board&&saveRequestGeneration===payloadSource.generation&&
+          boardEditSerial===payloadSource.edits;
         state.syncDirty = unedited ? false : payload!==cloudPayload();
         if(!state.syncDirty)clearCloudRetry({preserveAutomaticSource:true});
         if(Number.isFinite(res.serverUpdatedAt)) state.lastCloudServerAt=res.serverUpdatedAt;
@@ -7734,8 +7740,10 @@ async function sendPush(){
 let ownPublishedCopy=null;
 // Whether the live board still holds every task and History row of that
 // copy, or a delete or clear stands behind the one it lacks.
+// The keys of a board's History rows.
+function historyKeysOf(board){return (Array.isArray(board.workLog)?board.workLog:[]).map(historyEntryKey);}
 function ownPublishedCopyHeld(own){
-  const tasks=new Set((state.tasks||[]).map(task=>task?.id)),history=new Set((Array.isArray(state.workLog)?state.workLog:[]).map(historyEntryKey));
+  const tasks=new Set((state.tasks||[]).map(task=>task?.id)),history=new Set(historyKeysOf(state));
   return Array.isArray(own.taskIds)&&Array.isArray(own.historyKeys)&&
     own.taskIds.every(id=>tasks.has(id)||!!state.deletedTaskIds?.[id])&&own.historyKeys.every(key=>history.has(key)||!!state.clearedHistoryIds?.[key]);
 }
@@ -7748,12 +7756,19 @@ function serverTimeMs(value){
   return Number.isFinite(at) ? at : null;
 }
 /* What actually goes into the cloud document and legacy JSON compatibility. */
-function cloudPayloadFor(board){
+// The cloud copy of a board before it is serialized: every key but the
+// device-only ones, with the deletion log's exact union and prerequisite links
+// staged as released apps read them. A push joins its text from it too
+// (boardPushTexts), so both texts are made from one projection.
+function cloudProjection(board){
   const out = {};
   for(const k of Object.keys(board || {})) if(!DEVICE_LOCAL_KEYS.includes(k))
     out[k] = k==="deletionLog" ? exactDeletionLogUnion(board[k]) : board[k];
   projectLegacyPrerequisites(out,true);
-  return JSON.stringify(out);
+  return out;
+}
+function cloudPayloadFor(board){
+  return JSON.stringify(cloudProjection(board));
 }
 function cloudPayload(){ return cloudPayloadFor(state); }
 /* #2417: change records (GLOSSARY: Change record). What the cloud holds is
@@ -8339,18 +8354,30 @@ window.__chainHealthyOrdinaryPublication=(backend,identity,revision,payload)=>{
   }catch{return false;}
 };
 const decisionBaseIdentityCache=[];
+// The identity of a decision base's fact, hashed with hash (chanceHash). The
+// decision base worker runs this same function's source.
+function decisionBaseIdOf(fact,hash){
+  return "db1:"+[0,1,2,3].map(index=>hash("decision-base-v1:"+index+":"+fact).toString(16).padStart(8,"0")).join("");
+}
+function sameDecisionBaseFact(row,account,revision,payload){return row.account===account&&row.revision===revision&&row.payload===payload;}
+// Exact primitive inputs invalidate automatically when any byte changes.
+// Retain at most two complete keys of four million UTF-16 units each,
+// for this document lifetime; larger inputs are computed without retention.
+function retainableDecisionBaseFact(account,revision,payload){
+  return typeof account==="string"&&Number.isSafeInteger(revision)&&typeof payload==="string"&&account.length+payload.length<=4*1024*1024;
+}
+function cachedDecisionBaseIdentity(account,revision,payload){
+  return decisionBaseIdentityCache.find(row=>sameDecisionBaseFact(row,account,revision,payload))?.id??null;
+}
+function rememberDecisionBaseIdentity(account,revision,payload,id){
+  if(!retainableDecisionBaseFact(account,revision,payload)||cachedDecisionBaseIdentity(account,revision,payload)!==null)return;
+  decisionBaseIdentityCache.unshift({account,revision,payload,id});decisionBaseIdentityCache.length=Math.min(decisionBaseIdentityCache.length,2);
+}
 function decisionBaseIdentity(account,revision,payload){
-  const cached=decisionBaseIdentityCache.find(row=>row.account===account&&row.revision===revision&&row.payload===payload);
-  if(cached)return cached.id;
-  const fact=JSON.stringify([account,revision,payload]);
-  const digest=[0,1,2,3].map(index=>chanceHash("decision-base-v1:"+index+":"+fact).toString(16).padStart(8,"0")).join("");
-  const id="db1:"+digest;
-  // Exact primitive inputs invalidate automatically when any byte changes.
-  // Retain at most two complete keys of four million UTF-16 units each,
-  // for this document lifetime; larger inputs are computed without retention.
-  if(typeof account==="string"&&Number.isSafeInteger(revision)&&typeof payload==="string"&&account.length+payload.length<=4*1024*1024){
-    decisionBaseIdentityCache.unshift({account,revision,payload,id});decisionBaseIdentityCache.length=Math.min(decisionBaseIdentityCache.length,2);
-  }
+  const cached=cachedDecisionBaseIdentity(account,revision,payload);
+  if(cached!==null)return cached;
+  const id=decisionBaseIdOf(JSON.stringify([account,revision,payload]),chanceHash);
+  rememberDecisionBaseIdentity(account,revision,payload,id);
   return id;
 }
 /* #2427: the decision base identity of a push's acknowledgement hashes a
@@ -8359,21 +8386,14 @@ function decisionBaseIdentity(account,revision,payload){
    bound and later checked exactly as before (same id, same format). The
    worker runs the very hash below; where no worker can run, or it does not
    answer, the identity is made on the main thread when the base is bound, as
-   before. The worker's hash is chanceHash, line for line, under another name. */
+   before. The worker runs the sources of chanceHash and decisionBaseIdOf
+   themselves, so it cannot name a base differently from the main thread. */
 const DECISION_BASE_WORKER_SOURCE=`"use strict";
-function sameHashAsChanceHash(text){
-  let h = 2166136261;
-  for(let i=0;i<text.length;i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
-  h ^= h >>> 16; h = Math.imul(h, 0x7feb352d); h ^= h >>> 15;
-  h = Math.imul(h, 0x846ca68b); h ^= h >>> 16;
-  return h >>> 0;
-}
+${chanceHash.toString()}
+${decisionBaseIdOf.toString()}
 onmessage=event=>{
   const {n,account,revision,payload}=event.data||{};let id=null;
-  try{
-    const fact=JSON.stringify([account,revision,payload]);
-    id="db1:"+[0,1,2,3].map(index=>sameHashAsChanceHash("decision-base-v1:"+index+":"+fact).toString(16).padStart(8,"0")).join("");
-  }catch(e){id=null;}
+  try{id=decisionBaseIdOf(JSON.stringify([account,revision,payload]),chanceHash);}catch(e){id=null;}
   postMessage({n,id});
 };`;
 const DECISION_BASE_WORKER_WAIT_MS=10000;
@@ -8402,19 +8422,14 @@ function decisionBaseWorkerReady(){
     return true;
   }catch{decisionBaseWorkerFailed();return false;}
 }
-function rememberDecisionBaseIdentity(account,revision,payload,id){
-  if(decisionBaseIdentityCache.some(row=>row.account===account&&row.revision===revision&&row.payload===payload))return;
-  decisionBaseIdentityCache.unshift({account,revision,payload,id});decisionBaseIdentityCache.length=Math.min(decisionBaseIdentityCache.length,2);
-}
 // Resolves once the identity of (account, revision, payload) is in the cache,
 // or with null when it could not be made off the main thread (or would not be
 // kept: the cache holds only inputs it can retain). Never rejects.
 function decisionBaseIdentityOffThread(account,revision,payload){
-  if(typeof account!=="string"||!account||!Number.isSafeInteger(revision)||revision<0||typeof payload!=="string"||account.length+payload.length>4*1024*1024)
-    return Promise.resolve(null);
-  const cached=decisionBaseIdentityCache.find(row=>row.account===account&&row.revision===revision&&row.payload===payload);
-  if(cached)return Promise.resolve(cached.id);
-  const pending=decisionBaseIdentityPending.find(row=>row.account===account&&row.revision===revision&&row.payload===payload);
+  if(!account||revision<0||!retainableDecisionBaseFact(account,revision,payload))return Promise.resolve(null);
+  const cached=cachedDecisionBaseIdentity(account,revision,payload);
+  if(cached!==null)return Promise.resolve(cached);
+  const pending=decisionBaseIdentityPending.find(row=>sameDecisionBaseFact(row,account,revision,payload));
   if(pending)return pending.promise;
   if(!decisionBaseWorkerReady())return Promise.resolve(null);
   const row={account,revision,payload,promise:null};
@@ -15531,16 +15546,16 @@ function renderList(){
   let keptRanks=false;
   const wanted = [];
   for(const t of rows){
-    const kept=keptRow?.(t.id);
-    if(kept&&listRowsReuse===LIST_ROWS_ANSWER){
-      wanted.push({id:t.id,rest:kept.rest,fields:kept.fields,html:kept.html,spark:kept.spark,summary:kept.summary,readsClock:kept.minute!==null,unchanged:true});keptRanks=true;continue;
+    const reused=keptRow?.(t.id);
+    if(reused&&listRowsReuse===LIST_ROWS_ANSWER){
+      wanted.push({id:t.id,rest:reused.rest,fields:reused.fields,html:reused.html,spark:reused.spark,summary:reused.summary,readsClock:reused.minute!==null,unchanged:true});keptRanks=true;continue;
     }
     const selected=selectedIds.has(t.id),rankTag=selecting?'span':'div';
     const selectionAttrs=' data-act="bulk-toggle" data-id="'+esc(t.id)+'" aria-pressed="'+selected+'" aria-label="'+(selected?'Deselect ':'Select ')+esc(t.title)+'"';
     // A rank refresh puts the new rank into a kept row's markup.
-    const fields=kept?kept.fields:{task:t,rankColumns,...boardPresentation.rowFacts(state,t,{inChain,act,byId,nextDotted}),
+    const fields=reused?reused.fields:{task:t,rankColumns,...boardPresentation.rowFacts(state,t,{inChain,act,byId,nextDotted}),
       titleAttrs:selecting&&!showRank?selectionAttrs:' data-act="edit" data-id="'+esc(t.id)+'"',url:safeUrl(t.url),chips:chipHTML(t)};
-    const rest=kept?kept.rest:boardPresentation.taskRow(fields);
+    const rest=reused?reused.rest:boardPresentation.taskRow(fields);
     if(deferRanks&&listRowsDrawn.rows.get(t.id)?.rest===rest){wanted.push({id:t.id,rest,unchanged:true});continue;}
     const summary=showTopK?taskSelectionSummary(t,selectionStats,listMetric):null;
     const spark=showSparklines ? sparkParts(t.id, 88, 22) : null;
@@ -15551,7 +15566,7 @@ function renderList(){
         ? '<button type="button" class="rank-summary bulk-rank-toggle"'+selectionAttrs+'><span class="bulk-rank-original" aria-hidden="'+selected+'">'+rankContent+'</span>'+(selected?'<span class="tk bulk-rank-selected"><span class="tkl">Selected</span></span>':'')+'</button>'
         : '<div class="rank-summary">'+rankContent+'</div>'
       : '';
-    wanted.push({id:t.id,html:boardPresentation.taskRow({...fields,rankSummary}),rest,spark,summary,fields,readsClock:kept?kept.minute!==null:rowReadsClock(t,state,now)});
+    wanted.push({id:t.id,html:boardPresentation.taskRow({...fields,rankSummary}),rest,spark,summary,fields,readsClock:reused?reused.minute!==null:rowReadsClock(t,state,now)});
   }
   if(selecting)listRowBuilds.forget();else listRowBuilds.keep(rowKey,state,wanted,keptRow,minute);
   // "nothing here" and "nothing matching" are different problems with different fixes
