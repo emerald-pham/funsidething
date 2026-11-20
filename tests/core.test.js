@@ -7160,6 +7160,301 @@ test('RISK opening scenery browser: a seeded board takes trusted typing and a fr
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
 
+// #2430: every opening worked out the day's plan from the sun's position at
+// each minute of the UTC day, about 210 ms of astronomy at 4x CPU, before the
+// scenery could paint. A warm relaunch on the same day in the same place must
+// reuse that plan and paint exactly what a fresh computation paints. Another
+// place or another day computes the plan afresh, and a fresh device with those
+// same inputs paints the same landscape, so no stale sky or plan is shown. The
+// page clock is fixed so every launch shows one instant. Work is counted where
+// the sun is asked of the astronomy library, never timed.
+test('RISK opening scenery plan browser: a warm relaunch on the same day and place reuses the day plan and paints the identical landscape, while another place or day computes it afresh, in Chromium and WebKit under both motion choices',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=12,DAY_ONE='2026-11-19T17:00:00Z',DAY_TWO='2026-11-20T17:00:00Z',FRESH_PLAN=1000,REUSED_PLAN=100;
+ const TOKYO={latitude:35.6762,longitude:139.6503,timezone:'Asia/Tokyo',label:'Tokyo, JP',enabled:true};
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('plan-'+i,'Plan board task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true}));
+ const digest=value=>createHash('sha256').update(value).digest('hex').slice(0,16);
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const motion of ['normal','reduced']){
+    const label=`${engineName}/${motion}`,contexts=[];
+    const device=async(place=null)=>{
+     const context=await browser.newContext({viewport:{width:390,height:844},timezoneId:'America/New_York',serviceWorkers:'block',reducedMotion:motion==='reduced'?'reduce':'no-preference'});contexts.push(context);
+     await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+     await context.addInitScript(({board,motion,place})=>{
+      Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+      // A valid saved choice, so the first-run motion prompt cannot confound the
+      // opening. It predates both fixed instants: the page clock may not be fixed yet here.
+      localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:motion,savedAt:Date.parse('2026-11-18T12:00:00Z')}));
+      if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+      if(place&&localStorage.getItem('fvp:chain-scanner:location')===null)localStorage.setItem('fvp:chain-scanner:location',JSON.stringify(place));
+      const plan=window.__plan={sun:0,painted:false,frames:0};
+      // Count every request for the sun's position, wherever the scenery makes it.
+      let astronomy;Object.defineProperty(globalThis,'Astronomy',{configurable:true,enumerable:true,get:()=>astronomy,set(value){
+       const equator=value.Equator;value.Equator=function(body,...rest){if(body==='Sun')plan.sun++;return equator.call(this,body,...rest);};astronomy=value;
+      }});
+      const raf=window.requestAnimationFrame.bind(window),observe=()=>{if(plan.painted)plan.frames++;if(plan.frames<60)raf(observe);};raf(observe);
+      const context2d=CanvasRenderingContext2D.prototype;
+      for(const method of ['clearRect','fillRect','fill','stroke','drawImage','putImageData']){
+       const original=context2d[method];
+       context2d[method]=function(...args){if(!plan.painted&&this.canvas?.closest?.('#landscape'))plan.painted=true;return original.apply(this,args);};
+      }
+     },{board,motion,place});
+     return context;
+    };
+    // A launch first leaves the previous opening for a plain page of the same
+    // origin, so that opening cannot see the next instant and work that day out.
+    const launch=async(context,at,stage)=>{
+     const page=context.pages()[0]||await context.newPage();
+     if(page.url().startsWith(origin))await page.goto(origin+'/icon.svg');
+     await page.clock.setFixedTime(new Date(at));
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+     await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&window.__plan.painted&&window.__plan.frames>=60,null,{timeout:20000});
+     const shown=await page.evaluate(()=>{
+      const root=document.documentElement,back=document.querySelector('#landscape [data-scenery]'),front=document.querySelector('#landscape [data-life]');
+      return {sun:__plan.sun,back:back.toDataURL(),front:front.toDataURL(),backVisible:getComputedStyle(back).visibility,
+       scene:{season:root.dataset.sceneSeason,period:root.dataset.scenePeriod,tint:root.style.getPropertyValue('--scene-tint'),status:document.getElementById('sceneStatus').textContent,motion:root.dataset.landscapeMotion,location:JSON.stringify(globalThis.LivingLocation?.current())}};
+     });
+     const result={stage,sun:shown.sun,back:digest(shown.back),front:digest(shown.front),backVisible:shown.backVisible,scene:shown.scene};observed.push({label,...result,scene:undefined});
+     return result;
+    };
+    try{
+     const first=await device();
+     const cold=await launch(first,DAY_ONE,'cold');
+     const warm=await launch(first,DAY_ONE,'warm same day and place');
+     await first.pages()[0].evaluate(place=>localStorage.setItem('fvp:chain-scanner:location',JSON.stringify(place)),TOKYO);
+     const moved=await launch(first,DAY_ONE,'warm after moving');
+     const nextDay=await launch(first,DAY_TWO,'warm next day');
+     const other=await device(TOKYO);
+     const freshMoved=await launch(other,DAY_ONE,'fresh device moved');
+     const freshNextDay=await launch(other,DAY_TWO,'fresh device next day');
+     // Fixture preconditions: the counter sees a fresh day plan, the landscape painted and the saved choices apply.
+     assert.ok(cold.sun>=FRESH_PLAN,`${label}: a cold opening computes the day plan (${cold.sun} sun positions)`);
+     assert.ok(freshMoved.sun>=FRESH_PLAN&&freshNextDay.sun>=FRESH_PLAN,`${label}: a fresh device computes its own day plans (${freshMoved.sun}, ${freshNextDay.sun} sun positions)`);
+     for(const shown of [cold,warm,moved,nextDay,freshMoved,freshNextDay])assert.equal(shown.backVisible,'visible',`${label}: ${shown.stage} painted the landscape`);
+     assert.equal(cold.scene.motion,motion,`${label}: the saved motion choice applies`);
+     assert.notEqual(moved.scene.location,cold.scene.location,`${label}: the moved place applies`);
+     // Behavior under test.
+     if(warm.sun>=REUSED_PLAN)failures.push(`${label}: a warm relaunch on the same day in the same place computed the day plan again (${warm.sun} sun positions)`);
+     if(warm.back!==cold.back||warm.front!==cold.front)failures.push(`${label}: the warm relaunch painted a different landscape from the fresh computation`);
+     if(JSON.stringify(warm.scene)!==JSON.stringify(cold.scene))failures.push(`${label}: the warm relaunch showed different scene time, season, place, palette or message ${JSON.stringify([cold.scene,warm.scene])}`);
+     if(moved.sun<FRESH_PLAN)failures.push(`${label}: moving to another place reused the old place's plan (${moved.sun} sun positions)`);
+     if(nextDay.sun<FRESH_PLAN)failures.push(`${label}: the next day reused the previous day's plan (${nextDay.sun} sun positions)`);
+     if(moved.back!==freshMoved.back||moved.front!==freshMoved.front||JSON.stringify(moved.scene)!==JSON.stringify(freshMoved.scene))failures.push(`${label}: after moving, the landscape differs from a fresh device in that place`);
+     if(nextDay.back!==freshNextDay.back||nextDay.front!==freshNextDay.front||JSON.stringify(nextDay.scene)!==JSON.stringify(freshNextDay.scene))failures.push(`${label}: on the next day, the landscape differs from a fresh device on that day`);
+    }finally{for(const context of contexts)await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
+// #2430: the scenery's opening paint ran as one long task after the board
+// showed, so a tap in the first second waited for all of it. Its first canvas
+// draw busy-holds the main thread briefly here, so a trusted key typed into Add
+// is certainly pending, as on a slow phone. That key must be handled while the
+// opening paint is still under way, before the landscape is first shown, and
+// no frame may show a partly painted landscape. Only ordering is asserted.
+test('RISK opening scenery paint browser: a trusted key is handled during the scenery opening paint and no frame shows a partly painted landscape in Chromium and WebKit under both motion choices',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=30,HOLD_MS=250;
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('paint-'+i,'Paint board task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true}));
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const motion of ['normal','reduced']){
+    const label=`${engineName}/${motion}`,context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:motion==='reduced'?'reduce':'no-preference'});
+    try{
+     // The scenery waits at its first fetch until the board is usable and typing has begun.
+     let releaseRates;const ratesHeld=new Promise(resolve=>{releaseRates=resolve;});
+     await context.route('**/*',async route=>{
+      const url=new URL(route.request().url());if(url.origin!==origin)return route.abort();
+      if(url.pathname.endsWith('/SPAWN_RATES.md'))await ratesHeld;
+      return route.continue();
+     });
+     let shownSeen=false;await context.exposeBinding('__openingShown',()=>{shownSeen=true;});
+     await context.addInitScript(({board,motion,ROWS,HOLD_MS})=>{
+      Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+      // A valid saved choice, so the first-run motion prompt cannot confound the opening.
+      localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:motion,savedAt:Date.now()}));
+      if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+      const opening=window.__paint={log:[],started:false,lifeDrawn:false,complete:false};
+      opening.ready=()=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]')&&document.querySelectorAll('#listBody [data-row]').length===ROWS;
+      const scenery=()=>document.querySelector('#landscape [data-scenery]'),visible=()=>getComputedStyle(scenery()).visibility==='visible';
+      // The opening paint is complete once the opaque scenery canvas is
+      // visible and the life canvas has been drawn, checked as each happens.
+      const settle=()=>{if(opening.started&&!opening.complete&&opening.lifeDrawn&&visible()){opening.complete=true;opening.log.push({kind:'complete'});window.__openingShown();}};
+      document.addEventListener('DOMContentLoaded',()=>new MutationObserver(settle).observe(scenery(),{attributes:true,attributeFilter:['style']}));
+      // Every frame until then: a visible scenery canvas without its life is a partly painted landscape.
+      const raf=window.requestAnimationFrame.bind(window);
+      const observe=()=>{
+       if(opening.started&&!opening.complete)opening.log.push({kind:'frame',visible:visible(),lifeDrawn:opening.lifeDrawn});
+       if(!opening.complete)raf(observe);
+      };raf(observe);
+      for(const type of ['keydown','keyup'])document.addEventListener(type,event=>{if(event.isTrusted&&opening.started&&opening.log.length<400)opening.log.push({kind:'input',type});},true);
+      const context2d=CanvasRenderingContext2D.prototype;
+      for(const method of ['clearRect','fillRect','strokeRect','fill','stroke','drawImage','putImageData','fillText','strokeText']){
+       const original=context2d[method];
+       context2d[method]=function(...args){
+        const canvas=this.canvas;
+        if(canvas?.closest?.('#landscape')&&!opening.complete){
+         if(canvas.matches('[data-life]'))opening.lifeDrawn=true;
+         if(opening.log.at(-1)?.kind!=='draw')opening.log.push({kind:'draw',ready:opening.ready()});
+         if(!opening.started){opening.started=true;const until=performance.now()+HOLD_MS;while(performance.now()<until){}}
+         settle();
+        }
+        return original.apply(this,args);
+       };
+      }
+     },{board,motion,ROWS,HOLD_MS});
+     const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+     await page.waitForFunction(()=>window.__paint.ready(),null,{timeout:15000});
+     assert.equal(await page.evaluate(()=>__paint.started),false,`${label}: the scenery has not painted while held`);
+     await page.locator('#addInput').focus();
+     let typed=0;const deadline=Date.now()+20000;
+     // About a key per frame, as a fast typist: a flood of synthetic keys as fast
+     // as the driver allows starves Chromium's other tasks and stalls any opening.
+     while(!shownSeen&&Date.now()<deadline){await page.keyboard.press('KeyQ');if(++typed===3)releaseRates();await page.waitForTimeout(16);}
+     assert.ok(shownSeen,`${label}: the landscape is shown after opening ${JSON.stringify({typed,errors,log:await page.evaluate(()=>__paint.log.filter(entry=>entry.kind!=='input').slice(-12))})}`);
+     const result=await page.evaluate(()=>({log:__paint.log,value:document.getElementById('addInput').value,motion:document.documentElement.dataset.landscapeMotion}));
+     const {log}=result,first=log.findIndex(entry=>entry.kind==='draw'),complete=log.findIndex(entry=>entry.kind==='complete');
+     const firstInput=log.findIndex(entry=>entry.kind==='input'),partial=log.filter(entry=>entry.kind==='frame'&&entry.visible&&!entry.lifeDrawn).length;
+     const summary={label,first,firstInput,complete,partial,frames:log.filter(entry=>entry.kind==='frame').length,typed,motion:result.motion};observed.push(summary);
+     // Fixture preconditions: the board was usable when the scenery began painting, and every key reached Add.
+     assert.ok(first>=0&&log[first].ready,`${label}: the seeded board is usable before the scenery paints ${JSON.stringify(summary)}`);
+     assert.ok(firstInput>first,`${label}: a trusted key was typed after the opening paint began ${JSON.stringify(summary)}`);
+     assert.equal(result.motion,motion,`${label}: the saved motion choice applies`);
+     assert.equal(result.value,'q'.repeat(typed),`${label}: every trusted key reached Add`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+     // Behavior under test: ordering only.
+     if(!(firstInput>first&&firstInput<complete))failures.push(`${label}: the first trusted key after the opening paint began was handled only after the opening paint finished`);
+     if(partial)failures.push(`${label}: ${partial} frame(s) showed a partly painted landscape`);
+    }finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
+// #2430 typography review B1: on a warm reopen the board is ready before the
+// scenery script runs, and a slow web font holds the page's load until after
+// it, so the pageshow that follows paints and shows the whole landscape while
+// the opening paint is still owed. Text that arrives just after then joins the
+// opening paint, whose first step hid the shown landscape again: for a frame or
+// two the sun, skyline and clock tower vanished. Once shown, the landscape must
+// stay shown, whole, in every frame. The font file is held until the scenery
+// script has started and the board shows, and the human-written hourly text,
+// read in full at once, is handed to the scenery's fetch only when the
+// landscape is first shown, so the order is fixed rather than raced. Only
+// visibility per frame is asserted.
+test('RISK opening scenery reopen browser: on a warm reopen a landscape shown before the opening paint stays shown and whole in every frame when late text joins that paint, in Chromium and WebKit under both motion choices',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=12,HOLD_MS=250,REOPENS=2,FRAMES=90;
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('reopen-'+i,'Reopen board task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true}));
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const motion of ['normal','reduced']){
+    const label=`${engineName}/${motion}`,context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:motion==='reduced'?'reduce':'no-preference'});
+    try{
+     let releaseFont=()=>{},fontHeld=Promise.resolve();
+     await context.exposeBinding('__fontMayLoad',()=>releaseFont());
+     await context.route('**/*',async route=>{
+      const url=new URL(route.request().url());
+      // A slow web font: its stylesheet answers, but the font file waits for the board and scenery script, then fails.
+      if(url.hostname==='fonts.googleapis.com')return route.fulfill({status:200,contentType:'text/css',body:"@font-face{font-family:'Spline Sans';src:url(https://fonts.gstatic.com/held.woff2) format('woff2')}"});
+      if(url.hostname==='fonts.gstatic.com'){await fontHeld;return route.abort();}
+      return url.origin===origin?route.continue():route.abort();
+     });
+     await context.addInitScript(({board,motion,HOLD_MS,FRAMES})=>{
+      // The plain page each reopen leaves from has no scenery to watch.
+      if(location.pathname.endsWith('.svg'))return;
+      Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+      // A valid saved choice, so the first-run motion prompt cannot confound the opening.
+      localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:motion,savedAt:Date.now()}));
+      if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+      const o=window.__reopen={frames:[],drawn:false,draws:0,lifeDrawn:false,shown:false,textLoaded:false,textLoadedAtShow:null,delivered:false,textPaintedAtOnce:null};
+      // The font is released once the scenery script has started and the board
+      // is shown, whichever is later; the main thread is held there so the
+      // released font lands before the opening continues.
+      let sceneryStarted=false,fontReleased=false;
+      const releaseFont=()=>{
+       if(fontReleased||!sceneryStarted||document.documentElement.dataset.appReady!=='true')return;
+       fontReleased=true;window.__fontMayLoad();const until=performance.now()+HOLD_MS;while(performance.now()<until){}
+      };
+      document.addEventListener('landscape-scene-time-ready',()=>{sceneryStarted=true;releaseFont();},true);
+      new MutationObserver(releaseFont).observe(document,{subtree:true,attributes:true,attributeFilter:['data-app-ready']});
+      // The hourly text file is read in full now; the scenery's own fetch of it
+      // resolves only when the landscape is first shown.
+      const realFetch=window.fetch.bind(window),textFile=realFetch('./HUMAN_WRITTEN_HOURLY_TAGS.md').then(response=>response.text()).then(markdown=>{o.textLoaded=true;return markdown;});
+      let handOver;const handedOver=new Promise(resolve=>{handOver=resolve;});
+      window.fetch=function(resource,...rest){return String(resource).endsWith('HUMAN_WRITTEN_HOURLY_TAGS.md')?handedOver:realFetch(resource,...rest);};
+      // Whether applying that text painted at once or joined the owed opening paint.
+      let mood;Object.defineProperty(globalThis,'LandscapeMood',{configurable:true,enumerable:true,get:()=>mood,set(value){
+       // The module's API is frozen, so the page sees a copy with this one call observed.
+       mood=Object.freeze({...value,setHumanText(...args){const before=o.draws;queueMicrotask(()=>{o.textPaintedAtOnce=o.draws!==before;});return value.setHumanText(...args);}});
+      }});
+      const context2d=CanvasRenderingContext2D.prototype;
+      for(const method of ['clearRect','fillRect','strokeRect','fill','stroke','drawImage','putImageData','fillText','strokeText']){
+       const original=context2d[method];
+       context2d[method]=function(...args){
+        const canvas=this.canvas;
+        if(canvas?.closest?.('#landscape')){o.draws++;if(canvas.matches('[data-life]'))o.lifeDrawn=true;else o.drawn=true;}
+        return original.apply(this,args);
+       };
+      }
+      const scenery=()=>document.querySelector('#landscape [data-scenery]'),visible=()=>getComputedStyle(scenery()).visibility==='visible';
+      document.addEventListener('DOMContentLoaded',()=>new MutationObserver(()=>{
+       if(o.shown||!o.lifeDrawn||!visible())return;
+       o.shown=true;o.textLoadedAtShow=o.textLoaded;
+       textFile.then(markdown=>{o.delivered=true;handOver({ok:true,status:200,text:()=>Promise.resolve(markdown)});});
+      }).observe(scenery(),{attributes:true,attributeFilter:['style']}));
+      // Every frame: whether the scenery canvas is shown, and whether it and the life canvas have been drawn.
+      const raf=window.requestAnimationFrame.bind(window);
+      const observe=()=>{o.frames.push({visible:visible(),drawn:o.drawn,life:o.lifeDrawn});if(o.frames.length<FRAMES)raf(observe);};
+      raf(observe);
+     },{board,motion,HOLD_MS,FRAMES});
+     const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     const launch=async stage=>{
+      if(page.url().startsWith(origin))await page.goto(origin+'/icon.svg');
+      fontHeld=new Promise(resolve=>{releaseFont=resolve;});
+      await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+      await page.waitForFunction(FRAMES=>document.documentElement.dataset.appReady==='true'&&window.__reopen.frames.length>=FRAMES,FRAMES,{timeout:20000});
+      const o=await page.evaluate(()=>({...__reopen,motion:document.documentElement.dataset.landscapeMotion}));
+      const firstShown=o.frames.findIndex(frame=>frame.visible&&frame.drawn&&frame.life);
+      const vanished=firstShown<0?0:o.frames.slice(firstShown).filter(frame=>!frame.visible).length;
+      const partial=o.frames.filter(frame=>frame.visible&&frame.drawn&&!frame.life).length;
+      const summary={label,stage,firstShown,vanished,partial,shown:o.shown,textLoadedAtShow:o.textLoadedAtShow,delivered:o.delivered,textPaintedAtOnce:o.textPaintedAtOnce,motion:o.motion};observed.push(summary);
+      assert.ok(firstShown>=0,`${label}: ${stage} showed the landscape ${JSON.stringify(summary)}`);
+      assert.equal(o.motion,motion,`${label}: the saved motion choice applies`);
+      return summary;
+     };
+     await launch('cold');
+     for(let reopen=1;reopen<=REOPENS;reopen++){
+      const warm=await launch('warm reopen '+reopen);
+      // Fixture preconditions: the landscape was shown before the text arrived, and the text joined the owed opening paint.
+      assert.ok(warm.textLoadedAtShow&&warm.delivered,`${label}: the hourly text was handed over when the landscape was first shown ${JSON.stringify(warm)}`);
+      assert.equal(warm.textPaintedAtOnce,false,`${label}: the late text joined an opening paint still owed ${JSON.stringify(warm)}`);
+      // Behavior under test.
+      if(warm.vanished)failures.push(`${label}: ${warm.stage}: ${warm.vanished} frame(s) hid the landscape after it was shown`);
+      if(warm.partial)failures.push(`${label}: ${warm.stage}: ${warm.partial} frame(s) showed a partly painted landscape`);
+     }
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
 // #2203: the scenery's recurring refresh must not hold up input. The page's
 // Date is shifted so the scene's own minute boundary falls a few seconds after
 // opening; timers and frames stay real. When the refresh computes the scene at
@@ -43512,4 +43807,31 @@ test("RISK help scanning guidance: #2375's and #2376's November 15 changelog ite
     for (const [other, otherPromises] of Object.entries(bullets)) if (other !== feature)
       assert.doesNotMatch(matching[0], new RegExp(otherPromises[0].source.replace(/^\^/, "").replace(/\$$/, "")), feature + " does not also hold " + other);
   }
+});
+
+// #2427, #2428, #2429 and #2430: the November 20 changelog names each change
+// in its own bullet, in plain words, and Help's scenery answer says the board
+// takes input while the landscape draws in short steps, keeping the rest of
+// its released wording and the 130-word limit.
+test('RISK freeze and startup guidance: the November 20 changelog has one bullet each for a quicker Yes or No, a lighter upload, a sooner opening and the scenery, and Help’s scenery answer keeps its wording',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const bullets=(markup.split('<h3>November 20, 2026</h3><ul>')[1]?.split('</ul>')[0]||'').split('<li>').slice(1).map(item=>item.replace(/<\/li>$/,''));
+ const one=(pattern,label)=>{const found=bullets.filter(item=>pattern.test(item));assert.equal(found.length,1,label+' has exactly one bullet: '+JSON.stringify(bullets));return found[0];};
+ const answer=one(/a Yes or No now leaves less work behind it/,'the quicker Yes or No');
+ assert.match(answer,/All Tasks redraws only the rows the answer changed, and its countdowns still update every minute/);
+ assert.match(answer,/What is saved and synced is unchanged/);
+ const push=one(/With sync on, uploading a large board after an answer now does much less work on this device/,'the lighter upload');
+ assert.match(push,/What is uploaded, and how sync keeps your devices in step, are unchanged/);
+ const opening=one(/A large saved board opens a little sooner/,'the sooner opening');
+ assert.match(opening,/The quick preview shown while it opens looks the same/);
+ one(/starts the scenery sooner/,'the kept day sun');one(/first drawing after the app opens now runs in short steps/,'the stepped scenery paint');
+ assert.equal(bullets.length,5,'and no other bullet on November 20: '+JSON.stringify(bullets));
+ const scenery=markup.split('<dt>Why does the scenery fill in after the board opens?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.match(scenery,/A board that is showing accepts typing and taps while the landscape draws in short steps\./,'Help says the board takes input while the landscape draws in steps');
+ for(const kept of [/^When the app opens, the scene is worked out straight away/,/the background shows the scene’s sky colour as soon as it is known\./,/normal motion starts moving once the first scene is drawn/,
+  /While the app stays open, minute and weather updates also let typing and scrolling that is already waiting go first, then change the sky, its colours and the hourly message together\./])
+  assert.match(scenery,kept,'Help keeps its released scenery wording');
+ assert.ok(scenery.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the scenery answer stays within the 130-word limit');
 });

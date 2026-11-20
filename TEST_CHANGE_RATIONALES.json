@@ -24779,5 +24779,30 @@
       "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red --summary -- node --test --test-name-pattern=\"leaves that copy alone\" tests/persistence-recovery.test.js on 74042bc6 with the new test only (record 2026-11-19T02-37-33-167Z-e5f45ee7-e084-47af-9206-10d2cbb5f62e); then --test-name-pattern=\"over the same revision at once\" with the server clock change and the new test but before the transaction change (record 2026-11-19T02-46-36-310Z-f820f945-083b-44a2-9550-2868dd960980); GREEN for both and the decision-conflict test 2026-11-19T02-48-37-627Z-dc65296f-ad58-476c-915f-e0c1d72ffc8f; sensitivity with the clock ignored 2026-11-19T02-39-03-578Z-82aeef8b-dd1b-4e62-adc4-c6e88a1256c7; compatibility: node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- npm run -s test:compatibility with COMPATIBILITY_BASE_SHA=83469085af1247877e107125f200536835e8f011 on 580a21e3 before the compatibility test change (record 2026-11-19T03-54-41-169Z-2101da52-ade2-4b28-b6b4-fae14622eca2; GREEN 2026-11-19T03-55-15-819Z-060e296a-f841-4ec3-8bc9-f5609c2afa5a and 2026-11-19T03-55-31-067Z-29f444c8-06f3-479d-9c64-1ac41fa0d3cc); review B1: --purpose preimplementation-red -- node --max-old-space-size=8192 --test --test-concurrency=1 --test-name-pattern=\"RISK change records: (two devices publishing full copies over the same revision|a decision conflict between two devices|a device that publishes while another is still sending)\" tests/persistence-recovery.test.js on bc1d7a51 with the rules-faithful fake and the overlapping full-copy run, before the cloud store change (record 2026-11-19T04-12-36-871Z-61b4a0da-da90-4f54-9412-dbf833b2c1d5), and the new emulator test through npx firebase emulators:exec (record 2026-11-19T04-14-32-948Z-73ba0ce8-6c91-4c8a-a0fc-5d8ea0c81760)",
       "failure": "(1) AssertionError [ERR_ASSERTION]: the tablet’s copy is sealed: {\"error\":true,\"code\":\"seal-failed\",\"generationId\":\"57f49d06-24ca-43bd-803f-3616d472ed93\",\"phase\":\"publication\"}. (2) AssertionError [ERR_ASSERTION]: exactly one copy publishes: both pushes returned {\"ok\":true,\"rev\":2}. Compatibility: AssertionError [ERR_ASSERTION]: 8346908 new-client/old-rules: rules without records refuse them (actual undefined, expected true). Review B1: AssertionError [ERR_ASSERTION]: the other meets the revision guard: [{\"ok\":true,\"rev\":2,…},{\"error\":true,\"code\":\"permission-denied\",…,\"phase\":\"publication\"}]; the decision-conflict test: AssertionError [ERR_ASSERTION]: sync did not settle within 60000 ms: {\"work\":[],\"waiting\":[\"push:pending\"]}; on the emulator: AssertionError [ERR_ASSERTION]: trial 0: [{\"error\":true,\"code\":\"permission-denied\",…,\"phase\":\"publication\"},{\"ok\":true,\"rev\":2,…}]: the other meets the revision guard."
     }
+  },
+  {
+    "baseCommit": "f588e1401380be46e7658cb24ed0025c322cac4f",
+    "weakenedTestLines": [
+      "tests/persistence-recovery.test.js:-async function answeringDevice2408(t,{board=answeringBoard2408(),docs=new Map(),indexedDB,dbName,storage,saveMs,signedIn=true,dropDatabase=false}={}){",
+      "tests/shared.js:-async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, sharedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady, navigatorProvider, cryptoProvider = webcrypto, indexedDBProvider, deviceDbName, deviceOpenTimeoutMs, withSceneModules = false, sceneModulesAfterDomReady = false, locationHref, fetchProvider, budgetClock } = {}) {",
+      "tests/shared.js:-arguments[0]?.beforeAppScript?.(sandbox, shim);",
+      "tests/persistence-recovery.test.js:-return {counted,sites:work.sites(),device};"
+    ],
+    "reason": "#2427, #2428 and #2429 review: two shared fixtures take one more named option each, and the #2428 answer counter returns one more count. answeringDevice2408 takes worker, the page's Worker constructor, so a test can give the app a Worker that never answers; loadApp takes beforeAppScript as a named option instead of reading arguments[0]. Against the integration branch, the beforeAppScript call reads the named option instead of arguments[0], and oneCountedNo2428 returns crossed, the count of a No that is the first in a new minute, beside counted. No assertion is removed or weakened.",
+    "previousBehavior": "answeringDevice2408 always gave the app the harness Worker, which answers on a later turn, so no test could show a push's acknowledgement waiting on a Worker that never answers. loadApp read beforeAppScript from arguments[0] beside its destructured options.",
+    "intendedBehavior": "answeringDevice2408 installs the given Worker constructor before sign-in (no push has made one yet) and otherwise behaves exactly as before; loadApp runs beforeAppScript, now a named option defaulting to null, at the same point as before.",
+    "preservedCoverage": [
+      "Every existing caller of answeringDevice2408 passes no worker and keeps the harness Worker and every other default unchanged.",
+      "Every existing caller of loadApp keeps its options; beforeAppScript still runs before the app script, as the #2429 opening counts need.",
+      "The #2427 push work, #2428 answer work and #2429 opening once cohorts pass on the changed fixtures."
+    ],
+    "replacementTests": [
+      "RISK push work: a Worker that never answers delays neither the acknowledged revision nor its decision base, and a close or cloud read right after the ok keeps the acknowledgement",
+      "RISK answer work: a Can’t row’s time left in All Tasks still counts down in each new minute while answers keep the other rows"
+    ],
+    "redEvidence": {
+      "command": "node --max-old-space-size=8192 --test --test-name-pattern=\"Worker that never answers\" tests/persistence-recovery.test.js (on e79f939a with the new test and the worker option)",
+      "failure": "AssertionError [ERR_ASSERTION]: the board records the acknowledged revision within a second of the ok; actual: 2, expected: 3"
+    }
   }
 ]
