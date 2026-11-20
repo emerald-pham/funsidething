@@ -4805,6 +4805,25 @@ function savedTasksUnchanged(pieces){
   }
   return same;
 }
+/* #2427 review: a push may skip the union with the copy this tab last
+   published (sendPush) only while the saved board still holds everything
+   that copy does. That holds while every device save since the push's own
+   save merged from the saved board before it, or was it: such saves keep one
+   lineage. Any other write of the saved board (a save under another owner
+   binding, one that took another tab's head, a restore or recovery that sets
+   the saved board directly) leaves the lineage behind, and the push merges
+   in full again. {raw, id}: the saved board this tab last wrote and its
+   lineage. */
+let savedBoardLineage={raw:null,id:0},savedBoardLineages=0;
+// from: the saved board this save merged from or was, or null.
+function continueSavedBoardLineage(from,raw){
+  const same=from!==null&&from===lastPersistedRaw&&savedBoardLineage.raw===from;
+  savedBoardLineage={raw,id:same?savedBoardLineage.id:++savedBoardLineages};
+}
+// The lineage of the saved board when it is raw, or null.
+function savedLineageOf(raw){
+  return typeof raw==="string"&&raw===lastPersistedRaw&&savedBoardLineage.raw===raw?savedBoardLineage.id:null;
+}
 /* The disk half of save(), on its own: writes what is in memory and does
    nothing else. save() also re-stamps updatedAt and schedules a cloud push,
    which is exactly right for an edit and exactly wrong for bookkeeping — the
@@ -4867,11 +4886,17 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
   // #2417: the change records whose change this save's board holds.
   const changeRecordsHeld=changeRecordOutbox.order();
   if(lane)lane.requests=deviceSaveLane.requests();
+  // #2427 review: the saved board this save holds everything of, by merging
+  // from it or being it (savedBoardLineage).
+  let mergedFrom=lastPersistedRaw!==null&&lastPersistedRaw===payload?lastPersistedRaw:null;
   if(lastPersistedRaw!==payload&&lastPersistedRaw){
     const last=savedPayloadBoard(lastPersistedRaw);
-    // #2428: tasks whose rows the two boards hold alike are not merged.
-    if(last&&sameListOwner(state,last)&&keepMissingTasks(last,"last-save","A missing task was kept in the saved board.",{sourceOwned:true,sameTasks:savedTasksUnchanged(pieces)})){
-      recomputeRanks();render();pieces=boardSaveText();payload=pieces.text;
+    if(last&&sameListOwner(state,last)){
+      mergedFrom=lastPersistedRaw;
+      // #2428: tasks whose rows the two boards hold alike are not merged.
+      if(keepMissingTasks(last,"last-save","A missing task was kept in the saved board.",{sourceOwned:true,sameTasks:savedTasksUnchanged(pieces)})){
+        recomputeRanks();render();pieces=boardSaveText();payload=pieces.text;
+      }
     }
   }
   const chanceSeed = state.chance?.seed;
@@ -5057,6 +5082,7 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
         }
         recomputeRanks();render();
       }
+      continueSavedBoardLineage(committedPayload===payload?mergedFrom:null,committedPayload);
       deviceHeadHash=result.hash;lastPersistedRaw=committedPayload;changeRecordOutbox.saved(changeRecordsHeld);
       savedBoardPieces=pieces?.rows&&committedPayload===payload?{raw:payload,rows:pieces.rows,ids:pieces.ids}:null; // #2428
       persistedChanceSeed=committedPayload===payload?chanceSeed??null:JSON.parse(committedPayload).chance?.seed??null; // #2408: no second parse of this save's own text
@@ -5144,6 +5170,7 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
       if(!backupAlreadySafe) clearRedundantLocalBackups(payload,()=>localStorage.getItem(LOCAL_HEAD_KEY)===payload && localStorage.getItem(STORE_KEY)===payload,preserveBackupId);
       pendingRestoreSafetyIds.clear();
       if(completionSourcePayload!==null&&pendingLegacyCompletionSource===completionSourcePayload)pendingLegacyCompletionSource=null;
+      continueSavedBoardLineage(mergedFrom,payload);
       lastPersistedRaw=payload; persistedChanceSeed = chanceSeed; clearDeviceSaveIssue(); return true;
     }
     if(quota) return reportDeviceSaveFailure("primary-write","quota-exhausted","The protected board copies do not fit in local storage. Keep this tab open and use "+boardDownloadName()+" in Settings before choosing whether to delete an older backup.");
@@ -5198,6 +5225,7 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
     for(const [id,prior] of restoreProofs)
       if(pendingRestoreSafetyIds.get(id)===prior) pendingRestoreSafetyIds.delete(id);
     if(completionSourcePayload!==null&&pendingLegacyCompletionSource===completionSourcePayload)pendingLegacyCompletionSource=null;
+    continueSavedBoardLineage(mergedFrom,payload);
     lastPersistedRaw=payload; persistedChanceSeed = chanceSeed; clearDeviceSaveIssue(); return true;
   }
   catch(e){ toast("Couldn't save just now — will retry on your next change."); return false; }
@@ -7432,7 +7460,8 @@ async function sendPush(){
     // with at most change records this board holds over it, and this board
     // is still based on it (ownPublishedCopy). Each device save
     // since kept what the last saved board held, back to the board that push
-    // saved before it uploaded, so this board holds everything that copy does
+    // saved before it uploaded, and the skip is taken only while that chain
+    // is unbroken (savedBoardLineage), so this board holds everything that copy does
     // that was not deleted: the union below has nothing to bring back, and
     // that copy's evidence needs no second check. Only this board is
     // validated, once. A task or History row of that copy the board lacks
@@ -7442,7 +7471,7 @@ async function sendPush(){
     // before.
     const own=ownPublishedCopy;
     const knownIsOwn=!!own&&own.account===pushAccount&&known.account===pushAccount&&known.revision===own.revision&&
-      knownPayload===own.payload&&state.syncRev===own.revision&&ownPublishedCopyHeld(own);
+      knownPayload===own.payload&&state.syncRev===own.revision&&savedLineageOf(lastPersistedRaw)===own.lineage&&ownPublishedCopyHeld(own);
     if(knownIsOwn){
       const decisionIssue=decisionEvidenceIssue(state,pushAccount);
       if(decisionIssue){cloudAdoptionHeld=true;reportCloudReconcileError(decisionIssue);return;}
@@ -7506,6 +7535,8 @@ async function sendPush(){
       // payload, and its text need not be made again.
       const unchanged=!!texts&&state===pushedBoard&&saveRequestGeneration===diagnosticRequestGeneration&&
         boardEditSerial===editsAtPayload&&saved.saved===texts.text;
+      // #2427 review: the saved board that holds exactly this payload's board.
+      if(unchanged&&payloadFromLive)payloadFromLive.lineage=savedLineageOf(saved.saved);
       if(!unchanged&&payload !== cloudPayload()){
         // If an edit arrived while the save was in flight, retry with its exact
         // payload so a cloud write never outruns that edit's local safety copy.
@@ -7572,7 +7603,8 @@ async function sendPush(){
         changeRecordOutbox.fullCopyAcknowledged();
         bindDecisionBase(pushAccount,res.rev,payload,res); // #2354: res names the copy it published
         // #2427: the copy this tab published from a board it validated.
-        ownPublishedCopy=payloadFromLive?{account:pushAccount,revision:res.rev,payload,...payloadFromLive.held}:null;
+        ownPublishedCopy=payloadFromLive&&Number.isSafeInteger(payloadFromLive.lineage)?
+          {account:pushAccount,revision:res.rev,payload,lineage:payloadFromLive.lineage,...payloadFromLive.held}:null;
         // An edit made while this write was in flight is still unsynced.
         // #2427: with no save asked for since the payload was made and the
         // same board, nothing was edited; otherwise the texts are compared.

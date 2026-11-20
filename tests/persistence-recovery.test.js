@@ -18451,6 +18451,57 @@ test('RISK push work: an answer given while a push uploads, still in its catch-u
  assert.equal(ctx.state.syncDirty,false,'and the board is synced');
 });
 
+// #2427 review: a push skips the union with the cloud copy this tab
+// published only while that is provably the same as doing it: every device
+// save since the push that published it merged from the saved board before
+// it, so the saved board still holds everything that copy holds. A device
+// save that could not merge from the saved board before it (here, an older
+// copy of the app wrote the board under another owner binding) breaks that
+// proof, and a rating History row or a Done the published copy holds and
+// the board lost in a task that is still there must still be kept: the
+// next push takes the full union, as it did before #2427.
+test('RISK push work: after a device save that could not merge from the saved board before it, a push still keeps a rating History row and a Done the copy this tab published holds',{timeout:180000},async t=>{
+ const board=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
+  tasks:Array.from({length:20},(_,i)=>({...syncTask('lineage-2427-'+i,'Lineage task '+i),ctx:['home'],createdAt:1000+i}))});
+ const device=await answeringDevice2408(t,{board,saveMs:0});
+ await startAnswering2408(device);
+ const {ctx,clock,counters}=device;
+ // Answers give tasks History; Done gives a task completion evidence. Each
+ // is pushed, so the copy this tab published holds them.
+ for(const act of ['yes','no','no']){device.tap(act);await clock.advance(1500);}
+ await clock.settle();
+ const done=ctx.state.tasks.find(task=>!task.done&&task.id!==ctx.state.candidateId&&!ctx.state.chain.includes(task.id));
+ ctx.onAction('done-task',{dataset:{id:done.id}});
+ assert.equal(ctx.state.tasks.find(task=>task.id===done.id)?.done,true,'positive control: Done runs');
+ await clock.settle();
+ const published=(await device.cloud()).board;
+ const withHistory=published.tasks.find(task=>(task.ratingHistory||[]).length&&!task.done);
+ assert.ok(withHistory,'positive control: the published copy holds a task with History');
+ assert.equal(published.tasks.find(task=>task.id===done.id)?.done,true,'positive control: the published copy holds the Done');
+ const row=withHistory.ratingHistory[0].id,uploads=counters.uploads.length,owner=ctx.state.syncIdentity;
+ // An older copy of the app, or a bug, loses the History row and the Done in
+ // tasks that are still on the board, and saves the board under another owner
+ // binding, so that device save cannot merge from the saved board before it.
+ const live=id=>ctx.state.tasks.find(task=>task.id===id);
+ live(withHistory.id).ratingHistory=live(withHistory.id).ratingHistory.filter(entry=>entry.id!==row);
+ Object.assign(live(done.id),{done:false,completedAt:null,lastDoneAt:null});
+ ctx.state.syncIdentity='older-app-binding-2427';
+ vm.runInContext('persist()',ctx);
+ await clock.advance(100);
+ assert.equal(JSON.parse(counters.commits.at(-1).payload).tasks.find(task=>task.id===withHistory.id).ratingHistory.some(entry=>entry.id===row),false,
+  'positive control: the device saved the board without the row');
+ ctx.state.syncIdentity=owner;
+ // The next edit pushes.
+ ctx.state.updatedAt=Date.now();ctx.save();
+ await clock.settle();
+ assert.ok(counters.uploads.length>uploads,'positive control: the edit is pushed');
+ for(const [label,copy] of [['the cloud copy',(await device.cloud()).board],['the board',ctx.state]]){
+  const task=id=>copy.tasks.find(entry=>entry.id===id);
+  assert.ok(task(withHistory.id).ratingHistory.some(entry=>entry.id===row),label+' keeps the History row the published copy held');
+  assert.equal(task(done.id).done,true,label+' keeps the Done the published copy held');
+ }
+});
+
 // #2427: the push makes its device text and its cloud copy from one
 // serialization of the board; each is byte for byte the text the app's own
 // serializers make (JSON.stringify of the board, cloudPayloadFor), including
