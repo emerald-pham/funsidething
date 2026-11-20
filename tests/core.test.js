@@ -43695,3 +43695,30 @@ test("RISK help scanning guidance: #2375's and #2376's November 15 changelog ite
       assert.doesNotMatch(matching[0], new RegExp(otherPromises[0].source.replace(/^\^/, "").replace(/\$$/, "")), feature + " does not also hold " + other);
   }
 });
+
+// #2427, #2428, #2429 and #2430: the November 20 changelog names each change
+// in its own bullet, in plain words, and Help's scenery answer says the board
+// takes input while the landscape draws in short steps, keeping the rest of
+// its released wording and the 130-word limit.
+test('RISK freeze and startup guidance: the November 20 changelog has one bullet each for a quicker Yes or No, a lighter upload, a sooner opening and the scenery, and Help’s scenery answer keeps its wording',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const bullets=(markup.split('<h3>November 20, 2026</h3><ul>')[1]?.split('</ul>')[0]||'').split('<li>').slice(1).map(item=>item.replace(/<\/li>$/,''));
+ const one=(pattern,label)=>{const found=bullets.filter(item=>pattern.test(item));assert.equal(found.length,1,label+' has exactly one bullet: '+JSON.stringify(bullets));return found[0];};
+ const answer=one(/a Yes or No now leaves less work behind it/,'the quicker Yes or No');
+ assert.match(answer,/All Tasks redraws only the rows the answer changed, and its countdowns still update every minute/);
+ assert.match(answer,/What is saved and synced is unchanged/);
+ const push=one(/With sync on, uploading a large board after an answer now does much less work on this device/,'the lighter upload');
+ assert.match(push,/What is uploaded, and how sync keeps your devices in step, are unchanged/);
+ const opening=one(/A large saved board opens a little sooner/,'the sooner opening');
+ assert.match(opening,/The quick preview shown while it opens looks the same/);
+ one(/starts the scenery sooner/,'the kept day sun');one(/first drawing after the app opens now runs in short steps/,'the stepped scenery paint');
+ assert.equal(bullets.length,5,'and no other bullet on November 20: '+JSON.stringify(bullets));
+ const scenery=markup.split('<dt>Why does the scenery fill in after the board opens?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.match(scenery,/A board that is showing accepts typing and taps while the landscape draws in short steps\./,'Help says the board takes input while the landscape draws in steps');
+ for(const kept of [/^When the app opens, the scene is worked out straight away/,/the background shows the scene’s sky colour as soon as it is known\./,/normal motion starts moving once the first scene is drawn/,
+  /While the app stays open, minute and weather updates also let typing and scrolling that is already waiting go first, then change the sky, its colours and the hourly message together\./])
+  assert.match(scenery,kept,'Help keeps its released scenery wording');
+ assert.ok(scenery.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the scenery answer stays within the 130-word limit');
+});
