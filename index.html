@@ -11467,7 +11467,7 @@ const answerCatchUp=(()=>{
   function store(answer){storeCommit(answer.save,answer.immediate,null,answer.frame);}
   function draw(answer){
     if(queue.length>1)return;
-    listRanksDeferred=answer.deferRanks;listRowsReuse="answer"; // #2428
+    listRanksDeferred=answer.deferRanks;listRowsReuse=LIST_ROWS_ANSWER; // #2428: keeps the rows the answer did not change
     try{render();}finally{listRanksDeferred=false;listRowsReuse=null;}
   }
   // After the decision: capture what History reads now, mark the board
@@ -11484,7 +11484,7 @@ const answerCatchUp=(()=>{
     if(doSave!==false)markBoardEdited();
     // #2428: All Tasks rebuilds only the rows this answer changed.
     listRowBuilds.answered(answer.kind,answer.ids);
-    listRanksDeferred=deferRanks;listRowsReuse="answer";
+    listRanksDeferred=deferRanks;listRowsReuse=LIST_ROWS_ANSWER;
     try{render();}finally{listRanksDeferred=false;listRowsReuse=null;}
     schedule();
   }
@@ -15375,7 +15375,7 @@ let listRanksDeferred=false,listRankRefreshTimer=null;
 function refreshListRanks(){
   listRankRefreshTimer=null;
   if(!state?.listOpen||openingRecoveryHeld)return;
-  listRowsReuse="ranks";
+  listRowsReuse=LIST_ROWS_RANKS;
   try{renderList();}finally{listRowsReuse=null;}
 }
 /* #2428: building a row's markup (its eligibility, blockers, chips and skip
@@ -15384,24 +15384,48 @@ function refreshListRanks(){
    scanner Yes or No changes the rows of its candidate and the benchmark only
    (listRowBuilds.answered), so its drawings rebuild those rows and keep the
    rest, and a rank refresh keeps each kept row's markup and puts only its new
-   rank in. Any other drawing builds every row again, as before, and so does
-   the first drawing in each minute of the clock, for the chips and labels
-   that count minutes down. */
-let listRowsReuse=null; // "answer" while a scanner answer draws, "ranks" while a rank refresh does
+   rank in. Any other drawing builds every row again, as before. A row whose
+   markup reads the clock (rowReadsClock) is kept only within the minute it
+   was built in, so its chips and labels that count minutes down still move
+   on; every other row is kept across minutes. Keying every row by the minute
+   rebuilt all of them on the first answer in each minute. */
+// listRowsReuse while a drawing may keep rows: a scanner answer's, or a rank refresh's.
+const LIST_ROWS_ANSWER="answer",LIST_ROWS_RANKS="ranks";
+let listRowsReuse=null;
+// The answers that change only their candidate's and benchmark's rows.
+const ROW_KEEPING_ANSWERS=new Set(["yes","no"]);
+// Whether a task's row markup can change with the clock alone, at now: a
+// running postpone or evergreen wait, a future start, a due date, a running
+// Can't or Worked on it hold, or a prerequisite whose own wait may end.
+function rowReadsClock(task,board,now){
+  if(task.due||taskPrerequisiteIds(task).length)return true;
+  if(task.startsAt&&isoToDate(task.startsAt)>isoToDate(todayISO(0)))return true;
+  if(taskPostponeUntil(task)>now)return true;
+  if(task.evergreen&&task.lastDoneAt&&evergreenUntil(task)>now)return true;
+  const mark=board.considered?.[task.id];
+  if(mark==="cant"){const at=board.cantAt?.[task.id];return !!at&&at+board.settings.cantMin*60000>now;}
+  if(mark==="worked"){const at=board.workedAt?.[task.id];return !!at&&workedUntil(at,board)>now;}
+  return false;
+}
 const listRowBuilds=(()=>{
   let built=null;const changed=new Set();
   return Object.freeze({
     answered(kind,ids){
       if(!built)return;
-      if(kind==="yes"||kind==="no")for(const id of ids)changed.add(id);else built=null;
+      if(ROW_KEEPING_ANSWERS.has(kind))for(const id of ids)changed.add(id);else built=null;
     },
-    reusable(key,board){return built&&built.key===key&&built.board===board?{rows:built.rows,changed}:null;},
+    // The row kept for task id, if it can be kept at minute.
+    reusable(key,board,minute){
+      if(!built||built.key!==key||built.board!==board)return null;
+      return id=>{if(changed.has(id))return undefined;const row=built.rows.get(id);return row&&(row.minute===null||row.minute===minute)?row:undefined;};
+    },
     forget(){built=null;changed.clear();},
-    keep(key,board,wanted,prior){
+    // minute: the minute of the clock this drawing was built in.
+    keep(key,board,wanted,prior,minute){
       const rows=new Map();
       for(const row of wanted){
-        if(row.html&&row.fields)rows.set(row.id,{rest:row.rest,fields:row.fields,html:row.html,spark:row.spark,summary:row.summary});
-        else{const kept=prior?.rows.get(row.id);if(kept&&kept.rest===row.rest)rows.set(row.id,kept);}
+        if(row.html&&row.fields)rows.set(row.id,{rest:row.rest,fields:row.fields,html:row.html,spark:row.spark,summary:row.summary,minute:row.readsClock?minute:null});
+        else{const kept=prior?.(row.id);if(kept&&kept.rest===row.rest)rows.set(row.id,kept);}
       }
       built={key,board,rows};changed.clear();
     }
@@ -15498,17 +15522,18 @@ function renderList(){
   const showRank = showSparklines||showTopK;
   // An answer changes a few rows; rank noise changes all of them (#2313).
   const deferRanks = listRanksDeferred&&listRowsStillDrawn(body,selecting);
-  // #2428: what every row's markup reads that an answer could change, and
-  // the minute of the clock (listRowBuilds). A new pass clears every row's
-  // skip label.
-  const rowKey=[rankColumns,listMetric,[...act].join("\n"),nextDotted?.id??"",normalizeDateFormat(state.settings.dateFormat),String(state.passId??""),Math.floor(Date.now()/60000)].join("\u0001");
-  const built=listRowsReuse&&!selecting?listRowBuilds.reusable(rowKey,state):null;
+  // #2428: what every row's markup reads that an answer could change
+  // (listRowBuilds). A new pass clears every row's skip label. The clock is
+  // not in it: only rows that read the clock are built again in a new minute.
+  const rowKey=[rankColumns,listMetric,[...act].join("\n"),nextDotted?.id??"",normalizeDateFormat(state.settings.dateFormat),String(state.passId??"")].join("\u0001");
+  const now=Date.now(),minute=Math.floor(now/60000);
+  const keptRow=listRowsReuse&&!selecting?listRowBuilds.reusable(rowKey,state,minute):null;
   let keptRanks=false;
   const wanted = [];
   for(const t of rows){
-    const kept=built&&!built.changed.has(t.id)?built.rows.get(t.id):undefined;
-    if(kept&&listRowsReuse==="answer"){
-      wanted.push({id:t.id,rest:kept.rest,fields:kept.fields,html:kept.html,spark:kept.spark,summary:kept.summary,unchanged:true});keptRanks=true;continue;
+    const kept=keptRow?.(t.id);
+    if(kept&&listRowsReuse===LIST_ROWS_ANSWER){
+      wanted.push({id:t.id,rest:kept.rest,fields:kept.fields,html:kept.html,spark:kept.spark,summary:kept.summary,readsClock:kept.minute!==null,unchanged:true});keptRanks=true;continue;
     }
     const selected=selectedIds.has(t.id),rankTag=selecting?'span':'div';
     const selectionAttrs=' data-act="bulk-toggle" data-id="'+esc(t.id)+'" aria-pressed="'+selected+'" aria-label="'+(selected?'Deselect ':'Select ')+esc(t.title)+'"';
@@ -15526,9 +15551,9 @@ function renderList(){
         ? '<button type="button" class="rank-summary bulk-rank-toggle"'+selectionAttrs+'><span class="bulk-rank-original" aria-hidden="'+selected+'">'+rankContent+'</span>'+(selected?'<span class="tk bulk-rank-selected"><span class="tkl">Selected</span></span>':'')+'</button>'
         : '<div class="rank-summary">'+rankContent+'</div>'
       : '';
-    wanted.push({id:t.id,html:boardPresentation.taskRow({...fields,rankSummary}),rest,spark,summary,fields});
+    wanted.push({id:t.id,html:boardPresentation.taskRow({...fields,rankSummary}),rest,spark,summary,fields,readsClock:kept?kept.minute!==null:rowReadsClock(t,state,now)});
   }
-  if(selecting)listRowBuilds.forget();else listRowBuilds.keep(rowKey,state,wanted,built);
+  if(selecting)listRowBuilds.forget();else listRowBuilds.keep(rowKey,state,wanted,keptRow,minute);
   // "nothing here" and "nothing matching" are different problems with different fixes
   drawListRows(body,wanted,selecting,deferRanks,open.length
     ? '<div class="emptystate">No tasks match.<div style="margin-top:12px"><button class="btn subtle" data-act="clear-list-filters">Clear filters</button></div></div>'

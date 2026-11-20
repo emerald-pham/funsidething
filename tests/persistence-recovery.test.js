@@ -17975,9 +17975,8 @@ async function oneCountedNo2428(t,label,board,{before=[]}={}){
  const {ctx,clock,counters}=device;
  for(const act of before){device.tap(act);await clock.advance(1500);}
  await clock.advance(3000);
- // All Tasks builds every row again in each new minute of the clock, for
- // chips that count minutes down. A No at the start of a minute does that;
- // the No after it, in the same minute, is counted.
+ // A No at the start of a minute, then the No after it, in the same minute,
+ // is counted.
  await clock.advance(60000-vm.runInContext('Date.now()',ctx)%60000+100);
  device.tap('no');await clock.advance(1500);
  const seeded=Buffer.byteLength(JSON.stringify(board),'utf8');
@@ -17995,7 +17994,18 @@ async function oneCountedNo2428(t,label,board,{before=[]}={}){
  const rows=device.shim.document.getElementById('listBody').innerHTML.split('<div class="trow ').slice(1);
  assert.equal(rows.length,ctx.state.tasks.filter(task=>!task.done).length,label+': All Tasks shows every open task');
  assert.match(rows.find(row=>row.includes('data-row="'+candidate+'"'))||'',/class="skipped"/,label+': and the candidate’s row shows the No');
- return {counted,sites:work.sites(),device};
+ // #2428 review: a No whose drawing is the first in a new minute of the
+ // clock is counted too. Only rows whose markup counts minutes down need
+ // building again for the clock; neither board has one.
+ await clock.advance(60000-vm.runInContext('Date.now()',ctx)%60000+100);
+ work.reset();
+ const crossing=device.tap('no');
+ assert.equal(ctx.state.considered?.[crossing],'no',label+': positive control: the No in a new minute is taken');
+ await clock.advance(1500);
+ const crossed=work.now();
+ const after=device.shim.document.getElementById('listBody').innerHTML.split('<div class="trow ').slice(1);
+ assert.match(after.find(row=>row.includes('data-row="'+crossing+'"'))||'',/class="skipped"/,label+': and its candidate’s row shows the No');
+ return {counted,crossed,sites:work.sites(),device};
 }
 test('RISK answer work: one No with sync on costs the same whole-board work on a 20-task board as on the large board',{timeout:300000},async t=>{
  // The 20-task board has the large board's settings and context, and its
@@ -18015,6 +18025,37 @@ test('RISK answer work: one No with sync on costs the same whole-board work on a
  // two tasks' History is merged, whatever the board holds.
  assert.ok(large.counted.mergedTasks<=2,'the device save merges the History of the answered tasks only: '+JSON.stringify(large.counted));
  assert.deepEqual(large.counted,small.counted,'one answer costs the same whole-board work on the large board as on a 20-task board');
+ t.diagnostic(JSON.stringify({smallCrossed:small.crossed,largeCrossed:large.crossed}));
+ assert.deepEqual(large.crossed,small.crossed,'and so does an answer that is the first in a new minute of the clock');
+});
+
+// #2428 review: All Tasks keeps the rows an answer did not change, but a row
+// whose markup counts minutes down (a Can’t hold’s time left) is still
+// redrawn in each new minute of the clock, whichever action draws the list.
+test('RISK answer work: a Can’t row’s time left in All Tasks still counts down in each new minute while answers keep the other rows',{timeout:120000},async t=>{
+ const board=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
+  tasks:Array.from({length:20},(_,i)=>({...syncTask('clock-2428-'+i,'Clock task '+i),ctx:['home'],createdAt:1000+i}))});
+ board.settings={...board.settings,cantMin:30};
+ const device=await answeringDevice2408(t,{board,saveMs:0,signedIn:false});
+ await startAnswering2408(device);
+ const {ctx,clock}=device;
+ const held=device.tap('cant');
+ await clock.advance(1500);
+ assert.equal(ctx.state.considered?.[held],'cant','positive control: the Can’t is taken');
+ const label=()=>{
+  const rows=device.shim.document.getElementById('listBody').innerHTML.split('<div class="trow ').slice(1);
+  return (rows.find(row=>row.includes('data-row="'+held+'"'))||'').match(/class="skipped">([^<]*)</)?.[1]??null;
+ };
+ const minutes=()=>Number(label()?.match(/(\d+)m$/)?.[1]);
+ const first=minutes();
+ assert.ok(first>=28&&first<=30,'positive control: All Tasks shows the Can’t hold’s time left: '+label());
+ // Exactly a minute later the hold has exactly a minute less left, and the
+ // clock is in a new minute. The answer's own drawing is read at once.
+ for(let step=1;step<=2;step++){
+  await clock.advance(60000);
+  device.tap('no');
+  assert.equal(minutes(),first-step,'after '+step+' minute(s), an answer’s drawing shows the Can’t hold one minute shorter: '+label());
+ }
 });
 
 // #2428: the device save's missing-task check reads only the tasks that
