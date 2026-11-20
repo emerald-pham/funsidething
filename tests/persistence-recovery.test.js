@@ -18198,6 +18198,8 @@ async function openingOnce2429(t,{signed}){
  const opened=work.rows['device head']||{};
  assert.deepEqual({parses:opened.parses,checks:opened.checks},{parses:1,checks:1},'the device head is parsed once and checked once: '+JSON.stringify(work.rows));
  assert.ok((opened.hashes||0)<=1,'and hashed at most once: '+JSON.stringify(work.rows));
+ // #2429 review: and its decision evidence is checked at most once.
+ assert.ok((opened.decisionChecks||0)<=1,'and its decision evidence checked at most once: '+JSON.stringify(work.rows));
  // The older copy the preview shows is checked once, by the preview, whose
  // recovery-source check reads the copy as saved beside its normalized form
  // (#2225); nothing else parses or checks it again. Its text is also hashed
