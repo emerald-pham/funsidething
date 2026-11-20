@@ -17967,10 +17967,11 @@ function answerWork2428(device,boardBytes){
 }
 // A signed-in device with sync on, scanning on the board, settled, with the
 // answer's own push held behind its debounce; one No is answered and counted.
-async function oneCountedNo2428(t,label,board){
+async function oneCountedNo2428(t,label,board,{before=[]}={}){
  const device=await answeringDevice2408(t,{board,saveMs:0,dropDatabase:true});
  await startAnswering2408(device);
  const {ctx,clock,counters}=device;
+ for(const act of before){device.tap(act);await clock.advance(1500);}
  await clock.advance(3000);
  const seeded=Buffer.byteLength(JSON.stringify(board),'utf8');
  const work=answerWork2428(device,Math.min(seeded,Buffer.byteLength(ctx.cloudPayload(),'utf8')));
@@ -17986,11 +17987,13 @@ async function oneCountedNo2428(t,label,board){
  return {counted,sites:work.sites(),device};
 }
 test('RISK answer work: one No with sync on costs the same whole-board work on a 20-task board as on the large board',{timeout:300000},async t=>{
- // The 20-task board's tasks carry a future field of padding, so that its
- // whole-board texts stand out from its decision log as the large board's do.
- const twenty=answeringBoard2408({tasks:20,padBytes:0});
- for(const task of twenty.tasks)task.futureNote='x'.repeat(15000);
- const small=await oneCountedNo2428(t,'20 tasks',{...twenty,listOpen:true});
+ // The 20-task board has the large board's settings and context, and its
+ // tasks carry a future field of padding, so that its whole-board texts stand
+ // out from its decision log as the large board's do. A Yes first gives the
+ // No a benchmark whose rating it moves, as on the large board.
+ const twenty=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
+  tasks:Array.from({length:20},(_,i)=>({...syncTask('twenty-2428-'+i,'Twenty task '+i),ctx:['home'],createdAt:1000+i,futureNote:'x'.repeat(15000)}))});
+ const small=await oneCountedNo2428(t,'20 tasks',twenty,{before:['yes']});
  await small.device.close();
  const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
  const large=await oneCountedNo2428(t,'large board',JSON.parse(fixture.payload));
@@ -18001,4 +18004,47 @@ test('RISK answer work: one No with sync on costs the same whole-board work on a
  // two tasks' History is merged, whatever the board holds.
  assert.ok(large.counted.mergedTasks<=2,'the device save merges the History of the answered tasks only: '+JSON.stringify(large.counted));
  assert.deepEqual(large.counted,small.counted,'one answer costs the same whole-board work on the large board as on a 20-task board');
+});
+
+// #2428: the device save's missing-task check reads only the tasks that
+// changed since the last save, and keeps every guarantee it had: a task, or a
+// rating History row of a task the answer did not touch, or of one it did,
+// that the last saved board holds and the live board lacks with no delete
+// behind it, is kept, on the device and in the board.
+test('RISK answer work: the device save still keeps a task or rating History row the last save held and the board lost, after an answer',{timeout:120000},async t=>{
+ // The large board's settings, on 20 tasks: its answers record History.
+ const board=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
+  tasks:Array.from({length:20},(_,i)=>({...syncTask('kept-2428-'+i,'Kept task '+i),ctx:['home'],createdAt:1000+i}))});
+ const device=await answeringDevice2408(t,{board,saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock,counters}=device;
+ // Earlier answers give several tasks History of their own.
+ for(const act of ['no','yes','no','no','yes','no']){device.tap(act);await clock.advance(1500);}
+ const saved=JSON.parse(counters.commits.at(-1).payload);
+ const answered=new Set([ctx.state.candidateId,ctx.state.chain.at(-1)]);
+ const withHistory=saved.tasks.filter(task=>(task.ratingHistory||[]).length);
+ const lost=saved.tasks.find(task=>!answered.has(task.id)&&!withHistory.includes(task));
+ const untouched=withHistory.find(task=>!answered.has(task.id));
+ assert.ok(lost&&untouched,'positive control: the board has a task to lose and an untouched task with History: '+JSON.stringify(saved.tasks.map(task=>[task.id,(task.ratingHistory||[]).length]))+' '+JSON.stringify([...answered]));
+ const untouchedRow=untouched.ratingHistory[0].id;
+ // An older copy of the app, or a bug, drops a task and a History row with no delete.
+ ctx.state.tasks=ctx.state.tasks.filter(task=>task.id!==lost.id);
+ const live=ctx.state.tasks.find(task=>task.id===untouched.id);live.ratingHistory=live.ratingHistory.filter(row=>row.id!==untouchedRow);
+ // The next answer touches its candidate and the benchmark; one of them loses a row too.
+ await clock.advance(300);
+ const candidate=device.tap('no'),benchmark=ctx.state.chain.at(-1);
+ const touched=[candidate,benchmark].map(id=>ctx.state.tasks.find(task=>task.id===id)).find(task=>(saved.tasks.find(row=>row.id===task.id)?.ratingHistory||[]).length);
+ assert.ok(touched,'positive control: an answered task had History in the last save');
+ const touchedRow=saved.tasks.find(row=>row.id===touched.id).ratingHistory[0].id;
+ touched.ratingHistory=touched.ratingHistory.filter(row=>row.id!==touchedRow);
+ const commits=counters.commits.length;
+ await clock.advance(1500);
+ assert.ok(counters.commits.length>commits,'positive control: the answer is saved on the device');
+ for(const [label,board] of [['the saved board',JSON.parse(counters.commits.at(-1).payload)],['the live board',ctx.state]]){
+  const task=id=>board.tasks.find(row=>row.id===id);
+  assert.ok(task(lost.id),label+' keeps the task the board lost');
+  assert.ok(task(untouched.id).ratingHistory.some(row=>row.id===untouchedRow),label+' keeps the untouched task’s History row');
+  assert.ok(task(touched.id).ratingHistory.some(row=>row.id===touchedRow),label+' keeps the answered task’s History row');
+  assert.equal(board.considered?.[candidate],'no',label+' holds the answer');
+ }
 });
