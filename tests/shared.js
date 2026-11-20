@@ -1322,6 +1322,9 @@ async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactor
   };
   if (withSceneModules && !sceneModulesAfterDomReady) installSceneModules()();
   if (sceneModulesAfterDomReady) shim.document.readyState = "loading";
+  // #2429: runs in the page before the app's own script, as an earlier
+  // inline script does (the saved appearance) or an observer installed first.
+  arguments[0]?.beforeAppScript?.(sandbox, shim);
   shim.document.currentScript={textContent:appSource,src:""};
   vm.runInContext(appSource, sandbox, { filename: "index.html#app" });
   shim.document.currentScript=null;

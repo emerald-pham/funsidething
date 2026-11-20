@@ -18096,3 +18096,115 @@ test('RISK answer work: ten quick answers land in order on the device and in the
  assert.equal(reopened.ctx.state.considered?.[last],undefined,'without the undone one');
  assert.deepEqual(shownNo(reopened),kept,'on their rows in All Tasks');
 });
+
+// #2429: a warm relaunch of the large board reads, parses and checks each
+// saved copy once. The app is opened as a page opens it: the saved appearance
+// script first, then the app, over this device's storage (fake IndexedDB and
+// localStorage) and, with sync on, the shared fake cloud. The saved texts are
+// read from storage before the relaunch: the device head (the board the app
+// opens) and the older browser copy the instant preview shows. Work is counted,
+// never timed, where it happens: JSON.parse of a saved text, a crypto digest or
+// the app's JS hash of a saved text's exact bytes, and the app's whole-board
+// check (hydrateState) or decision-evidence check (decisionEvidenceIssue) of a
+// board parsed from a saved text. The checks have no outside boundary, so the
+// counter wraps the app's own check functions in place before the app boots;
+// the positive controls make sure every counter sees the work it counts.
+const appearanceScript2429=html.match(/<script>\s*(\/\*SAVED-APPEARANCE-START\*\/[\s\S]*?\/\*SAVED-APPEARANCE-END\*\/)\s*<\/script>/)?.[1];
+const openingObserver2429=`{const source=globalThis.__boardSource2429,work=globalThis.__openingWork2429;
+for(const [name,kind] of [['hydrateState','checks'],['decisionEvidenceIssue','decisionChecks']]){const check=globalThis[name];
+ globalThis[name]=function(board,...rest){const id=source.get(board);if(id)work.count(id,kind);return check.call(this,board,...rest);};}
+const hash=chanceHash;chanceHash=function(text){work.hashed(text);return hash(text);};}
+`;
+function openingWork2429(){
+ const texts=new Map(),rows={},seen=new Set();
+ const idOf=text=>{if(typeof text!=='string'||text.length<100000)return null;for(const [id,saved] of texts)if(text===saved)return id;return null;};
+ return {texts,rows,seen,idOf,
+  count(id,kind){seen.add(kind);(rows[id]??={parses:0,checks:0,decisionChecks:0,hashes:0})[kind]++;},
+  hashed(text){const id=idOf(text);if(id)this.count(id,'hashes');}};
+}
+async function openDevice2429(t,{indexedDB,dbName,storage,docs,signed,work=null}){
+ const source=new WeakMap();let preview=null;
+ const subtle=new Proxy(webcrypto.subtle,{get(target,key){const value=Reflect.get(target,key,target);if(typeof value!=='function')return value;
+  return async(...args)=>{if(key==='digest'&&work&&args[1]?.byteLength>=100000)work.hashed(new TextDecoder().decode(args[1]));return value.apply(target,args);};}});
+ const crypto={getRandomValues:webcrypto.getRandomValues.bind(webcrypto),randomUUID:webcrypto.randomUUID.bind(webcrypto),subtle};
+ assert.ok(appearanceScript2429,'the page holds the saved appearance script');
+ assert.ok(appSrc.includes('(async function init(){'),'the app boots from its init function');
+ const app=await loadApp({appSource:work?appSrc.replace('(async function init(){',openingObserver2429+'(async function init(){'):appSrc,
+  indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage,cryptoProvider:crypto,
+  beforeAppScript(sandbox){
+   if(work){
+    const host=JSON;sandbox.__boardSource2429=source;sandbox.__openingWork2429=work;
+    sandbox.JSON={[Symbol.toStringTag]:'JSON',stringify:host.stringify,parse(text,...rest){
+     const value=host.parse(text,...rest),id=work.idOf(text);
+     if(id){work.count(id,'parses');if(value&&typeof value==='object')source.set(value,id);}
+     return value;}};
+   }
+   vm.runInContext(appearanceScript2429,sandbox,{filename:'index.html#saved-appearance'});
+   const appearance=sandbox.window.SavedAppearance,show=appearance.showBoard;
+   appearance.showBoard=(board,...rest)=>{preview??=JSON.parse(JSON.stringify(board));return show(board,...rest);};
+  }});
+ t.after(()=>app.dispose());
+ const backend=await loadCloudBackendV2({runtimeWindow:app.ctx.window,sharedDocs:docs,failures:{authPending:true},timeoutMs:5000,
+  recordSyncError:app.ctx.recordSyncError,cryptoProvider:crypto,serverClock:Date.now});
+ t.after(()=>backend.CS.suspend());
+ app.ctx.window.cloudPull=app.ctx.cloudPull;app.ctx.window.CLOUD_PUSH_DELAY_MS=20;
+ if(signed)backend.emitAuth({uid:'owner',email:'e@example.com'});
+ await syncSettled(app.ctx,{within:60000,synced:signed});
+ // The opening's deferred steps (the trim resume, backup bookkeeping) run
+ // within a second of the first frame.
+ await new Promise(resolve=>setTimeout(resolve,1000));
+ await syncSettled(app.ctx,{within:60000,synced:signed});
+ const close=async()=>{backend.CS.suspend();await app.dispose();};
+ return {...app,backend,preview:()=>preview,close};
+}
+async function relaunchLargeBoard2429(t,{signed}){
+ const fixture=signed?await largeSignedInBoardFixture('e@example.com'):await largeBoardFixture();
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),dbName='opening-once-2429-'+signed+'-'+Math.random();
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:fixture.payload,[LOCAL_HEAD_KEY]:fixture.payload}),docs=new Map();
+ // The first opening moves the board into device storage and, with sync on,
+ // publishes it and saves the cloud's acknowledgement.
+ await (await openDevice2429(t,{indexedDB,dbName,storage,docs,signed})).close();
+ const store=loadStorageV2({indexedDB}).createDeviceStore({indexedDB,crypto:webcrypto,dbName});await store.open();
+ const head=await store.readHead();await store.close?.();
+ assert.ok(head?.payload,'positive control: the first opening saved the board in device storage');
+ const work=openingWork2429();work.texts.set('device head',head.payload);
+ const legacy=storage.getItem(LOCAL_HEAD_KEY);
+ assert.equal(storage.getItem(SYNC_STORE_KEY),legacy,'positive control: the two older browser copies are one text');
+ if(legacy!==head.payload)work.texts.set('older browser copy',legacy);
+ const device=await openDevice2429(t,{indexedDB,dbName,storage,docs,signed,work});
+ return {device,work,head:head.payload,legacy};
+}
+async function openingOnce2429(t,{signed}){
+ const {device,work,head,legacy}=await relaunchLargeBoard2429(t,{signed});
+ const {ctx}=device;
+ t.diagnostic(JSON.stringify({signed,sizes:Object.fromEntries([...work.texts].map(([id,text])=>[id,text.length])),work:work.rows}));
+ // Positive controls: the board opened from the device head, every counter
+ // saw its work, and with sync on the cloud check found nothing new.
+ assert.equal(ctx.state.tasks.length,LARGE_BOARD_SHAPE.tasks,'the large board opened');
+ assert.equal(vm.runInContext('liveBoardAccepted',ctx),true,'and was accepted');
+ for(const kind of ['parses','checks','decisionChecks','hashes'])assert.ok(work.seen.has(kind),'positive control: the counter sees '+kind+': '+JSON.stringify(work.rows));
+ if(signed){
+  const pulls=JSON.parse(ctx.supportDiagnosticsText()).events.filter(event=>event.stage==='cloud-pull');
+  assert.equal(pulls.at(-1)?.status,'unchanged','positive control: the cloud still holds the acknowledged copy: '+JSON.stringify(pulls.map(event=>event.status)));
+ }
+ // The preview shows the older browser copy, as it does today.
+ const preview=device.preview(),shown=JSON.parse(legacy);
+ assert.ok(preview,'the instant preview shows a board');
+ assert.deepEqual(preview.tasks.map(task=>[task.id,task.title,task.done===true]),shown.tasks.map(task=>[task.id,task.title,task.done===true]),'the preview shows the older browser copy’s tasks');
+ assert.deepEqual(preview.chain,shown.chain,'and its chain');
+ // The board this device opens is parsed, checked and hashed once.
+ const opened=work.rows['device head']||{};
+ assert.deepEqual({parses:opened.parses,checks:opened.checks},{parses:1,checks:1},'the device head is parsed once and checked once: '+JSON.stringify(work.rows));
+ assert.ok((opened.hashes||0)<=1,'and hashed at most once: '+JSON.stringify(work.rows));
+ // The older copy the preview shows is checked once, by the preview, whose
+ // recovery-source check reads the copy as saved beside its normalized form
+ // (#2225); nothing else parses or checks it again. Its text is also hashed
+ // by the browser backup list's own bookkeeping, because a backup row holds
+ // the same bytes; that is not a read of the saved board.
+ if(head!==legacy){
+  const older=work.rows['older browser copy']||{};
+  assert.ok(older.parses<=2&&older.checks===1&&older.decisionChecks===1,'the older browser copy is checked once, by the preview: '+JSON.stringify(work.rows));
+ }
+}
+test('RISK opening once: a warm relaunch of the large board with sync off parses, checks and hashes the board it opens once, the preview alone checks its older copy, and the preview shows the same board',{timeout:300000},t=>openingOnce2429(t,{signed:false}));
+test('RISK opening once: a warm relaunch of the large board with sync on parses, checks and hashes the board it opens once, the preview alone checks its older copy, and the preview shows the same board',{timeout:300000},t=>openingOnce2429(t,{signed:true}));

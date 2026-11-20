@@ -44,18 +44,46 @@
       ...(type==='fireworks'?{scheduleDuration:Math.round(base*1000)/1000}:{}),
       ...(['cyclist','flock'].includes(type)?{count:S.groupSize(type,seed)}:{})};
   }
+  // Every scheduling decision here compares the sun with the same few lines:
+  // 6 degrees below the horizon, the horizon, 8 degrees above it, due south
+  // (azimuth 180) and polar day. Each minute's sun is kept only as which side of
+  // those lines it is on, so every decision stays exactly as it was, and a
+  // device can keep the whole day's sun as one short string. Working the day
+  // out from the astronomy library, minute by minute, was about 210 ms of each
+  // opening at 4x CPU (#2430). A sun from sunAt is {altitude, azimuth, polarDay}.
+  const SUN_ALTITUDES=[-12,-3,4,20,NaN],SUN_AZIMUTHS=[90,270],SUN_LETTERS='abcdefghijklmnopqrst',UNKNOWN_SUN='.';
+  const SUN_SIDES=Array.from({length:20},(_,code)=>Object.freeze({altitude:SUN_ALTITUDES[code%5],azimuth:SUN_AZIMUTHS[Math.floor(code/5)%2],polarDay:code>=10}));
+  function sunCode(sun){
+    const altitude=sun.altitude,band=altitude<-6?0:altitude<0?1:altitude<8?2:altitude>=8?3:4;
+    return band+(sun.azimuth<180?0:5)+(sun.polarDay?10:0);
+  }
+  // The kept minutes stay within this many UTC days before the day asked about.
+  const SUN_MEMORY_DAYS=3;
   function create(options={}){
     const seed=normalizeSeed(options.seed),season=C.seasons[options.season]?options.season:'summer';
-    const sunCache=new Map(),showCache=new Map();let cachedBucket=null,cached=null;
+    const sunCache=new Map(),showCache=new Map();let cachedBucket=null,cached=null,sunComputations=0;
+    const liveSun=minute=>{
+      const date=new Date(minute*60000);sunComputations++;
+      return SUN_SIDES[sunCode(options.sunAt?options.sunAt(+date):S.sunAt(date,options.location))];
+    };
+    const remember=(minute,sun)=>{sunCache.set(minute,sun);if(sunCache.size>8192)sunCache.delete(sunCache.keys().next().value);};
     const sunAt=seconds=>{
       const minute=Math.floor(seconds/60);
-      if(!sunCache.has(minute)){
-        const date=new Date(minute*60000);
-        sunCache.set(minute,options.sunAt?options.sunAt(+date):S.sunAt(date,options.location));
-        if(sunCache.size>8192)sunCache.delete(sunCache.keys().next().value);
-      }
+      if(!sunCache.has(minute))remember(minute,liveSun(minute));
       return sunCache.get(minute);
     };
+    // A kept sun is trusted only for the same seed, place and scene choices,
+    // which the caller's key vouches for. Its first and last minutes are still
+    // checked against the live sun, so a changed sky model or a wrong key
+    // discards it instead of showing a sky that is no longer true.
+    const kept=options.sunMemory;
+    if(kept&&Number.isSafeInteger(kept.start)&&typeof kept.codes==='string'&&kept.codes.length<=8192&&/^[a-t.]*$/.test(kept.codes)){
+      let first=-1,last=-1;
+      for(let index=0;index<kept.codes.length;index++)if(kept.codes[index]!==UNKNOWN_SUN){if(first<0)first=index;last=index;}
+      if(first>=0&&[first,last].every(index=>liveSun(kept.start+index)===SUN_SIDES[SUN_LETTERS.indexOf(kept.codes[index])])){
+        for(let index=0;index<kept.codes.length;index++)if(kept.codes[index]!==UNKNOWN_SUN)remember(kept.start+index,SUN_SIDES[SUN_LETTERS.indexOf(kept.codes[index])]);
+      }
+    }
     const terrain=n=>terrainSample(n,seed),city=root.LandscapeGeometry.create(1440,900).cityscape(terrain);
     const visits=root.LandscapeVisits.create();
     const dayPlans=new Map();
@@ -224,6 +252,19 @@
       return {...gardenSamples};
     }
     return {
+      // The sun this timeline has worked out, for a later timeline with the
+      // same key: the kept days before the given instant's UTC day, and that day.
+      sunMemory(instant){
+        const day=Math.floor((instant instanceof Date?+instant:instant)/86400000),from=(day-SUN_MEMORY_DAYS)*1440,to=(day+1)*1440;
+        let start=Infinity,end=-Infinity;
+        for(const minute of sunCache.keys())if(minute>=from&&minute<to){start=Math.min(start,minute);end=Math.max(end,minute);}
+        if(start>end)return null;
+        const codes=Array(end-start+1).fill(UNKNOWN_SUN);
+        for(const [minute,sun] of sunCache)if(minute>=start&&minute<=end)codes[minute-start]=SUN_LETTERS[SUN_SIDES.indexOf(sun)];
+        return {start,codes:codes.join('')};
+      },
+      // How many minutes of sun this timeline has asked sunAt for.
+      sunComputations:()=>sunComputations,
       at(instant){
         const milliseconds=instant instanceof Date?+instant:instant;
         if(!Number.isFinite(milliseconds))throw new TypeError('Valid UTC instant required');

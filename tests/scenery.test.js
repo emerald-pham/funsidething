@@ -2077,3 +2077,43 @@ test('RISK pedestrian gait cache bounds: route prefixes and contact windows have
  const tiny=vm.createContext({});vm.runInContext(source.replace('MAX_HUMAN_CLEARANCES=345*2*2','MAX_HUMAN_CLEARANCES=8'),tiny);const small=tiny.LandscapeGeometry.create(8192,900);for(let i=0;i<12;i++){const x=100+i*20;small.humanWalkPose(x,small.trail(x)+5,x+32,1,small.humanGround('trail',5),false,1,{kind:'constant',speed:3.5,startDistance:0});const stats=small.cacheStats();assert.ok(stats.windows<=8);assert.equal(stats.windows,stats.actualWindows);}assert.equal(small.cacheStats().windows,8,'fixture actually reaches window eviction');
  const event={type:'walker',seed:.3,lane:.5,duration:2400,activityDuration:60,age:100},p=g.groundPose('walker',event),walk=geo=>geo.humanWalkPose(p.x,p.y,p.distance,1,geo.humanGround('trail',5),false,1,p.travel),cold=walk(c.LandscapeGeometry.create(8192,900));assert.deepEqual(walk(g),cold,'an evicted route reconstructs the exact cold pose');assert.deepEqual(JSON.parse(JSON.stringify(walk(small))),JSON.parse(JSON.stringify(cold)),'window eviction reconstructs the exact cold pose across isolated realms');
 });
+
+// #2430: the day's sun is kept between openings as which side of the
+// timeline's decision lines each minute is on. A timeline given a kept sun for
+// the same place must give exactly the scenes the released planner gives from
+// the live sky, without asking for the day's sun again. A kept sun that
+// disagrees with the live sky (another place, a changed sky model) or is
+// malformed is discarded rather than shown. The negative control removes the
+// live check and must then show the wrong sky's scenes.
+test('RISK opening scenery plan: a kept day sun restores the released scenes without asking the sky again, and a kept sun that disagrees with the live sky is discarded',()=>{
+ const released=spawnSync('git',['show','f588e1401380be46e7658cb24ed0025c322cac4f:landscape-timeline.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(released.status,0,released.stderr);
+ const snapshot=value=>JSON.parse(JSON.stringify(value)),storage={getItem(){return null;}};
+ const orlando={latitude:28.5383,longitude:-81.3792,timezone:'America/New_York',elevation:20},tokyo={latitude:35.6762,longitude:139.6503,timezone:'Asia/Tokyo',elevation:20};
+ const noon=Date.parse('2026-11-19T17:00:00Z'),instants=[noon,noon+8000,noon-8000,noon+3*3600000,noon-6*3600000,noon+7*3600000-1,noon+7*3600000+1];
+ const setup=c=>{assert.equal(c.LandscapeConfig.setSpawnRates('| blimp | 1 |'),true);return c;};
+ const current=setup(sceneTimeline()),prior=setup(sceneTimeline({'landscape-timeline.js':()=>released.stdout}));
+ let asked=0;
+ const options=(c,location,extra={})=>({seed:c.LandscapeTimeline.DEFAULT_SEED,season:'autumn',location,...extra,sunAt:at=>{asked++;return c.LivingSky.sunAt(c.LivingSky.sceneDate(new Date(at),storage,location),location);}});
+ const scenes=timeline=>instants.map(at=>snapshot(timeline.at(at)));
+ const expected=scenes(prior.LandscapeTimeline.create(options(prior,orlando)));
+ const fresh=current.LandscapeTimeline.create(options(current,orlando));
+ assert.deepEqual(scenes(fresh),expected,'the live sky, kept only as sides of the decision lines, gives the released scenes');
+ const kept=snapshot(fresh.sunMemory(noon));
+ assert.ok(kept&&kept.codes.length<=4*1440&&/^[a-t.]+$/.test(kept.codes),'the kept sun is a short letter string');
+ asked=0;const restored=current.LandscapeTimeline.create(options(current,orlando,{sunMemory:kept}));
+ const sameDay=instants.filter(at=>Math.floor(at/86400000)===Math.floor(noon/86400000));
+ assert.deepEqual(sameDay.map(at=>snapshot(restored.at(at))),expected.slice(0,sameDay.length),'a kept sun for the same place restores the released scenes');
+ assert.ok(asked<=12,`a kept day sun still asked the sky for ${asked} minutes on its own day`);
+ assert.deepEqual(scenes(restored),expected,'the next UTC day is worked out afresh and matches the released scenes');
+ assert.ok(asked>=1000,'fixture: the next UTC day asks the sky for its own plan');
+ const tokyoExpected=scenes(prior.LandscapeTimeline.create(options(prior,tokyo)));
+ assert.notDeepEqual(tokyoExpected,expected,'fixture: the two places really schedule different scenes');
+ assert.deepEqual(scenes(current.LandscapeTimeline.create(options(current,tokyo,{sunMemory:kept}))),tokyoExpected,'a kept sun that disagrees with the live sky is discarded');
+ for(const malformed of [null,{},{start:'1',codes:'a'},{start:1.5,codes:'a'},{start:kept.start,codes:'z'+kept.codes.slice(1)},{start:kept.start,codes:'.'.repeat(5)},{start:kept.start,codes:'a'.repeat(9000)}])
+  assert.deepEqual(scenes(current.LandscapeTimeline.create(options(current,orlando,{sunMemory:malformed}))),expected,`malformed kept sun ${JSON.stringify(malformed)?.slice(0,40)} is ignored`);
+ const unchecked=setup(sceneTimeline({'landscape-timeline.js':source=>{
+  const check='[first,last].every(index=>liveSun(kept.start+index)===SUN_SIDES[SUN_LETTERS.indexOf(kept.codes[index])])';
+  assert.ok(source.includes(check),'negative control finds the live check');return source.replace(check,'true');
+ }}));
+ assert.notDeepEqual(scenes(unchecked.LandscapeTimeline.create(options(unchecked,tokyo,{sunMemory:kept}))),tokyoExpected,'negative control: without the live check, the wrong place\'s kept sun changes the scenes');
+});
