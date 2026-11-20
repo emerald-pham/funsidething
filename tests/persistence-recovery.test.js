@@ -18208,3 +18208,92 @@ async function openingOnce2429(t,{signed}){
 }
 test('RISK opening once: a warm relaunch of the large board with sync off parses, checks and hashes the board it opens once, the preview alone checks its older copy, and the preview shows the same board',{timeout:300000},t=>openingOnce2429(t,{signed:false}));
 test('RISK opening once: a warm relaunch of the large board with sync on parses, checks and hashes the board it opens once, the preview alone checks its older copy, and the preview shows the same board',{timeout:300000},t=>openingOnce2429(t,{signed:true}));
+
+// #2427: the work one cloud push costs this device's main thread, with sync
+// on, counted and never timed, from the end of the answer's own device save
+// until the push and its acknowledgement are done and sync is settled. One No
+// asks for the push; it uploads after the push debounce. Counted through the
+// app's own functions and its JSON:
+// - validations: whole-board decision-evidence validations (an outermost call
+//   to the app's decision-evidence or projection check, on any board). The
+//   copies a validation makes of the board for its own comparison belong to
+//   it and count nowhere else;
+// - hashes: JavaScript hashes of text of at least half the board;
+// - serializations: whole-board texts made outside a validation: an outermost
+//   call of one of the app's whole-board serializers (the cloud copy, the
+//   device save's text, the save-loop check's content, and the push's texts
+//   if the app has a function for them), or else JSON text of at least half
+//   the board;
+// - parses: JSON text of at least half the board read outside a validation;
+// - deviceSaves: whole-board device saves (device head commits).
+// Half of the smaller of the saved board and the cloud copy, so a 20-task
+// board's whole-board texts count as the large board's do.
+const SERIALIZERS2427=['cloudPayloadFor','boardSaveText','cloudSaveLoopContent','boardPushTexts'];
+function pushWork2427(device,boardBytes){
+ const {ctx,counters}=device,counts={validations:0,hashes:0,serializations:0,parses:0,deviceSaves:0};
+ const host=ctx.JSON,big=Math.max(1024,Math.floor(boardBytes/2)),sites=new Map(),inside={validation:0,serializer:0};
+ const where=kind=>{const at=new Error().stack.split('\n').slice(3,8).map(line=>line.trim().replace(/^at /,'').replace(/ \(.*\)$/,'')).join(' < ');sites.set(kind+' '+at,(sites.get(kind+' '+at)||0)+1);};
+ ctx.JSON={[Symbol.toStringTag]:'JSON',
+  stringify(...args){const text=host.stringify(...args);if(typeof text==='string'&&text.length>=big&&!inside.validation&&!inside.serializer){counts.serializations++;where('stringify');}return text;},
+  parse(text,...rest){if(typeof text==='string'&&text.length>=big&&!inside.validation){counts.parses++;where('parse');}return host.parse(text,...rest);}};
+ ctx.__work2427=counts;ctx.__big2427=big;ctx.__where2427=where;ctx.__inside2427=inside;
+ vm.runInContext(`(()=>{const c=__work2427,inside=__inside2427;
+  for(const name of ['decisionEvidenceIssue','decisionSourceIssue','decisionProjectionIssue','conflictingDecisionEvidence']){
+   const check=globalThis[name];
+   globalThis[name]=function(){if(!inside.validation){c.validations++;__where2427('validation '+name);}inside.validation++;try{return check.apply(this,arguments);}finally{inside.validation--;}};
+  }
+  for(const name of ${JSON.stringify(SERIALIZERS2427)}){
+   const serialize=globalThis[name];if(typeof serialize!=='function')continue;
+   globalThis[name]=function(){if(!inside.validation&&!inside.serializer){c.serializations++;__where2427('serializer '+name);}inside.serializer++;try{return serialize.apply(this,arguments);}finally{inside.serializer--;}};
+  }
+  for(const name of ['chanceHash','backupArchiveHash']){
+   const hash=globalThis[name];
+   globalThis[name]=function(text){if(typeof text==='string'&&text.length>=__big2427){c.hashes++;__where2427('hash '+name);}return hash.apply(this,arguments);};
+  }
+ })()`,ctx);
+ let commits=counters.commits.length;
+ return {reset(){for(const key of Object.keys(counts))counts[key]=0;sites.clear();commits=counters.commits.length;},
+  now:()=>({...counts,deviceSaves:counters.commits.length-commits}),sites:()=>Object.fromEntries(sites)};
+}
+// A signed-in device with sync on, scanning on the board, settled. One No is
+// answered and saved on the device; its push is counted.
+async function oneCountedPush2427(t,label,board,{before=[]}={}){
+ const device=await answeringDevice2408(t,{board,saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock,counters}=device;
+ for(const act of before){device.tap(act);await clock.advance(1500);}
+ await clock.settle();
+ const seeded=Buffer.byteLength(JSON.stringify(board),'utf8');
+ const work=pushWork2427(device,Math.min(seeded,Buffer.byteLength(ctx.cloudPayload(),'utf8')));
+ const candidate=device.tap('no');
+ assert.equal(ctx.state.considered?.[candidate],'no',label+': positive control: the No is taken');
+ await clock.advance(1500);
+ const uploads=counters.uploads.length,revision=ctx.state.syncRev;
+ work.reset();
+ await clock.settle();
+ const counted=work.now();
+ assert.equal(counters.uploads.length-uploads,1,label+': positive control: one push uploads');
+ assert.equal(ctx.state.syncRev,revision+1,label+': positive control: the push is acknowledged');
+ assert.equal(ctx.state.syncDirty,false,label+': positive control: and nothing is left to push');
+ return {counted,sites:work.sites(),device};
+}
+test('RISK push work: with sync on, one push serializes the board once, validates it at most once, hashes no whole board in JavaScript and records its acknowledgement without a whole-board device save, the same on a 20-task board as on the large board',{timeout:300000},async t=>{
+ // The 20-task board as #2428 builds it: the large board's settings and
+ // context, tasks padded with a future field so its whole-board texts stand
+ // out from its decision log, and a Yes first so the No moves a benchmark.
+ const twenty=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
+  tasks:Array.from({length:20},(_,i)=>({...syncTask('twenty-2427-'+i,'Twenty task '+i),ctx:['home'],createdAt:1000+i,futureNote:'x'.repeat(15000)}))});
+ const small=await oneCountedPush2427(t,'20 tasks',twenty,{before:['yes']});
+ await small.device.close();
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const large=await oneCountedPush2427(t,'large board',JSON.parse(fixture.payload));
+ t.diagnostic(JSON.stringify({small:small.counted,large:large.counted}));
+ t.diagnostic(JSON.stringify({smallSites:small.sites,largeSites:large.sites}));
+ for(const [label,{counted}] of [['20 tasks',small],['large board',large]]){
+  assert.equal(counted.serializations,1,label+': the push serializes the board once: '+JSON.stringify(counted));
+  assert.ok(counted.validations<=1,label+': and validates its decision evidence at most once: '+JSON.stringify(counted));
+  assert.equal(counted.hashes,0,label+': no whole board is hashed in JavaScript: '+JSON.stringify(counted));
+  assert.equal(counted.deviceSaves,0,label+': the acknowledgement is recorded without a whole-board device save: '+JSON.stringify(counted));
+ }
+ assert.deepEqual(large.counted,small.counted,'one push costs the same whole-board work on the large board as on a 20-task board');
+});
