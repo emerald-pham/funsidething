@@ -7160,6 +7160,98 @@ test('RISK opening scenery browser: a seeded board takes trusted typing and a fr
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
 
+// #2430: every opening worked out the day's plan from the sun's position at
+// each minute of the UTC day, about 210 ms of astronomy at 4x CPU, before the
+// scenery could paint. A warm relaunch on the same day in the same place must
+// reuse that plan and paint exactly what a fresh computation paints. Another
+// place or another day computes the plan afresh, and a fresh device with those
+// same inputs paints the same landscape, so no stale sky or plan is shown. The
+// page clock is fixed so every launch shows one instant. Work is counted where
+// the sun is asked of the astronomy library, never timed.
+test('RISK opening scenery plan browser: a warm relaunch on the same day and place reuses the day plan and paints the identical landscape, while another place or day computes it afresh, in Chromium and WebKit under both motion choices',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=12,DAY_ONE='2026-11-19T17:00:00Z',DAY_TWO='2026-11-20T17:00:00Z',FRESH_PLAN=1000,REUSED_PLAN=100;
+ const TOKYO={latitude:35.6762,longitude:139.6503,timezone:'Asia/Tokyo',label:'Tokyo, JP',enabled:true};
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('plan-'+i,'Plan board task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true}));
+ const digest=value=>createHash('sha256').update(value).digest('hex').slice(0,16);
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const motion of ['normal','reduced']){
+    const label=`${engineName}/${motion}`,contexts=[];
+    const device=async(place=null)=>{
+     const context=await browser.newContext({viewport:{width:390,height:844},timezoneId:'America/New_York',serviceWorkers:'block',reducedMotion:motion==='reduced'?'reduce':'no-preference'});contexts.push(context);
+     await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+     await context.addInitScript(({board,motion,place})=>{
+      Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+      // A valid saved choice, so the first-run motion prompt cannot confound the
+      // opening. It predates both fixed instants: the page clock may not be fixed yet here.
+      localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:motion,savedAt:Date.parse('2026-11-18T12:00:00Z')}));
+      if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+      if(place&&localStorage.getItem('fvp:chain-scanner:location')===null)localStorage.setItem('fvp:chain-scanner:location',JSON.stringify(place));
+      const plan=window.__plan={sun:0,painted:false,frames:0};
+      // Count every request for the sun's position, wherever the scenery makes it.
+      let astronomy;Object.defineProperty(globalThis,'Astronomy',{configurable:true,enumerable:true,get:()=>astronomy,set(value){
+       const equator=value.Equator;value.Equator=function(body,...rest){if(body==='Sun')plan.sun++;return equator.call(this,body,...rest);};astronomy=value;
+      }});
+      const raf=window.requestAnimationFrame.bind(window),observe=()=>{if(plan.painted)plan.frames++;if(plan.frames<60)raf(observe);};raf(observe);
+      const context2d=CanvasRenderingContext2D.prototype;
+      for(const method of ['clearRect','fillRect','fill','stroke','drawImage','putImageData']){
+       const original=context2d[method];
+       context2d[method]=function(...args){if(!plan.painted&&this.canvas?.closest?.('#landscape'))plan.painted=true;return original.apply(this,args);};
+      }
+     },{board,motion,place});
+     return context;
+    };
+    // A launch first leaves the previous opening for a plain page of the same
+    // origin, so that opening cannot see the next instant and work that day out.
+    const launch=async(context,at,stage)=>{
+     const page=context.pages()[0]||await context.newPage();
+     if(page.url().startsWith(origin))await page.goto(origin+'/icon.svg');
+     await page.clock.setFixedTime(new Date(at));
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+     await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&window.__plan.painted&&window.__plan.frames>=60,null,{timeout:20000});
+     const shown=await page.evaluate(()=>{
+      const root=document.documentElement,back=document.querySelector('#landscape [data-scenery]'),front=document.querySelector('#landscape [data-life]');
+      return {sun:__plan.sun,back:back.toDataURL(),front:front.toDataURL(),backVisible:getComputedStyle(back).visibility,
+       scene:{season:root.dataset.sceneSeason,period:root.dataset.scenePeriod,tint:root.style.getPropertyValue('--scene-tint'),status:document.getElementById('sceneStatus').textContent,motion:root.dataset.landscapeMotion,location:JSON.stringify(globalThis.LivingLocation?.current())}};
+     });
+     const result={stage,sun:shown.sun,back:digest(shown.back),front:digest(shown.front),backVisible:shown.backVisible,scene:shown.scene};observed.push({label,...result,scene:undefined});
+     return result;
+    };
+    try{
+     const first=await device();
+     const cold=await launch(first,DAY_ONE,'cold');
+     const warm=await launch(first,DAY_ONE,'warm same day and place');
+     await first.pages()[0].evaluate(place=>localStorage.setItem('fvp:chain-scanner:location',JSON.stringify(place)),TOKYO);
+     const moved=await launch(first,DAY_ONE,'warm after moving');
+     const nextDay=await launch(first,DAY_TWO,'warm next day');
+     const other=await device(TOKYO);
+     const freshMoved=await launch(other,DAY_ONE,'fresh device moved');
+     const freshNextDay=await launch(other,DAY_TWO,'fresh device next day');
+     // Fixture preconditions: the counter sees a fresh day plan, the landscape painted and the saved choices apply.
+     assert.ok(cold.sun>=FRESH_PLAN,`${label}: a cold opening computes the day plan (${cold.sun} sun positions)`);
+     assert.ok(freshMoved.sun>=FRESH_PLAN&&freshNextDay.sun>=FRESH_PLAN,`${label}: a fresh device computes its own day plans (${freshMoved.sun}, ${freshNextDay.sun} sun positions)`);
+     for(const shown of [cold,warm,moved,nextDay,freshMoved,freshNextDay])assert.equal(shown.backVisible,'visible',`${label}: ${shown.stage} painted the landscape`);
+     assert.equal(cold.scene.motion,motion,`${label}: the saved motion choice applies`);
+     assert.notEqual(moved.scene.location,cold.scene.location,`${label}: the moved place applies`);
+     // Behavior under test.
+     if(warm.sun>=REUSED_PLAN)failures.push(`${label}: a warm relaunch on the same day in the same place computed the day plan again (${warm.sun} sun positions)`);
+     if(warm.back!==cold.back||warm.front!==cold.front)failures.push(`${label}: the warm relaunch painted a different landscape from the fresh computation`);
+     if(JSON.stringify(warm.scene)!==JSON.stringify(cold.scene))failures.push(`${label}: the warm relaunch showed different scene time, season, place, palette or message ${JSON.stringify([cold.scene,warm.scene])}`);
+     if(moved.sun<FRESH_PLAN)failures.push(`${label}: moving to another place reused the old place's plan (${moved.sun} sun positions)`);
+     if(nextDay.sun<FRESH_PLAN)failures.push(`${label}: the next day reused the previous day's plan (${nextDay.sun} sun positions)`);
+     if(moved.back!==freshMoved.back||moved.front!==freshMoved.front||JSON.stringify(moved.scene)!==JSON.stringify(freshMoved.scene))failures.push(`${label}: after moving, the landscape differs from a fresh device in that place`);
+     if(nextDay.back!==freshNextDay.back||nextDay.front!==freshNextDay.front||JSON.stringify(nextDay.scene)!==JSON.stringify(freshNextDay.scene))failures.push(`${label}: on the next day, the landscape differs from a fresh device on that day`);
+    }finally{for(const context of contexts)await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
 // #2203: the scenery's recurring refresh must not hold up input. The page's
 // Date is shifted so the scene's own minute boundary falls a few seconds after
 // opening; timers and frames stay real. When the refresh computes the scene at
