@@ -8148,7 +8148,9 @@ const changeRecordOutbox=(()=>{
     // #2417 specialist review B1: a record carries nothing this board's own
     // full copy could not: none while its decision evidence fails the checks
     // a push makes (sendPush). One made while sync holds the board waits.
-    if(decisionRecoveryHolds().length||decisionEvidenceIssue(state,CS.user))return;
+    // #2435: the same check, extended from the projection it last verified
+    // with the answer's own decisions; any issue is the full check's verdict.
+    if(decisionRecoveryHolds().length||DecisionProjection.evidenceIssue(state,CS.user))return;
     let parts=null;
     try{parts=describeBoardChange(frame.snapshot,frame.after);}catch{parts=null;}
     const text=parts&&JSON.stringify(parts);
@@ -8712,7 +8714,9 @@ function normalizeExpiredTimedHoldsForComparison(board,effectiveNow){
     }
   }
 }
-function decisionProjectionIssue(board,checkCoherence=true,effectiveNow=Date.now()){
+// capture (#2435): an object that receives what the coherence replay chose and
+// wrote (DecisionProjection); the verdict is unchanged.
+function decisionProjectionIssue(board,checkCoherence=true,effectiveNow=Date.now(),capture=null){
   if(decisionBaselineRecoveryRows(board).length)return "unprojectable-decision-evidence";
   const rows=Array.isArray(board?.decisionEvents)?board.decisionEvents:[],baseline=board?.decisionBaseline;
   if(!rows.length && baseline===undefined)return null;
@@ -8816,7 +8820,9 @@ function decisionProjectionIssue(board,checkCoherence=true,effectiveNow=Date.now
     }:undefined));
     let projected=comparisonCopy(true);
     if(!Object.hasOwn(projected,"syncAccount"))projected.syncAccount=baseline.account;
-    projectDecisionEvents(projected);
+    projectDecisionEvents(projected,null,{capture});
+    // #2435: the incremental projection keeps what this replay wrote.
+    if(capture?.replayed)capture.values=DecisionProjection.values(projected,capture);
     normalizeExpiredTimedHoldsForComparison(projected,effectiveNow);
     const byId=new Map(projected.tasks.map(task=>[task.id,[task.mu,task.sigma]]));
     // A read that throws still throws where the comparison reaches it.
@@ -8885,10 +8891,10 @@ function decisionSourceIssue(board,account){
   if(conflictingDecisionEvidence(board))return "conflicting-decision-evidence";
   return null;
 }
-function decisionEvidenceIssue(board,account,checkProjection=true){
+function decisionEvidenceIssue(board,account,checkProjection=true,capture=null){
   const issue=decisionSourceIssue(board,account);if(issue)return issue;
   if(ambiguousLegacyCompletion(board))return "ambiguous-legacy-completion";
-  return checkProjection?decisionProjectionIssue(board):null;
+  return checkProjection?decisionProjectionIssue(board,true,Date.now(),capture):null;
 }
 function currentChoiceSourceIssue(board){
   const events=Array.isArray(board?.decisionEvents)?board.decisionEvents:[];
@@ -11648,10 +11654,13 @@ const taskActionOwnerBundle=(()=>{
     // - The replay of a pass Start began also ends an intervention prompt. One
     //   the action did not end stays up while the board scans the same
     //   benchmark, with no candidate, as maybeIntervene leaves it (review B2).
+    // #2435: the replay extends the projection the last replay or check
+    // verified with this decision alone, or replays the whole board where it
+    // cannot (DecisionProjection); either way the board is the same.
     function settle(replay,direct){
       const offered=state.candidateId,intervening=state.interventionActive,weighed=benchmark()?.id;let path="direct";
-      if(replay&&decisionReplayReady(state)){
-        projectDecisionEvents(state,null,{refreshRanks:false,ready:true});expireCants();expireWorked();path="replay";
+      if(replay&&DecisionProjection.replay(state)){
+        expireCants();expireWorked();DecisionProjection.swept(state);path="replay";
       }else direct();
       if(intervening&&!state.interventionActive&&state.mode==="scan"&&benchmark()?.id===weighed){
         state.interventionActive=true;state.candidateId=null;
@@ -13421,20 +13430,25 @@ function decisionReplayReady(board=state){
   return supportedDecisionBaseline(baseline,account)&&!decisionProjectionIssue(board,false);
 }
 // ready: the caller has just checked decisionReplayReady on this board.
-function projectDecisionEvents(board=state,inheritedCancellations=null,{refreshRanks=true,ready=false}={}){
+// capture (#2435): an object that receives what this replay chose, for the
+// incremental projection (DecisionProjection); the replay itself is unchanged.
+function projectDecisionEvents(board=state,inheritedCancellations=null,{refreshRanks=true,ready=false,capture=null}={}){
   const baseline=board?.decisionBaseline;
   if(!ready&&!decisionReplayReady(board))return false;
   const before=JSON.stringify([(board.tasks||[]).map(task=>[task.id,task.mu,task.sigma]),board.chain,board.considered,board.cantAt,board.workedAt,board.mode,board.scanMode,board.settings?.scanMode]);
-  if(typeof projectDecisionPassBase==="function")projectDecisionPassBase(board);
+  if(typeof projectDecisionPassBase==="function")projectDecisionPassBase(board,capture);
   const {values:ratings,conflicts}=decisionBaselineRatings(baseline);
   const {events,blockedIds,byId}=decisionEventOrder(board,baseline);
   const cancelled=new Set([...decisionUndoTargets(board),...(inheritedCancellations||[])]);
+  if(capture)Object.assign(capture,{replayed:true,ratings,conflicts:conflicts.size,cancelled,inheritedCancellations:!!inheritedCancellations?.size,
+    inheritanceReplays:0,cancelledInPass:false});
   for(const row of baseline.ratings)ratings.set(row.taskId,{mu:row.mu,sigma:row.sigma});
   // Explicit ownership adoption embodies source learning without changing the
   // source facts. Undo reconstructs that exact source, then later owner facts
   // still replay once against the reconstructed values.
   for(const receipt of baseline.inheritance||[]){
     if(!receipt.sourceBaseline||!receipt.facts.some(fact=>cancelled.has(fact.id)))continue;
+    if(capture)capture.inheritanceReplays++;
     const source=JSON.parse(JSON.stringify(board));
     source.syncAccount=receipt.sourceAccount;source.decisionBaseline=JSON.parse(JSON.stringify(receipt.sourceBaseline));
     source.decisionEvents=receipt.facts.map(fact=>JSON.parse(readDecisionWitness(fact.witness)));
@@ -13456,7 +13470,9 @@ function projectDecisionEvents(board=state,inheritedCancellations=null,{refreshR
   // remains visible evidence but is never reverse-engineered into comparisons.
   for(const task of board.tasks||[]){const rating=ratings.get(task.id);if(rating){task.mu=rating.mu;task.sigma=rating.sigma;}}
   const activePass=PassChain.passId(board),passEvents=events.filter(event=>event.passId===activePass);
+  if(capture)Object.assign(capture,{activePass,passEvents:passEvents.length});
   for(const event of passEvents)if(cancelled.has(event.id)&&(event.kind==="no"||event.kind==="comparison")){
+    if(capture)capture.cancelledInPass=true;
     const id=event.kind==="no"?event.candidateId:event.taskId,kind=baseline.considered?.[id];
     if(board.tasks?.find(task=>task.id===id)?.done)continue;
     const value=kind==="cant"?{kind,at:baseline.cantAt?.[id]}:kind==="worked"?{kind,at:baseline.workedAt?.[id]}:{kind};
@@ -13532,12 +13548,13 @@ function projectDecisionEvents(board=state,inheritedCancellations=null,{refreshR
     else if(event.action==="dislodge")disposition.set(id,"dislodged");
     else if(event.action==="yes"||event.action==="dot")disposition.set(id,"clear");
   }
+  if(capture)Object.assign(capture,{outstanding,disposition});
   board.considered=board.considered&&typeof board.considered==="object"&&!Array.isArray(board.considered)?board.considered:{};
   for(const [id,value] of disposition){
     if(value==="clear"){delete board.considered[id];if(board.cantAt)delete board.cantAt[id];if(board.workedAt)delete board.workedAt[id];}
     else board.considered[id]=value;
   }
-  if(typeof projectCurrentChoiceEvents==="function")projectCurrentChoiceEvents(board,cancelled);
+  if(typeof projectCurrentChoiceEvents==="function")projectCurrentChoiceEvents(board,cancelled,capture);
   // Ordinary Yes/Done already refresh once after projection and before History.
   // Leave that owner the final refresh; standalone projections still refresh.
   if(refreshRanks)recomputeProjectedDecisionRanks(board);
@@ -13546,6 +13563,388 @@ function projectDecisionEvents(board=state,inheritedCancellations=null,{refreshR
 function recomputeProjectedDecisionRanks(board){
   if(board===state)recomputeRanks();
 }
+/* #2435: the incremental decision projection. A scanner answer checked its
+   board's whole decision evidence twice on the main thread: its replay before
+   the paint (BoardDecision's settle) and the sender's gate on its change
+   record (changeRecordOutbox.record), which keeps the #2417 rule that a record
+   carries nothing the board's own full copy could not push. Each replayed
+   every decision the board holds, so both grew with the board and its
+   History. This keeps the projection the last full check or replay verified
+   (what the replay writes on the board, and what extending it needs) and
+   extends it with each new decision, so an answer replays its own decisions
+   only. It gives the full check's result, or runs the full check:
+   - It holds for the board it was made on alone: the same decision baseline
+     (every field of it, its ratings by value), the same decisions in the same
+     order with the new ones after them, the same tasks (ids, order, done),
+     account and pass, and the time before the next 2 AM reset of a Start it
+     replays. Decisions and History rows are never changed in place: every
+     writer adds a row or replaces the list, and the board's own check reads
+     them the same way.
+   - Only a decision that observed every earlier one, so that it replays
+     last, and whose effect it knows (a No, Yes or Dislodge, or a Can't or
+     Worked on it) extends it. Any other decision goes to the full check.
+   - Every use checks that the board still holds each value the replay
+     writes (its fixed point): ratings, chain, pass, marks (with expired holds
+     left out, as the full check leaves them out), every current choice's
+     target and the contexts. A board changed behind it, a stale projection,
+     is caught there and goes to the full check, which makes a new one.
+   - The gate answers only that nothing holds the record. Every issue is the
+     full check's to name, so every verdict the gate gives is the full
+     check's. The replay gives the board, the draw count and the key order of
+     its marks exactly as projectDecisionEvents does. */
+const DecisionProjection=(()=>{
+  let verified=null;
+  const MAPS=["considered","cantAt","workedAt"],PASS_FIELDS=["passId","passStartedAt","mode","scanMode","chance"];
+  const plain=value=>!!value&&typeof value==="object"&&!Array.isArray(value);
+  const text=value=>{try{const out=JSON.stringify(value);return out===undefined?"undefined":out;}catch{return null;}};
+  const fieldText=(board,key)=>Object.hasOwn(board,key)?text(board[key]):"absent";
+  const targetKey=target=>JSON.stringify([target.type,target.id,target.property]);
+  const readTarget=(board,target)=>{try{return text(currentChoiceTargetRead(board,target));}catch{return null;}};
+  // Every current choice's target outside the pass's own fields and the
+  // marks, as the board reads it, and whether any choice is about a context.
+  function targetsOf(events){
+    const targets=new Map();let contexts=false;
+    for(const event of events){
+      if(event?.kind!=="current-choice"||!plain(event.target))continue;
+      const {type,id,property}=event.target;
+      if(type==="context")contexts=true;
+      if(type==="pass"||type==="task"&&property==="disposition")continue;
+      targets.set(targetKey(event.target),{type,id,property});
+    }
+    return {targets,contexts};
+  }
+  // What a replay wrote on board, read from it: capture is the replay's own.
+  function values(board,capture){
+    const ratings=new Map();
+    for(const task of Array.isArray(board.tasks)?board.tasks:[])if(capture.ratings.has(task?.id))ratings.set(task.id,[task.mu,task.sigma]);
+    const {targets,contexts}=targetsOf(Array.isArray(board.decisionEvents)?board.decisionEvents:[]);
+    return {ratings,chain:Array.isArray(board.chain)?board.chain.slice():null,
+      pass:Object.fromEntries(PASS_FIELDS.map(key=>[key,fieldText(board,key)])),
+      maps:Object.fromEntries(MAPS.map(key=>[key,plain(board[key])?{...board[key]}:null])),
+      targets,reads:new Map([...targets].map(([key,target])=>[key,readTarget(board,target)])),
+      contexts:contexts?text(board.contexts):null};
+  }
+  // The marks as the full check compares them: expired holds left out.
+  function marksText(maps,settings,now){
+    const view={settings};
+    for(const key of MAPS)view[key]=plain(maps[key])?{...maps[key]}:maps[key];
+    normalizeExpiredTimedHoldsForComparison(view,now);
+    return canonicalDecisionFact(MAPS.map(key=>view[key]??null));
+  }
+  const readyAccountOf=board=>Object.hasOwn(board,"syncAccount")?board.syncAccount:board.decisionBaseline?.account??window.CloudSync?.user??null;
+  const ownerOf=board=>typeof board.syncAccount==="string"&&board.syncAccount?board.syncAccount:null;
+  // The baseline's fields by identity and length (a writer replaces a list or
+  // adds to it), and its ratings by value.
+  function baselineKey(baseline){
+    return {fields:Object.keys(baseline).map(key=>[key,baseline[key],Array.isArray(baseline[key])?baseline[key].length:-1]),
+      rows:[...baseline.ratings,...(Array.isArray(baseline.ratingExtensions)?baseline.ratingExtensions:[])].map(row=>[row,row?.taskId,row?.mu,row?.sigma])};
+  }
+  // The rating extensions the baseline gained since key (ensureDecisionBaseline
+  // adds one for a task that was not rated yet, the first time a decision
+  // names it), or null when anything else about it changed.
+  function grownBaseline(baseline,key,rated,legacy){
+    if(!plain(baseline))return null;
+    const keys=Object.keys(baseline);
+    if(keys.length!==key.fields.length&&!(keys.length===key.fields.length+1&&keys.at(-1)==="ratingExtensions"&&!key.fields.some(([name])=>name==="ratingExtensions")))return null;
+    for(let i=0;i<key.fields.length;i++){
+      const [name,value,length]=key.fields[i],now=baseline[keys[i]];
+      if(keys[i]!==name)return null;
+      if(name==="ratingExtensions"&&Array.isArray(now)&&Array.isArray(value)&&now.length>=length)continue;
+      if(now!==value||(Array.isArray(now)?now.length:-1)!==length)return null;
+    }
+    const extensions=Array.isArray(baseline.ratingExtensions)?baseline.ratingExtensions:[];
+    if(baseline.ratingExtensions!==undefined&&!Array.isArray(baseline.ratingExtensions))return null;
+    const rows=[...baseline.ratings,...extensions];
+    if(rows.length<key.rows.length)return null;
+    for(let i=0;i<key.rows.length;i++){const [row,id,mu,sigma]=key.rows[i];if(rows[i]!==row||row?.taskId!==id||row?.mu!==mu||row?.sigma!==sigma)return null;}
+    // Each new one is a row supportedDecisionBaseline accepts, for a task no
+    // rating names yet, so no rating conflicts with it, and no No from before
+    // ratingApplied names it (its rating could make that No train).
+    const grown=rows.slice(key.rows.length),seen=new Set();
+    for(const row of grown){
+      if(!decisionRating(row)||!(row.sourceBaseId===null||decisionId(row.sourceBaseId))
+        ||!(row.sourceRevision===null||Number.isSafeInteger(row.sourceRevision)&&row.sourceRevision>=0)
+        ||rated.has(row.taskId)||seen.has(row.taskId)||legacy.has(row.taskId))return null;
+      seen.add(row.taskId);
+    }
+    return grown;
+  }
+  // P8 of decisionProjectionIssue for one History row.
+  const unrepresented=(row,represented,pending)=>validRatingHistoryRow(row)&&row.before&&["no","yes","dot","dislodge"].includes(row.kind)
+    &&(row.before.mu!==row.after.mu||row.before.sigma!==row.after.sigma)&&!represented.has(row.id)&&!pending.has(row.id);
+  // A projection verified for board. checked: the full check found nothing
+  // for that account; ready: decisionReplayReady said the board replays.
+  function anchor(board,capture,{account=null,ready=false}={}){
+    verified=null;
+    const baseline=board?.decisionBaseline,events=board?.decisionEvents,v=capture?.values;
+    // The gate's check replays a copy that takes the baseline's account when
+    // the board names none, so it keeps a projection only for a board that
+    // names its account, as the replay of the board itself reads it.
+    if(!v||!capture.replayed||capture.conflicts||capture.inheritanceReplays||capture.inheritedCancellations||capture.cancelledInPass||!capture.passEvents
+      ||!plain(baseline)||!Array.isArray(events)||!Array.isArray(board.tasks)||board.decisionBaselineRecovery!==undefined
+      ||account!==null&&!Object.hasOwn(board,"syncAccount")||typeof WeakRef!=="function")return;
+    const readyAccount=readyAccountOf(board);
+    if(account!==null)ready=supportedDecisionBaseline(baseline,readyAccount);
+    const ids=new Set(),undoActions=new Set(),undoEvents=new Set(),cancelledDispositions=new Set(),legacy=[],legacyTasks=new Set();
+    const taskIndex=new Map(board.tasks.map((task,index)=>[task?.id,index]));
+    for(const event of events){
+      ids.add(event?.id);
+      if(event?.kind==="undo"){undoActions.add(event.targetActionId);for(const id of event.targetEventIds||[])undoEvents.add(id);}
+      if(event?.kind==="current-choice"&&event.target?.type==="task"&&event.target.property==="disposition"&&capture.cancelled.has(event.id))cancelledDispositions.add(event.target.id);
+      // A No from before ratingApplied replays by its History rows.
+      if(event?.kind==="no"&&event.ratingApplied===undefined&&event.baseId)for(const id of [event.candidateId,event.benchmarkId]){
+        const index=taskIndex.get(id),rows=index===undefined?undefined:board.tasks[index].ratingHistory;
+        legacy.push([index,rows,Array.isArray(rows)?rows.length:-1]);legacyTasks.add(id);
+      }
+    }
+    const owner=ownerOf(board),passRoots=PassChain.starts(events.filter(event=>event?.account===owner)).pairs.map(({taskId})=>
+      [taskId,board.deletedTaskIds?.[taskId]===true&&!board.restoredTaskIds?.[taskId]]);
+    const receipts=replacementDecisionReceipts(baseline);
+    const represented=new Set([...(baseline.observedRatingHistoryIds||[]),...baseline.includedActionIds,...ids,
+      ...receipts.flatMap(receipt=>[...(receipt.baseline.observedRatingHistoryIds||[]),...receipt.baseline.includedActionIds,...receipt.facts.map(fact=>fact.id)])]);
+    // The completion and Start facts ambiguousLegacyCompletion reads.
+    const boundaries=new Map(),completions=new Map(),starts=new Set();
+    for(const fact of retainedDecisionFacts(board)){
+      if(fact?.kind==="completion-boundary")(boundaries.get(fact.taskId)||boundaries.set(fact.taskId,new Set()).get(fact.taskId)).add(fact.sourceEvidence);
+      if(fact?.kind==="completion")(completions.get(fact.taskId)||completions.set(fact.taskId,new Set()).get(fact.taskId)).add(fact.at);
+      const start=PassChain.read(fact);if(start?.kind==="start")starts.add(start.taskId);
+    }
+    // The compared choices whose target the full check reads on the board.
+    const nullTargets=new Set(events.filter(event=>event?.kind==="current-choice"&&event.account===baseline.account&&!attestedDecisionEvent(baseline,event)
+      &&["setting","scene","context"].includes(event.target?.type)).map(event=>targetKey(event.target)));
+    // Marks the replay deletes and writes again move to the end of their map,
+    // in the order it writes them (a Yes's clear, then a later Can't).
+    const moves=[];
+    for(const [id,selected] of capture.dispositionWinners||[])if(capture.disposition.get(id)==="clear"&&selected.present){
+      moves.push(["considered",id]);
+      if(selected.value?.kind==="cant")moves.push(["cantAt",id]);else if(selected.value?.kind==="worked")moves.push(["workedAt",id]);
+    }
+    // The check that made it found no History row it does not represent.
+    const okLists=new WeakSet();
+    for(const task of board.tasks)if(Array.isArray(task?.ratingHistory))okLists.add(task.ratingHistory);
+    verified={board:new WeakRef(board),account,ready,readyAccount,owner,baseline,baselineKey:baselineKey(baseline),events:events.slice(),ids,
+      frontier:new Set(decisionActionFrontier(events)),included:new Set([...baseline.includedActionIds,...inheritedDecisionFacts(baseline).map(fact=>fact.id)]),
+      retired:new Set(receipts.flatMap(receipt=>receipt.facts.map(fact=>fact.id))),undoActions,undoEvents,cancelledDispositions,
+      rated:new Set(decisionBaselineRatings(baseline).values.keys()),trained:new Set(capture.ratings.keys()),
+      activePass:capture.activePass,passBase:capture.passBase?.winner||null,undoneRoots:new Set(capture.passBase?.undoneRoots||[]),
+      passWinners:capture.passWinners||[],horizon:capture.passBase?.horizon??Infinity,anchorAt:Date.now(),
+      syncAccount:fieldText(board,"syncAccount"),taskIds:board.tasks.map(task=>task?.id),taskDone:board.tasks.map(task=>task?.done),taskIndex,passRoots,legacy,legacyTasks,
+      values:v,disposition:new Map(capture.disposition),outstanding:new Map([...capture.outstanding].map(([id,set])=>[id,new Set(set)])),moves,settleFull:false,
+      represented,okRows:new WeakSet(),okLists,boundaries,completions,starts,nullTargets};
+  }
+  // The projection, if it was made on this board and nothing it depends on
+  // has moved: its decisions are the board's first ones.
+  function current(board,{account=null,ready=false}={}){
+    const sigma=verified;
+    if(!sigma||sigma.board.deref()!==board)return null;
+    if(account!==null?sigma.account!==account:!ready||!sigma.ready||sigma.readyAccount!==readyAccountOf(board))return null;
+    const now=Date.now(),events=board.decisionEvents,tasks=board.tasks;
+    sigma.grown=board.decisionBaseline===sigma.baseline?grownBaseline(board.decisionBaseline,sigma.baselineKey,sigma.rated,sigma.legacyTasks):null;
+    if(!(now>=sigma.anchorAt&&now<sigma.horizon)||!sigma.grown
+      ||board.decisionBaselineRecovery!==undefined||Object.hasOwn(board,"decisionEventsRecovery")&&(!Array.isArray(board.decisionEventsRecovery)||board.decisionEventsRecovery.length)
+      ||!Array.isArray(events)||events.length<sigma.events.length||fieldText(board,"syncAccount")!==sigma.syncAccount
+      ||!Array.isArray(tasks)||tasks.length!==sigma.taskIds.length||PassChain.passId(board)!==sigma.activePass||sigma.undoneRoots.has(board.passId))return null;
+    for(let i=0;i<sigma.events.length;i++)if(events[i]!==sigma.events[i])return null;
+    for(let i=0;i<tasks.length;i++)if(tasks[i]?.id!==sigma.taskIds[i]||tasks[i]?.done!==sigma.taskDone[i])return null;
+    for(const [id,deleted] of sigma.passRoots)if((board.deletedTaskIds?.[id]===true&&!board.restoredTaskIds?.[id])!==deleted)return null;
+    for(const [index,rows,length] of sigma.legacy){const now=index===undefined?undefined:tasks[index].ratingHistory;if(now!==rows||(Array.isArray(now)?now.length:-1)!==length)return null;}
+    return sigma;
+  }
+  // The values the replay writes once new decisions extend sigma, built
+  // beside it: sigma itself changes only once the board is found to hold them.
+  function begin(sigma){
+    const v=sigma.values;
+    // A task rated since (a new extension) starts the replay at its rating.
+    const grown=sigma.grown||[],ratings=new Map(grown.map(row=>[row.taskId,[row.mu,row.sigma]]));
+    return {ids:new Set(),frontier:sigma.frontier,ratings,rated:new Set(ratings.keys()),chain:v.chain.slice(),maps:null,disposition:new Map(),
+      outstanding:null,moves:sigma.moves,settleFull:sigma.settleFull,
+      rating(id){const row=this.ratings.get(id)??v.ratings.get(id);return row?{mu:row[0],sigma:row[1]}:null;},
+      marks(){if(!this.maps)this.maps=Object.fromEntries(MAPS.map(key=>[key,{...v.maps[key]}]));return this.maps;},
+      dispositionOf(id){return this.disposition.has(id)?this.disposition.get(id):sigma.disposition.get(id);},
+      moving(id){return this.moves.some(([,key])=>key===id);}};
+  }
+  // applyCurrentChoiceDisposition on the values being built.
+  function writeMark(next,id,choice){
+    const {considered,cantAt,workedAt}=next.marks();
+    if(!choice.present){delete considered[id];delete cantAt[id];delete workedAt[id];}
+    else if(choice.value.kind==="cant"){considered[id]="cant";cantAt[id]=choice.value.at;delete workedAt[id];}
+    else if(choice.value.kind==="worked"){considered[id]="worked";workedAt[id]=choice.value.at;delete cantAt[id];}
+    else{considered[id]=choice.value.kind;delete cantAt[id];delete workedAt[id];}
+  }
+  // One new decision. It replays last only if it observed every earlier one.
+  // Each step is projectDecisionEvents' own for that decision, made last.
+  function extend(sigma,next,board,event){
+    if(!supportedDecisionEvent(event))return false;
+    const baseline=board.decisionBaseline;
+    if(event.account!==baseline.account||event.account!==sigma.owner||sigma.account!==null&&event.account!==sigma.account
+      ||sigma.ids.has(event.id)||next.ids.has(event.id)||sigma.retired.has(event.id)
+      ||sigma.included.has(event.id)||event.passId!==sigma.activePass||sigma.undoActions.has(event.actionId||event.id)||sigma.undoEvents.has(event.id))return false;
+    const observed=new Set(event.observedActionIds);
+    for(const id of next.frontier)if(!observed.has(id))return false;
+    for(const id of observed)if(!sigma.ids.has(id)&&!next.ids.has(id)&&!sigma.included.has(id))return false;
+    const live=id=>{const index=sigma.taskIndex.get(id),task=index===undefined?null:board.tasks[index];return !!task&&task.done===false;};
+    const drop=id=>{const at=next.chain.indexOf(id);if(at>=0){next.chain=next.chain.slice();next.chain.splice(at,1);}};
+    const answer=event.kind==="no"||event.kind==="comparison"&&(event.action==="yes"||event.action==="dislodge");
+    if(answer){
+      const subject=event.kind==="no"?event.candidateId:event.taskId;
+      if(!decisionBaselineAcceptsEvent(baseline,event)||!live(subject)||typeof event.ratingApplied!=="boolean")return false;
+      if(event.ratingApplied){
+        const ids=event.kind==="no"?[event.candidateId,event.benchmarkId]:event.action==="dislodge"?[event.taskId]:[event.winnerId,event.loserId];
+        if(ids.some(id=>!(sigma.rated.has(id)&&sigma.trained.has(id))&&!next.rated.has(id)))return false;
+        const pair=event.kind==="no"?[event.benchmarkId,event.candidateId]:event.action==="yes"?[event.winnerId,event.loserId]:null;
+        const winner=pair?next.rating(pair[0]):{mu:PRIOR_MU,sigma:PRIOR_SIGMA},loser=next.rating(pair?pair[1]:event.taskId);
+        if(!winner||!loser)return false;
+        updatePair(winner,loser);
+        if(pair)next.ratings.set(pair[0],[winner.mu,winner.sigma]);
+        next.ratings.set(pair?pair[1]:event.taskId,[loser.mu,loser.sigma]);
+      }
+      drop(subject);
+      if(event.kind==="comparison"&&event.action==="yes"){
+        next.chain=[...next.chain,subject];
+        // A Yes that observed every completion of its task puts it back.
+        const outstanding=next.outstanding??sigma.outstanding;
+        if(outstanding.has(subject)){next.outstanding=new Map(outstanding);next.outstanding.delete(subject);}
+      }
+      const outstanding=next.outstanding??sigma.outstanding;
+      if(outstanding.size)next.chain=next.chain.filter(id=>!outstanding.has(id));
+      const value=event.kind==="no"?"no":event.action==="dislodge"?"dislodged":"clear";
+      next.disposition.set(subject,value);
+      writeMark(next,subject,value==="clear"?{present:false}:{present:true,value:{kind:value}});
+      if(next.moving(subject))next.moves=next.moves.filter(([,key])=>key!==subject);
+    }else if(event.kind==="current-choice"&&event.target?.type==="task"&&event.target.property==="disposition"
+      &&event.after?.present===true&&["cant","worked"].includes(event.value?.kind)){
+      const subject=event.target.id;
+      if(!live(subject)||sigma.cancelledDispositions.has(subject))return false;
+      drop(subject);
+      writeMark(next,subject,{present:true,value:event.value});
+      if(next.moving(subject)){
+        // Still written again at its place: its time is now this hold's.
+        next.moves=next.moves.flatMap(entry=>entry[1]!==subject?[entry]:entry[0]==="considered"?[entry,[event.value.kind==="cant"?"cantAt":"workedAt",subject]]:[]);
+      }else if(next.dispositionOf(subject)==="clear")next.settleFull=true;
+    }else return false;
+    next.ids.add(event.id);next.frontier=new Set([event.id]);
+    return true;
+  }
+  // Whether board holds every value the replay writes, once next extends it.
+  function holds(board,sigma,next,now){
+    const v=sigma.values;
+    for(const task of board.tasks){
+      const expected=next.ratings.get(task.id)??v.ratings.get(task.id);
+      if(expected&&(task.mu!==expected[0]||task.sigma!==expected[1]))return false;
+    }
+    const chain=board.chain;
+    if(!Array.isArray(chain)||chain.length!==next.chain.length||chain.some((id,i)=>id!==next.chain[i]))return false;
+    for(const key of PASS_FIELDS)if(fieldText(board,key)!==v.pass[key])return false;
+    if(!MAPS.every(key=>plain(board[key]))||!MAPS.every(key=>plain(v.maps[key])))return false;
+    if(marksText(board,board.settings,now)!==marksText(next.maps??v.maps,board.settings,now))return false;
+    for(const [key,target] of v.targets)if(readTarget(board,target)!==v.reads.get(key))return false;
+    return v.contexts===null||text(board.contexts)===v.contexts;
+  }
+  // P8 on the History rows, each row once.
+  function historyHolds(board,sigma,next){
+    for(const task of board.tasks){
+      const rows=task?.ratingHistory;if(!Array.isArray(rows)||sigma.okLists.has(rows))continue;
+      for(const row of rows){
+        if(sigma.okRows.has(row))continue;
+        if(unrepresented(row,sigma.represented,next.ids))return false;
+        if(!next.ids.has(row?.id))sigma.okRows.add(row);
+      }
+      if(rows.every(row=>sigma.okRows.has(row)))sigma.okLists.add(rows);
+    }
+    return true;
+  }
+  // ambiguousLegacyCompletion, from the facts sigma keeps: false only when it
+  // is false.
+  function unambiguous(board,sigma){
+    const chain=board.chain;
+    const candidates=board.tasks.filter(task=>!task.done&&(task.lastDoneAt||task.completedAt)&&chain.includes(task.id));
+    if(!candidates.length)return true;
+    if((board.syncAccount??board.decisionBaseline?.account??null)!==sigma.account)return false;
+    return !candidates.some(task=>{
+      const run=taskRestoreRun(task);
+      if(run&&!runObserved(task.completedAfterRestoreOp,run))return false;
+      const sourceEvidence=canonicalDecisionFact([task.id,task.lastDoneAt??null,task.completedAt??null]);
+      if(sigma.boundaries.get(task.id)?.has(sourceEvidence)||sigma.completions.get(task.id)?.has(task.lastDoneAt||task.completedAt))return false;
+      return sigma.starts.has(task.id);
+    });
+  }
+  function commit(sigma,next,fresh,board){
+    for(const event of fresh){sigma.events.push(event);sigma.ids.add(event.id);sigma.represented.add(event.id);}
+    sigma.frontier=next.frontier;
+    if(sigma.grown?.length){
+      for(const row of sigma.grown){sigma.rated.add(row.taskId);sigma.trained.add(row.taskId);}
+      sigma.baselineKey=baselineKey(board.decisionBaseline);
+    }
+    const v=sigma.values;
+    for(const [id,rating] of next.ratings)v.ratings.set(id,rating);
+    v.chain=next.chain;if(next.maps)v.maps=next.maps;
+    for(const [id,value] of next.disposition)sigma.disposition.set(id,value);
+    if(next.outstanding)sigma.outstanding=next.outstanding;
+    sigma.moves=next.moves;sigma.settleFull=next.settleFull;
+  }
+  // The sender's gate: decisionEvidenceIssue(board,account), as the full
+  // check gives it.
+  function evidenceIssue(board,account){
+    const sigma=current(board,{account});
+    if(sigma){
+      try{
+        const fresh=board.decisionEvents.slice(sigma.events.length),next=begin(sigma),now=Date.now();
+        if(fresh.every(event=>extend(sigma,next,board,event))&&holds(board,sigma,next,now)&&historyHolds(board,sigma,next)&&unambiguous(board,sigma)
+          &&![...sigma.nullTargets].some(key=>sigma.values.reads.get(key)==="null")){commit(sigma,next,fresh,board);return null;}
+      }catch{}
+    }
+    verified=null;
+    const capture={},issue=decisionEvidenceIssue(board,account,true,capture);
+    if(issue===null)anchor(board,capture,{account});
+    return issue;
+  }
+  // BoardDecision's replay (settle): true once board holds exactly what
+  // projectDecisionEvents makes of it, false where decisionReplayReady is.
+  function replay(board){
+    const sigma=current(board,{ready:true});
+    let plan=null;
+    if(sigma&&!sigma.settleFull){
+      try{
+        const fresh=board.decisionEvents.slice(sigma.events.length),answer=fresh.at(-1),next=begin(sigma),now=Date.now();
+        // The decisions before this answer were drawn by their own rules
+        // (a Can't or Worked on it); the board holds what they left.
+        if(answer&&(answer.kind==="no"||answer.kind==="comparison"&&(answer.action==="yes"||answer.action==="dislodge"))
+          &&fresh.slice(0,-1).every(event=>event.kind==="current-choice"&&extend(sigma,next,board,event))&&!next.settleFull
+          &&holds(board,sigma,next,now)&&historyHolds(board,sigma,next)&&extend(sigma,next,board,answer))plan={fresh,answer,next};
+      }catch{plan=null;}
+    }
+    // Writing is the replay's own work: a write that throws throws, as the
+    // whole-board replay's would, and is never replayed a second time.
+    if(plan){write(board,sigma,plan.next,plan.answer);commit(sigma,plan.next,plan.fresh,board);return true;}
+    verified=null;
+    if(!decisionReplayReady(board))return false;
+    const capture={};
+    projectDecisionEvents(board,null,{refreshRanks:false,ready:true,capture});
+    if(capture.replayed){capture.values=values(board,capture);anchor(board,capture,{ready:true});}
+    return true;
+  }
+  // The replay's writes for its last decision, in its order; everything else
+  // it writes the board already holds.
+  function write(board,sigma,next,answer){
+    if(sigma.passBase)applyDecisionPassBase(board,sigma.passBase);
+    for(const task of board.tasks){const rating=next.ratings.get(task.id);if(rating){task.mu=rating[0];task.sigma=rating[1];}}
+    board.chain=next.chain.slice();
+    const subject=answer.kind==="no"?answer.candidateId:answer.taskId,value=next.disposition.get(subject);
+    if(value==="clear"){delete board.considered[subject];if(board.cantAt)delete board.cantAt[subject];if(board.workedAt)delete board.workedAt[subject];}
+    else board.considered[subject]=value;
+    if(sigma.passBase)for(const {property,winner} of sigma.passWinners)(property==="mode"?applyCurrentChoicePassMode:applyCurrentChoicePassScanMode)(board,winner);
+    for(const [key,id] of next.moves){const map=board[key];if(plain(map)&&Object.hasOwn(map,id)){const kept=map[id];delete map[id];map[id]=kept;}}
+    applyCurrentChoiceDisposition(board,subject,value==="clear"?{present:false}:{present:true,value:{kind:value}});
+  }
+  // After the replay's own sweeps (expireCants, expireWorked): the marks they
+  // left are the ones the next answer finds.
+  function swept(board){
+    const sigma=verified;
+    if(sigma&&sigma.board.deref()===board&&MAPS.every(key=>plain(board[key])))
+      sigma.values.maps=Object.fromEntries(MAPS.map(key=>[key,{...board[key]}]));
+  }
+  return Object.freeze({values,evidenceIssue,replay,swept,forget(){verified=null;}});
+})();
 function decisionGestureFields(gesture,at){
   const captured=gesture&&typeof gesture==="object"?gesture:captureDecisionGesture(null,at);
   return {actionId:decisionId(captured.actionId)?captured.actionId:uid(),at:Number.isFinite(captured.at)&&captured.at>=0?captured.at:at,
@@ -14147,11 +14546,16 @@ function currentChoiceStartEnvelopeMatches(modeEvent,chainEvent){
     ["at","account","baseId","passId","passAt","scanMode","chainIds","observedActionIds"].every(key=>
       JSON.stringify(modeEvent[key])===JSON.stringify(chainEvent[key]));
 }
-function projectDecisionPassBase(board=state){
+// capture (#2435): what an incremental projection needs from this step, as
+// projectDecisionEvents passes it: the Start pass it installs, the time its
+// choice next changes and the passes an Undo of a Start gives back.
+function projectDecisionPassBase(board=state,capture=null){
   if(!board||typeof board!=="object"||Array.isArray(board)||!Array.isArray(board.tasks))return false;
   const source=Array.isArray(board.decisionEvents)?board.decisionEvents:[],byId=currentChoiceProjectionIndex(source),cancelled=decisionUndoTargets(board);
+  if(capture)capture.passBase={winner:null,horizon:Infinity,undoneRoots:[]};
   for(const event of source)if(event?.kind==="undo"&&supportedDecisionEvent(event)&&event.passBefore){
     const root=PassChain.starts(event.targetEventIds.map(id=>byId.get(id))).pairs[0]?.root;
+    if(capture&&root&&cancelled.has(root.id))capture.passBase.undoneRoots.push(root.target.id);
     if(!root||!cancelled.has(root.id)||board.passId!==root.target.id)continue;
     const prior=event.passBefore;
     board.passId=prior.passId;board.passStartedAt=prior.passAt;board.chain=prior.chainIds.slice();board.mode=prior.mode;
@@ -14167,6 +14571,7 @@ function projectDecisionPassBase(board=state){
     if(!task||task.done===true||board.deletedTaskIds?.[task.id]===true&&!board.restoredTaskIds?.[task.id])continue;
     if(Date.now()>=passResetCutoff(root.at))continue;
     groups.push({root,mode});
+    if(capture)capture.passBase.horizon=Math.min(capture.passBase.horizon,passResetCutoff(root.at));
   }
   if(!groups.length)return false;
   const winnerMode=latestCurrentChoiceEvent(groups.map(group=>group.mode),byId);
@@ -14176,6 +14581,13 @@ function projectDecisionPassBase(board=state){
     const activeAt=Number.isFinite(board.passStartedAt)&&board.passStartedAt>=0?board.passStartedAt:0;
     if(activeAt>winner.root.at||activeAt===winner.root.at&&activeId>winner.root.target.id)return false;
   }
+  if(capture)capture.passBase.winner=winner;
+  return applyDecisionPassBase(board,winner);
+}
+// The Start pass a replay installs: its root, its first dot and its draw. A
+// replay of a board in that pass writes these again every time, so the
+// candidate goes and the draw counts once more (chanceGeneration).
+function applyDecisionPassBase(board,winner){
   const rootTask=winner.root.value[0];
   const before=JSON.stringify([board.passId,board.passStartedAt,board.chain,board.mode,board.scanMode,board.chance,board.candidateId,board.interventionActive]);
   board.passId=winner.root.target.id;board.passStartedAt=winner.root.at;board.chain=[rootTask];board.mode="scan";
@@ -14301,9 +14713,30 @@ function projectCurrentChoiceContextProperty(task,events,byId,cancelled=new Set(
   if(present)task.ctx=next;else delete task.ctx;
   return prior!==(Object.hasOwn(task,"ctx")?JSON.stringify(task.ctx):null);
 }
-function projectCurrentChoiceEvents(board=state,cancellationOverride=null){
+// The pass's own mode choices, written as projectCurrentChoiceEvents writes
+// them: only a value the board does not hold yet is written, and writing one
+// lets the candidate go (a new draw counts once more).
+function applyCurrentChoicePassMode(board,winner){
+  if(!winner.after.present||board.mode===winner.value)return false;
+  board.mode=winner.value;board.candidateId=null;board.interventionActive=false;
+  return true;
+}
+function applyCurrentChoicePassScanMode(board,winner){
+  if(!winner.after.present)return false;
+  const next=winner.value,modeChanged=board.scanMode!==next.mode;
+  const drawChanged=JSON.stringify(board.chance??null)!==JSON.stringify(next.chance);
+  if(!modeChanged&&!drawChanged)return false;
+  board.scanMode=next.mode;board.chance=next.chance===null?null:JSON.parse(JSON.stringify(next.chance));
+  board.candidateId=null;board.interventionActive=false;
+  if(board===state)chanceGeneration++;
+  return true;
+}
+// capture (#2435): the pass's mode winners, in the order they are written,
+// and each task's disposition winner, in the order of the dispositions.
+function projectCurrentChoiceEvents(board=state,cancellationOverride=null,capture=null){
   if(!board||typeof board!=="object"||Array.isArray(board)||!Array.isArray(board.tasks))return false;
   const events=Array.isArray(board.decisionEvents)?board.decisionEvents:[],byId=currentChoiceProjectionIndex(events),cancelled=cancellationOverride||decisionUndoTargets(board);let changed=false;
+  if(capture){capture.passWinners=[];capture.dispositionWinners=[];}
   const taskById=new Map(board.tasks.filter(task=>task&&typeof task.id==="string"&&task.id&&!Object.hasOwn(Object.prototype,task.id)).map(task=>[task.id,task]));
   changed=projectCurrentChoiceContextExistence(board,events,byId,cancelled)||changed;
   const properties=new Map();
@@ -14332,22 +14765,9 @@ function projectCurrentChoiceEvents(board=state,cancellationOverride=null){
     if(type==="task"&&property==="ctx"){
       changed=projectCurrentChoiceContextProperty(target,rows,byId,cancelled)||changed;continue;
     }
-    if(type==="pass"&&property==="mode"){
-      if(winner.after.present&&board.mode!==winner.value){
-        board.mode=winner.value;board.candidateId=null;board.interventionActive=false;changed=true;
-      }
-      continue;
-    }
-    if(type==="pass"&&property==="scanMode"){
-      if(!winner.after.present)continue;
-      const next=winner.value,modeChanged=board.scanMode!==next.mode;
-      const drawChanged=JSON.stringify(board.chance??null)!==JSON.stringify(next.chance);
-      if(modeChanged||drawChanged){
-        board.scanMode=next.mode;board.chance=next.chance===null?null:JSON.parse(JSON.stringify(next.chance));
-        board.candidateId=null;board.interventionActive=false;
-        if(board===state)chanceGeneration++;
-        changed=true;
-      }
+    if(type==="pass"&&(property==="mode"||property==="scanMode")){
+      if(capture)capture.passWinners.push({property,winner});
+      changed=(property==="mode"?applyCurrentChoicePassMode(board,winner):applyCurrentChoicePassScanMode(board,winner))||changed;
       continue;
     }
     const typedTarget={type,id,property};
@@ -14364,7 +14784,8 @@ function projectCurrentChoiceEvents(board=state,cancellationOverride=null){
   const dispositions=currentChoiceDispositionActions(board,events,cancelled);
   for(const [id,rows] of dispositions){
     const winner=latestCurrentChoiceEvent(rows.map(row=>row.event),byId);if(!winner)continue;
-    const selected=rows.find(row=>row.event.id===winner.id);if(selected)changed=applyCurrentChoiceDisposition(board,id,selected)||changed;
+    const selected=rows.find(row=>row.event.id===winner.id);
+    if(selected){if(capture)capture.dispositionWinners.push([id,selected]);changed=applyCurrentChoiceDisposition(board,id,selected)||changed;}
   }
   return changed;
 }
