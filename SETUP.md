@@ -49,6 +49,14 @@ reconnect also trigger reconciliation. An open editor or active scanner gesture
 defers adoption, and scanner controls remain bound to the tasks they displayed.
 
 - Writes are debounced 2 seconds, so a fast scanning run costs one write, not thirty
+- While every change since the board was last clean went up as a change record
+  (below) whose reply the Sync session accepted, the board shows Synced and the
+  full copy is only a checkpoint: it waits for 30 seconds without changes, or
+  for the app to be hidden (it goes after the read that showing the app again
+  starts), instead of each 2-second pause and the 20-second longest wait. Any
+  other change, or a record that does not go, puts it back on that schedule.
+  A record's reply from an obsolete connection leaves the change pending and
+  starts a fresh read, after which the record is sent again under its own id
 - Each scanner answer (Yes, No, Can't, Done, Worked on it, Postpone,
   Dislodge) is also saved on the device as a small row and sent at once as a
   change record, numbered by the cloud. Other open devices hear it on a live
