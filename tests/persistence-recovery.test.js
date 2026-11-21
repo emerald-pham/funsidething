@@ -37,6 +37,7 @@ import { markupButtons } from "./shared.js";
 import { commitSetting } from "./shared.js"; // #2422: Settings toggles in the older and current apps
 import { benchmarkEdit } from "./shared.js";
 import { woopFields2421, woopBoard2421, woopSnapshot2421 } from "./shared.js"; // #2421 saved WOOP data
+import { decisionMixedActionsApp146 } from "./shared.js"; // #2435: every kind of recorded choice, for the decision evidence gate
 
 test('RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap',async t=>{
  if(process.env.CHAIN_RECOVERY_MEMORY_CHILD!=='1'){
@@ -14482,6 +14483,27 @@ test('RISK sync session: an obsolete reply leaves the work pending and asks for 
  assert.ok(bound);
 });
 
+// #2419 review S3: a change record's reply is accepted with a push reply's
+// checks (mayRecord). One that comes back after its connection was replaced,
+// while the page's owner binding is still the one its send started under,
+// leaves the change pending and, as an obsolete push does, ends read
+// authority and unbinds the owner: the record counts only after a fresh read
+// of the current connection.
+test('RISK sync session: a change record’s reply from a replaced connection, with the owner binding unchanged, asks for a fresh read and ends read authority and the binding',async()=>{
+ const {session,cloud}=syncSession2377();await acceptedRead2377(session);
+ const ticket=session.mayRecord({});assert.equal(ticket.go,true,'positive control: a record may go');
+ const owner=session.snapshot().owner;assert.ok(owner,'positive control: an owner is bound');
+ cloud.replace({user:'e@example.com',ready:true});
+ assert.equal(session.snapshot().owner,owner,'positive control: the owner binding is unchanged');
+ let installed=0;
+ const outcome=await ticket.send.accept({ok:true,seq:1,rev:3},{install:async()=>{installed++;return true;}});
+ assert.deepEqual({accepted:outcome.accepted,reason:outcome.reason},{accepted:false,reason:'obsolete'},'the reply is not accepted');
+ assert.equal(installed,0,'nothing is noted for it');
+ assert.equal(outcome.readRequired,true,'the reply asks for a fresh read');
+ assert.equal(session.snapshot().authority,null,'read authority ends');
+ assert.equal(session.snapshot().owner,null,'and the owner is unbound');
+});
+
 test('RISK sync session: an ordinary push’s acknowledgement older than this device’s revision is ignored, a recovery publication’s is not, and cancelled, failed, conflicting and missing replies are not accepted',async()=>{
  const {session,held}=syncSession2377({ack:acknowledgement2377({revision:5})});await acceptedRead2377(session,{revision:5});
  const before=session.snapshot();
@@ -17991,6 +18013,28 @@ test('RISK full copies off the answer path: after a single No or Yes with nothin
  }
 });
 
+// #2419 review S2: an answer still catching up (its save and record not asked
+// for yet) is a change the cloud does not hold, so the sync status the tap
+// draws is not Synced, even straight after an earlier answer's record made it
+// Synced (currentRecordCoverage's answerCatchUp.pending()).
+test('RISK full copies off the answer path: a second answer does not show synced while it catches up, though the first answer’s record already shows Synced',{timeout:120000},async t=>{
+ const device=await answeringDevice2408(t,{board:answeringBoard2408({tasks:20,padBytes:0}),saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {clock,docs}=device;
+ device.tap('no');await clock.advance(1000);
+ assert.equal(syncText2419(device),'☁ synced','positive control: the first answer shows synced by its record');
+ const records=cloudRecords2417(docs).length;
+ const second=device.tap('no');
+ // The clock has not moved: the answer is drawn, and its catch-up (its save
+ // and record) has not run.
+ assert.equal(device.ctx.state.considered?.[second],'no','positive control: the second answer is on the board');
+ assert.equal(cloudRecords2417(docs).length,records,'positive control: its record has not gone');
+ assert.notEqual(syncText2419(device),'☁ synced','the second answer does not show synced while it catches up');
+ await clock.advance(1000);
+ assert.equal(cloudRecords2417(docs).length,records+1,'positive control: its record goes up');
+ assert.equal(syncText2419(device),'☁ synced','and once it is accepted the answer shows synced');
+});
+
 test('RISK full copies off the answer path: a record’s reply counts toward Synced only through the Sync session: one this device could not save or older than its revision leaves the answer pending, and one from an obsolete connection leaves it pending and asks for a fresh read',{timeout:180000},async t=>{
  // This device cannot note that its record went up.
  const unsaved=await answeringDevice2408(t,{saveMs:0,dropDatabase:true});
@@ -18080,12 +18124,18 @@ test('RISK full copies off the answer path: while every change since the last fu
  assert.deepEqual(uploads(),[],'positive control: no full copy before the app is hidden');
  device.shim.document.hidden=true;device.shim.document.dispatchEvent({type:'visibilitychange'});
  await clock.advance(1000);
+ // #2419 review N1: the record listener showing the app starts again hears
+ // nothing yet, so only the hide's own end of the wait (suspendCloudSync)
+ // sends the full copy, not records heard again after the read.
+ const heard=holdHeardRecords2419(device);
  device.shim.document.hidden=false;device.shim.document.dispatchEvent({type:'visibilitychange'});
  const shownAt=clock.now;
  await clock.advance(3000);
+ assert.ok(heard.held>0,'positive control: the record listener started on showing has heard nothing yet');
  assert.equal(uploads().length,1,'after the app is hidden and shown again the full copy goes without another wait');
  assert.ok(uploads()[0].at<=shownAt+3000,'within 3 seconds of showing: '+(uploads()[0].at-shownAt)+' ms');
  assert.deepEqual(decisionsAbout2417(JSON.parse(uploads()[0].payload),[third]),['no:'+third],'carrying the answer');
+ heard.release();
  await clock.settle();
  assert.equal(syncText2419(device),'☁ synced','and sync ends synced');
 });
@@ -18175,6 +18225,222 @@ test('RISK full copies off the answer path: the support report shows which chang
  await clock.settle();
  const pushes=device.report().events.filter(event=>event.stage==='push'&&event.status==='acknowledged');
  assert.equal(pushes.at(-1)?.metadata?.recordsThrough,2,'the full copy’s acknowledgement names the records it includes: '+JSON.stringify(pushes.at(-1)));
+});
+
+// #2419 review S1: a full copy names, as its includedSeq, the change records
+// it includes, and the cloud then removes them. While an answer's sender
+// waits out its full copy's longer pause, or is put away, its record is the
+// only place the cloud holds the answer. So a full copy never names a record
+// its device skipped (one its board cannot hold, #2417 B1) or could not read:
+// the cloud keeps that record until a full copy that holds it names it. The
+// skip is the page's own, so a device that reopens must not name it either.
+// The skipped records are crafted at the cloud, as the #2417 B1 test makes
+// one; what matters is that the receiving board cannot hold them.
+const cloudRecordIds2419=docs=>[...docs.keys()].filter(path=>/^users\/owner\/changeRecords\//.test(path)).map(path=>path.split('/').at(-1)).sort();
+// Whether the cloud holds an answer about a task: in the active full copy, or
+// in a change record it keeps.
+async function cloudHoldsAnswer2419(docs,id){
+ const root=await cloudCopy2408(docs);
+ return decisionsAbout2417(root,[id]).length>0||cloudRecords2417(docs).some(row=>typeof row.parts==='string'&&row.parts.includes(id));
+}
+// Runs a device on the real schedule from now: the push debounce, the
+// longest wait and the full copy's longer pause, on the #2408 fake clock.
+async function realSchedule2419(device){delete device.ctx.window.CLOUD_PUSH_DELAY_MS;device.clock.install();await device.clock.advance(1000);}
+// Rewrites what this device's live change-record listener delivers, on the
+// listener running now and on any it starts later; the cloud keeps the
+// records as written.
+function rewriteHeardRecords2419(device,rewrite){
+ const sdk=device.backend.sdk,onSnapshot=sdk.onSnapshot,records=reference=>/\/changeRecords$/.test(reference.path);
+ for(const entry of device.backend.liveQueries)if(records(entry.reference)){const next=entry.next;entry.next=snapshot=>rewrite(snapshot,next);}
+ sdk.onSnapshot=(reference,options,next,error)=>onSnapshot(reference,options,records(reference)?snapshot=>rewrite(snapshot,next):next,error);
+}
+// The listener delivers every record with these parts: a record this app
+// cannot parse, or one in a format it does not know.
+function unreadableHeardRecords2419(device,parts){
+ rewriteHeardRecords2419(device,(snapshot,next)=>next({...snapshot,docs:snapshot.docs.map(doc=>({...doc,data:()=>({...doc.data(),parts})}))}));
+}
+// The listener hears nothing until release(), then everything it was sent, as
+// on a slow connection.
+function holdHeardRecords2419(device){
+ const held=[];let holding=true;
+ rewriteHeardRecords2419(device,(snapshot,next)=>{if(holding)held.push(()=>next(snapshot));else next(snapshot);});
+ return {get held(){return held.length;},release(){holding=false;for(const deliver of held.splice(0))deliver();}};
+}
+// The #2417 B1 test's record: a No naming a learning baseline no board has.
+function unholdableRecord2419(board){
+ const [first,second]=board.tasks.filter(task=>!task.done&&!board.considered?.[task.id]&&task.id!==board.candidateId).map(task=>task.id);
+ return {v:1,before:{considered:{}},after:{considered:{[first]:'no'},decisionEvents:[{v:1,id:'crafted-unholdable-event-2419',kind:'no',at:Date.now(),
+  account:'e@example.com',candidateId:first,benchmarkId:second,baselineId:'no-such-learning-baseline'}]}};
+}
+test('RISK full copies off the answer path: a full copy names no change record its device skipped, so the cloud keeps the record, also after that device reopens without it',{timeout:300000},async t=>{
+ const docs=new Map();
+ const phone=await answeringDevice2408(t,{board:answeringBoard2408({tasks:20,padBytes:0}),docs,saveMs:0,dropDatabase:true});
+ phone.ctx.onAction('start-scan',{dataset:{}});
+ await syncSettled(phone.ctx,{within:60000});
+ // The laptop keeps its database, so it can reopen.
+ const laptop=await answeringDevice2408(t,{docs,storage:sharedScannerStorage(),saveMs:0});
+ await settledTogether([phone,laptop],[],{within:60000});
+ holdFullCopy2417(t,phone);
+ const sent=await phone.backend.CS.appendChangeRecord({id:'unholdable-2419',parts:JSON.stringify(unholdableRecord2419(laptop.ctx.state))});
+ assert.equal(sent.ok,true,'positive control: the record is in the cloud');
+ await until2417(()=>recordEvents2417(laptop).includes('skipped:'+sent.seq),'positive control: the laptop skips it: '+JSON.stringify(recordEvents2417(laptop)));
+ // The laptop's own change goes by its full copy.
+ laptop.ctx.addTask('Added on the laptop after the skip',false);
+ await syncSettled(laptop.ctx,{within:60000,synced:true});
+ assert.ok((await cloudCopy2408(docs)).tasks.some(task=>task.title==='Added on the laptop after the skip'),'positive control: the laptop’s full copy is the active one');
+ assert.ok(!(docs.get('users/owner').includedSeq>=sent.seq),'that full copy does not name the skipped record: '+JSON.stringify({includedSeq:docs.get('users/owner').includedSeq,seq:sent.seq}));
+ assert.deepEqual(cloudRecordIds2419(docs),['unholdable-2419'],'so the cloud keeps the record');
+ // Reopened, the laptop has forgotten the skip, and its listener has not
+ // heard the record again when its next full copy goes: only what it saved
+ // keeps that copy from naming the record.
+ await laptop.close();
+ const reopened=await answeringDevice2408(t,{docs,indexedDB:laptop.indexedDB,dbName:laptop.dbName,storage:laptop.storage,saveMs:0,signedIn:false});
+ const heard=holdHeardRecords2419(reopened);
+ reopened.signIn();await syncSettled(reopened.ctx,{within:20000});
+ reopened.ctx.addTask('Added on the laptop after reopening',false);
+ await syncSettled(reopened.ctx,{within:60000,synced:true});
+ assert.ok(heard.held>0,'positive control: the reopened laptop’s listener was sent the record and has not heard it');
+ assert.ok((await cloudCopy2408(docs)).tasks.some(task=>task.title==='Added on the laptop after reopening'),'positive control: the reopened laptop’s full copy is the active one');
+ assert.ok(!(docs.get('users/owner').includedSeq>=sent.seq),'reopened: its full copy does not name the record either: '+JSON.stringify({includedSeq:docs.get('users/owner').includedSeq,seq:sent.seq}));
+ assert.deepEqual(cloudRecordIds2419(docs),['unholdable-2419'],'reopened: the cloud keeps the record');
+ // Once it hears the record again it skips it again, and still never names it.
+ heard.release();
+ await until2417(()=>recordEvents2417(reopened).includes('skipped:'+sent.seq),'positive control: the reopened laptop skips the record again: '+JSON.stringify(recordEvents2417(reopened)));
+ reopened.ctx.addTask('Added on the laptop after hearing the record again',false);
+ await syncSettled(reopened.ctx,{within:60000,synced:true});
+ assert.ok(!(docs.get('users/owner').includedSeq>=sent.seq),'heard again: its full copy does not name the record');
+ assert.deepEqual(cloudRecordIds2419(docs),['unholdable-2419'],'heard again: the cloud keeps the record');
+});
+
+test('RISK full copies off the answer path: a full copy names no change record its device took back after drawing it, when the whole-board replay found its board could not then be pushed',{timeout:300000},async t=>{
+ const {phone,laptop,docs}=await twoOpenDevices2417(t,answeringBoard2408({tasks:20,padBytes:0}));
+ holdFullCopy2417(t,phone);
+ // A title edited on the laptop records that choice as a decision, so a
+ // record that changes the title with no decision of its own passes the
+ // checks made before it is drawn, and only the replay after finds it.
+ const id=laptop.ctx.state.tasks.at(-1).id,now=vm.runInContext('Date.now',laptop.ctx);
+ await saveEditorChoice(laptop,id,Date.now(),{title:'Edited on the laptop'});
+ laptop.ctx.__now2419=now;vm.runInContext('Date.now=__now2419',laptop.ctx);
+ await syncSettled(laptop.ctx,{within:60000,synced:true});
+ const change={v:1,before:{tasks:[{id,title:'Edited on the laptop'}]},after:{tasks:[{id,title:'Changed by a record'}]}};
+ laptop.ctx.__crafted2419=change;
+ assert.deepEqual([...vm.runInContext('(()=>{const board=JSON.parse(JSON.stringify(state));applyChangeRecordTo(board,JSON.parse(JSON.stringify(__crafted2419)),{cleanOnly:true});return [changeRecordHoldableBounded(board,window.CloudSync.user),changeRecordHoldable(board,window.CloudSync.user)];})()',laptop.ctx)],
+  [true,false],'positive control: only the whole-board replay refuses a board holding the record');
+ const sent=await phone.backend.CS.appendChangeRecord({id:'taken-back-2419',parts:JSON.stringify(change)});
+ assert.equal(sent.ok,true,'positive control: the record is in the cloud');
+ await until2417(()=>recordEvents2417(laptop).includes('skipped:'+sent.seq),'positive control: the laptop takes it back: '+JSON.stringify(recordEvents2417(laptop)));
+ await syncSettled(laptop.ctx,{within:30000});
+ assert.equal(laptop.ctx.state.tasks.find(task=>task.id===id).title,'Edited on the laptop','positive control: none of it stays on the laptop');
+ laptop.ctx.addTask('Added on the laptop after taking it back',false);
+ await syncSettled(laptop.ctx,{within:60000,synced:true});
+ assert.ok((await cloudCopy2408(docs)).tasks.some(task=>task.title==='Added on the laptop after taking it back'),'positive control: the laptop’s full copy is the active one');
+ assert.ok(!(docs.get('users/owner').includedSeq>=sent.seq),'that full copy does not name the record it took back: '+JSON.stringify({includedSeq:docs.get('users/owner').includedSeq,seq:sent.seq}));
+ assert.deepEqual(cloudRecordIds2419(docs),['taken-back-2419'],'so the cloud keeps the record');
+});
+
+test('RISK full copies off the answer path: a full copy names no change record its device could not read, so an answer the cloud holds only as its record stays there while its sender is put away',{timeout:300000},async t=>{
+ for(const [label,parts] of [['not JSON','{"v":1,"before":'],['a format it does not know','{"v":2,"before":{},"after":{}}']]){
+  const {phone,laptop,docs}=await twoOpenDevices2417(t,answeringBoard2408({tasks:20,padBytes:0}));
+  await realSchedule2419(phone);await realSchedule2419(laptop);
+  unreadableHeardRecords2419(laptop,parts);
+  const answered=phone.tap('no');await phone.clock.advance(1000);
+  assert.equal(syncText2419(phone),'☁ synced',label+': positive control: the phone shows the answer synced by its record');
+  // The phone is put away and closed before its full copy goes.
+  phone.shim.document.hidden=true;phone.shim.document.dispatchEvent({type:'visibilitychange'});await phone.clock.advance(100);
+  await phone.close();
+  await laptop.clock.advance(1000);
+  assert.ok(recordEvents2417(laptop).includes('received:1'),label+': positive control: the laptop hears the record: '+JSON.stringify(recordEvents2417(laptop)));
+  assert.equal(laptop.ctx.state.considered?.[answered],undefined,label+': positive control: and cannot apply it');
+  laptop.ctx.addTask('Added on the laptop',false);
+  await laptop.clock.advance(5000);await laptop.clock.settle();
+  assert.ok((await cloudCopy2408(docs)).tasks.some(task=>task.title==='Added on the laptop'),label+': positive control: the laptop’s full copy is the active one');
+  assert.ok(!(docs.get('users/owner').includedSeq>=1),label+': that full copy does not name the record the laptop could not read: '+JSON.stringify(docs.get('users/owner').includedSeq));
+  assert.ok(await cloudHoldsAnswer2419(docs,answered),label+': so the cloud still holds the phone’s answer');
+  const tablet=await answeringDevice2408(t,{docs,storage:sharedScannerStorage(),saveMs:0,dropDatabase:true});
+  assert.equal(tablet.ctx.state.considered?.[answered],'no',label+': a device opening now finds the phone’s answer');
+  assert.ok(tablet.ctx.state.tasks.some(task=>task.title==='Added on the laptop'),label+': and the laptop’s task');
+  await laptop.close();await tablet.close();
+ }
+});
+
+// #2419 review N3 (the reviewer's test): two open devices answering on the
+// real schedule, the push debounce, longest wait and longer pause on each
+// device's fake clock. Whenever a device shows Synced the cloud holds every
+// answer that device holds, in its full copy or a change record, and both
+// answers end in the full copy.
+test('RISK full copies off the answer path: two open devices on the real schedule show Synced only while the cloud holds their answers, and both answers end in the full copy',{timeout:300000},async t=>{
+ const {phone,laptop,docs}=await twoOpenDevices2417(t,answeringBoard2408({tasks:20,padBytes:0}));
+ await realSchedule2419(phone);await realSchedule2419(laptop);
+ const answers=[];
+ const holds=async label=>{
+  for(const [name,device] of [['phone',phone],['laptop',laptop]]){
+   if(syncText2419(device)!=='☁ synced')continue;
+   for(const id of answers)if(device.ctx.state.considered?.[id]==='no')
+    assert.ok(await cloudHoldsAnswer2419(docs,id),label+': the '+name+' shows synced, so the cloud holds its answer about '+id);
+  }
+ };
+ const c1=phone.tap('no');answers.push(c1);await phone.clock.advance(1000);
+ assert.equal(syncText2419(phone),'☁ synced','the phone shows its answer synced by its record');
+ await holds('phone answered');
+ await laptop.clock.advance(1000);
+ assert.equal(laptop.ctx.state.considered?.[c1],'no','the laptop applies the phone’s answer');
+ await holds('laptop heard');
+ const c2=laptop.tap('no');answers.push(c2);await laptop.clock.advance(1000);
+ assert.equal(syncText2419(laptop),'☁ synced','the laptop shows its answer synced by its record');
+ await holds('laptop answered');
+ await phone.clock.advance(1000);
+ assert.equal(phone.ctx.state.considered?.[c2],'no','the phone applies the laptop’s answer');
+ await holds('phone heard');
+ await phone.clock.advance(5000);await holds('5 seconds later');
+ // The fake cloud's root listener is driven by the test, as Firestore's would deliver it.
+ const rootChanged=device=>device.ctx.window.dispatchEvent({type:'cloudboardchange',detail:{user:'e@example.com',rev:docs.get('users/owner').rev}});
+ rootChanged(laptop);await laptop.clock.advance(5000);await holds('the laptop read the root');
+ for(let i=1;i<=4;i++){
+  await phone.clock.advance(31000);await laptop.clock.advance(31000);rootChanged(laptop);rootChanged(phone);
+  await holds(31*i+' seconds on');
+ }
+ await phone.clock.settle();await laptop.clock.settle();
+ assert.deepEqual(decisionsAbout2417(await cloudCopy2408(docs),[c1,c2]),['no:'+c1,'no:'+c2].sort(),'the full copy holds both answers');
+ assert.equal(syncText2419(phone),'☁ synced','the phone ends synced');
+ assert.equal(syncText2419(laptop),'☁ synced','and so does the laptop');
+});
+
+// #2419 review N4: once records no longer hold the board, a full copy waiting
+// for the longer pause goes back on the ordinary schedule: the 2-second pause
+// after the latest push request, or the longest wait if that comes first.
+// When the upload already running carries that request, no request waits and
+// there is no longest wait, so the full copy still waits the 2-second pause.
+// That takes a push asked for with nothing new while an upload saves; no
+// control asks for one, so the test does, through the app's immediate push
+// (cloudPushNow).
+test('RISK full copies off the answer path: a full copy back on the ordinary schedule while no push request waits still waits the 2-second pause',{timeout:120000},async t=>{
+ const device=await answeringDevice2408(t,{board:answeringBoard2408({tasks:20,padBytes:0}),saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock,counters,backend}=device,session=vm.runInContext('syncSession',ctx);
+ device.tap('no');await clock.advance(100);
+ assert.equal(syncText2419(device),'☁ synced','positive control: the answer shows synced by its record');
+ // An immediate push's device save takes a second before it uploads. A push
+ // asked for while that save runs has nothing new: the upload carries it,
+ // and it waits for the longer pause the records allow.
+ const from=counters.uploads.length;
+ device.saveMs=1000;ctx.cloudPushNow();await clock.advance(100);
+ ctx.cloudPushNow();const askedAt=clock.now;device.saveMs=0;
+ await clock.advance(1200);
+ assert.equal(counters.uploads.length,from+1,'positive control: the first push uploads');
+ assert.equal(vm.runInContext('cloudPushInFlight',ctx),false,'positive control: and has finished');
+ assert.ok([...session.snapshot().work].some(item=>item.kind==='push-debounce'),'positive control: the second waits as a scheduled push: '+JSON.stringify(session.snapshot().work));
+ // Another device's record changes this board in place, so records alone no longer hold it.
+ const sent=await backend.CS.appendChangeRecord({id:'in-place-2419',parts:JSON.stringify({v:1,before:{settings:{horizonMin:60}},after:{settings:{horizonMin:90}}})});
+ assert.equal(sent.ok,true,'positive control: the record is in the cloud');
+ // The fake cloud's listener delivers on a real timer; the app then applies the record on its own clock.
+ await until2417(()=>recordEvents2417(device).includes('received:'+sent.seq),'positive control: the record is heard: '+JSON.stringify(recordEvents2417(device)));
+ await clock.advance(50);
+ assert.equal(ctx.state.settings.horizonMin,90,'positive control: the record changed the board in place: '+JSON.stringify(recordEvents2417(device)));
+ await clock.advance(askedAt+PUSH_DEBOUNCE2408-200-clock.now);
+ assert.equal(counters.uploads.length,from+1,'the full copy waits for the 2-second pause after the latest push request: '+JSON.stringify(counters.uploads.slice(from+1).map(upload=>upload.at-askedAt)));
+ await clock.advance(400);
+ assert.equal(counters.uploads.length,from+2,'and then goes');
+ assert.equal(JSON.parse(counters.uploads.at(-1).payload).settings.horizonMin,90,'carrying the record’s change');
 });
 
 // #2428: the work one scanner answer causes on this device, counted, never
@@ -19108,4 +19374,344 @@ test('RISK push work: the push’s texts are byte for byte the board’s device 
  // The kept decision base text is the base's own: a new base gets its own.
  board.decisionBase={...board.decisionBase,revision:4};
  assert.equal(ctx.boardPushTexts(board).text,JSON.stringify(board),'a replaced decision base');
+});
+
+// #2435: the decision events one scanner answer's decision-evidence checks
+// replay, with sync on, counted and never timed (responsiveness guidance), in
+// the two places an answer checks its board's whole decision evidence:
+// - tap: the answer's own replay before the paint (BoardDecision's settle);
+// - gate: the sender's check on its change record (changeRecordOutbox.record),
+//   which keeps the #2417 rule that a record carries nothing the board's own
+//   full copy could not push.
+// Every replay and check reads a decision event through the app's own event
+// check, supportedDecisionEvent. The counter wraps that check in place and
+// counts each event once per answer and place, by its caller on the stack.
+// The rest of an answer's work (#2428) and its push (#2427) have their own
+// counts; a push's checks have no change record on their stack.
+function evidenceReplays2435(device){
+ const {ctx}=device,read={tap:new Set(),gate:new Set()},calls={tap:0,gate:0};
+ ctx.__replays2435={read,calls};
+ vm.runInContext(`(()=>{const r=__replays2435,check=supportedDecisionEvent;
+  supportedDecisionEvent=function(event){
+   const limit=Error.stackTraceLimit;Error.stackTraceLimit=Infinity;const stack=new Error().stack;Error.stackTraceLimit=limit;
+   const place=/\\n\\s*at settle \\(/.test(stack)?'tap':/\\n\\s*at Object\\.record \\([^\\n]*\\n\\s*at storeCommit \\(/.test(stack)?'gate':null;
+   if(place){r.calls[place]++;if(typeof event?.id==='string')r.read[place].add(event.id);}
+   return check.apply(this,arguments);};})()`,ctx);
+ return {reset(){for(const place of ['tap','gate']){read[place].clear();calls[place]=0;}},
+  now:()=>({tap:read.tap.size,gate:read.gate.size,tapCalls:calls.tap,gateCalls:calls.gate}),
+  // The events read that the counted answer did not make.
+  others:answered=>Object.fromEntries(['tap','gate'].map(place=>[place,[...read[place]].filter(id=>!answered.includes(id)).length]))};
+}
+// A signed-in device with sync on, scanning on the board, settled, with an
+// earlier No answered, its change record sent and its push gone, as answers
+// follow each other. Then a No and a Yes are answered, each counted from its
+// tap until its change record is written.
+async function countedAnswers2435(t,label,board,{before=[]}={}){
+ const device=await answeringDevice2408(t,{board,saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock}=device;
+ for(const act of [...before,'no']){device.tap(act);await clock.advance(1500);}
+ await clock.advance(3000);
+ const replays=evidenceReplays2435(device),counted={};
+ for(const act of ['no','yes']){
+  const records=recordsWritten2417(device),from=ctx.state.decisionEvents.length;
+  replays.reset();
+  const candidate=device.tap(act);
+  assert.ok(act==='no'?ctx.state.considered?.[candidate]==='no':ctx.state.chain.at(-1)===candidate,label+': positive control: the '+act+' is taken');
+  await clock.advance(1500);
+  assert.equal(recordsWritten2417(device)-records,1,label+': positive control: the sender’s gate lets the '+act+'’s change record go');
+  const answered=ctx.state.decisionEvents.slice(from).map(event=>event.id);
+  counted[act]={...replays.now(),answered:answered.length,others:replays.others(answered),log:ctx.state.decisionEvents.length};
+  // The yes pushes at once and the no after the push debounce; both are done
+  // before the next answer.
+  await clock.advance(3000);
+ }
+ return {counted,device};
+}
+test('RISK decision evidence work: a No and a Yes with sync on replay the same decision events in the tap and in the sender’s gate on a 20-task board as on the large board',{timeout:300000},async t=>{
+ // A Yes first gives the 20-task board's answers a benchmark whose rating
+ // they move, as on the large board.
+ const twenty=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
+  tasks:Array.from({length:20},(_,i)=>({...syncTask('twenty-2435-'+i,'Twenty task '+i),ctx:['home'],createdAt:1000+i}))});
+ const small=await countedAnswers2435(t,'20 tasks',twenty,{before:['yes']});
+ await small.device.close();
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const large=await countedAnswers2435(t,'large board',JSON.parse(fixture.payload));
+ t.diagnostic(JSON.stringify({small:small.counted,large:large.counted}));
+ for(const [label,{counted}] of [['20 tasks',small],['large board',large]])for(const act of ['no','yes']){
+  // The answer's own replay reads at least the decision it records.
+  assert.ok(counted[act].tap>=1,label+': positive control: the tap’s replay reads the '+act+'’s own decision: '+JSON.stringify(counted[act]));
+  assert.ok(counted[act].log>counted[act].answered,label+': positive control: the board holds earlier decisions');
+ }
+ for(const act of ['no','yes']){
+  const strip=({log,...rest})=>rest;
+  assert.deepEqual(strip(large.counted[act]),strip(small.counted[act]),'a '+act+' replays the same decision events on the large board as on a 20-task board');
+  assert.deepEqual(large.counted[act].others,{tap:0,gate:0},'and none but the '+act+'’s own');
+ }
+});
+
+// #2435: the sender's gate (DecisionProjection.evidenceIssue, which
+// changeRecordOutbox.record calls) gives the full check's verdict
+// (decisionEvidenceIssue) on every board. On a warm device, whose projection
+// its last answers verified, each change below is made behind the
+// projection's back, as a stale device, an older copy of the app or a merge
+// would make it, so the projection is stale. The gate catches each one, falls
+// back to the full check (it reads decisions the board held before the
+// change) and gives that check's verdict: one change for each error code the
+// full check names, and one it finds nothing in. An answer on that board
+// sends its change record exactly when the full check finds nothing at its
+// gate: the answer's own whole-board replay puts back a lost mark or a moved
+// rating, as it did before #2435, and then the record goes.
+function gateReads2435(device){
+ const {ctx}=device,read=new Set();ctx.__gateReads2435=read;
+ vm.runInContext(`(()=>{const read=__gateReads2435,check=supportedDecisionEvent;
+  supportedDecisionEvent=function(event){
+   const limit=Error.stackTraceLimit;Error.stackTraceLimit=Infinity;const stack=new Error().stack;Error.stackTraceLimit=limit;
+   if(/\\n\\s*at Object\\.evidenceIssue \\(/.test(stack)&&typeof event?.id==='string')read.add(event.id);
+   return check.apply(this,arguments);};})()`,ctx);
+ return read;
+}
+const gateVerdict2435=(ctx,check)=>vm.runInContext(check+'(state,'+JSON.stringify(ACCOUNT2408.email)+')',ctx);
+// The board's newest decision, copied as another decision of the same answer
+// shape: a new id and action, observing the newest one.
+function nextDecision2435(ctx,change){
+ const last=ctx.state.decisionEvents.at(-1);
+ return {...JSON.parse(JSON.stringify(last)),id:'stale-2435-'+change,actionId:'stale-2435-'+change,at:last.at+1,observedActionIds:[last.id]};
+}
+const STALE2435=[
+ ['unsupported-decision-evidence','a decision this version cannot read arrives',ctx=>{
+  ctx.state.decisionEvents=[...ctx.state.decisionEvents,{...nextDecision2435(ctx,'unsupported'),at:-1}];}],
+ ['unsupported-decision-evidence','a merge rewrites an earlier decision in the list',ctx=>{
+  const events=ctx.state.decisionEvents,at=events.findIndex(event=>event.kind==='no');
+  ctx.state.decisionEvents=events.map((event,index)=>index===at?{...JSON.parse(JSON.stringify(event)),at:-1}:event);}],
+ ['unsupported-decision-evidence','the decision baseline is replaced with one whose ratings changed',ctx=>{
+  const baseline=ctx.state.decisionBaseline;
+  ctx.state.decisionBaseline={...JSON.parse(JSON.stringify(baseline)),ratings:baseline.ratings.map((row,index)=>index?{...row}:{...row,mu:row.mu+1})};}],
+ ['decision-account-mismatch','another account’s decision arrives',ctx=>{
+  ctx.state.decisionEvents=[...ctx.state.decisionEvents,{...nextDecision2435(ctx,'foreign'),account:'foreign@example.com'}];}],
+ ['conflicting-decision-evidence','a decision arrives again with other bytes',ctx=>{
+  const last=ctx.state.decisionEvents.at(-1);
+  ctx.state.decisionEvents=[...ctx.state.decisionEvents,{...JSON.parse(JSON.stringify(last)),at:last.at+1}];}],
+ ['ambiguous-legacy-completion','an older copy marks the Start’s first dot done before, with no record of when',ctx=>{
+  const root=ctx.state.decisionEvents.find(event=>event.kind==='current-choice'&&event.target?.type==='pass'&&event.target.property==='chain'&&event.chainIds.length===0);
+  assert.ok(root&&ctx.state.chain.includes(root.value[0]),'positive control: the Start’s first dot is on the chain');
+  ctx.state.tasks.find(task=>task.id===root.value[0]).lastDoneAt=vm.runInContext('Date.now()',ctx)-3600000;}],
+ ['unprojectable-decision-evidence','a task’s Can’t mark is lost behind its recorded Can’t',ctx=>{
+  const cant=ctx.state.decisionEvents.findLast(event=>event.kind==='current-choice'&&event.target?.property==='disposition'&&event.value?.kind==='cant');
+  assert.equal(ctx.state.considered[cant.target.id],'cant','positive control: the board holds the Can’t');
+  delete ctx.state.considered[cant.target.id];delete ctx.state.cantAt[cant.target.id];}],
+ ['unprojectable-decision-evidence','a decision arrives whose earlier decision is missing',ctx=>{
+  ctx.state.decisionEvents=[...ctx.state.decisionEvents,{...nextDecision2435(ctx,'orphan'),observedActionIds:['stale-2435-missing']}];}],
+ ['unrepresented-legacy-learning','a rating moves with no decision',ctx=>{
+  const id=ctx.state.chain.at(-1);ctx.state.tasks.find(task=>task.id===id).mu+=0.5;}],
+ ['unrepresented-legacy-learning','a History row records a rating change no decision made',ctx=>{
+  const task=ctx.state.tasks.find(row=>(row.ratingHistory||[]).some(entry=>entry.before&&entry.before.mu!==entry.after.mu));
+  const row=JSON.parse(JSON.stringify(task.ratingHistory.find(entry=>entry.before&&entry.before.mu!==entry.after.mu)));
+  task.ratingHistory=[...task.ratingHistory,{...row,id:'stale-2435-history'}];}],
+ ['unprojectable-decision-undo','an Undo names an action its decision does not belong to',ctx=>{
+  const last=ctx.state.decisionEvents.at(-1);
+  ctx.state.decisionEvents=[...ctx.state.decisionEvents,{v:1,id:'stale-2435-undo',at:last.at+1,account:last.account,baseId:last.baseId,
+   baselineId:ctx.state.decisionBaseline.id,actionId:'stale-2435-undo',passId:last.passId,passAt:last.passAt,scanMode:last.scanMode,
+   chainIds:last.chainIds.slice(),observedActionIds:[last.id],kind:'undo',targetActionId:'stale-2435-not-an-action',targetEventIds:[last.id]}];}],
+ // Two devices showed the same candidate; the other one's No did not see
+ // this device's later answers, so it does not replay after them.
+ [null,'another device’s No on the same candidate arrives without this device’s later answers',ctx=>{
+  const no=ctx.state.decisionEvents.findLast(event=>event.kind==='no');
+  assert.ok(ctx.state.decisionEvents.at(-1).id!==no.id,'positive control: answers followed that No');
+  ctx.state.decisionEvents=[...ctx.state.decisionEvents,{...JSON.parse(JSON.stringify(no)),id:'stale-2435-concurrent',actionId:'stale-2435-concurrent',
+   at:no.at+1,ratingApplied:false}];}],
+ [null,'an older copy reorders the chain, which the full check does not compare',ctx=>{
+  const chain=ctx.state.chain;assert.ok(chain.length>=3,'positive control: the chain has dots to reorder');
+  ctx.state.chain=[...chain.slice(0,-2),chain.at(-1),chain.at(-2)];}],
+];
+test('RISK decision evidence gate: a stale projection is caught and the gate gives the full check’s verdict for every error code it names',{timeout:300000},async t=>{
+ const named=new Set();
+ for(const [code,label,change] of STALE2435)await t.test(label,async t=>{
+  const board=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
+   tasks:Array.from({length:12},(_,i)=>({...syncTask('verdict-2435-'+i,'Verdict task '+i),ctx:['home'],createdAt:1000+i}))});
+  const device=await answeringDevice2408(t,{board,saveMs:0,dropDatabase:true});
+  await startAnswering2408(device);
+  const {ctx,clock}=device;
+  for(const act of ['yes','no','cant','no','yes']){device.tap(act);await clock.advance(1500);}
+  await clock.advance(3000);
+  const read=gateReads2435(device),held=new Set(ctx.state.decisionEvents.map(event=>event.id));
+  // Positive control: the projection is warm, so the gate reads nothing.
+  assert.equal(gateVerdict2435(ctx,'DecisionProjection.evidenceIssue'),null,'positive control: the warm board passes the gate');
+  assert.equal(read.size,0,'positive control: the warm gate reads no decision');
+  change(ctx);
+  const full=gateVerdict2435(ctx,'decisionEvidenceIssue');
+  assert.equal(full,code,'the full check’s verdict on this board');
+  read.clear();
+  assert.equal(gateVerdict2435(ctx,'DecisionProjection.evidenceIssue'),full,'the gate gives the full check’s verdict');
+  // Only the full check names an issue. Where it finds none, the gate shows
+  // it asked it: it read decisions the board held before the change.
+  if(!code)assert.ok([...read].some(id=>held.has(id)),'and it fell back to the full check, which reads decisions the board held before');
+  if(code)named.add(code);
+  // The person answers the board as drawn now.
+  ctx.render();await clock.advance(300);
+  const records=recordsWritten2417(device),from=ctx.state.decisionEvents.length;
+  device.tap('no');await clock.advance(1500);
+  assert.ok(ctx.state.decisionEvents.length>from,'positive control: the answer is taken');
+  const atGate=gateVerdict2435(ctx,'decisionEvidenceIssue');
+  t.diagnostic(JSON.stringify({code,atGate}));
+  assert.equal(recordsWritten2417(device)-records,atGate===null?1:0,'an answer on this board sends its change record exactly when the full check finds nothing: '+atGate);
+ });
+ assert.deepEqual([...named].sort(),['ambiguous-legacy-completion','conflicting-decision-evidence','decision-account-mismatch','unprojectable-decision-evidence',
+  'unprojectable-decision-undo','unrepresented-legacy-learning','unsupported-decision-evidence'],'every error code the full check names is covered');
+});
+
+// #2435: with the mixed decision fixture (#146: settings, scene, context,
+// editor title, Dot and its Undo, Pause and its Undo, Dislodge, Start and its
+// Undo, every kind of choice the app records), answers after it pass the gate
+// as the full check does, and the gate reads only each answer's own decision
+// once a full check has verified the board.
+test('RISK decision evidence gate: on the mixed decision fixture, answers pass the gate with the full check’s verdict and read only their own decisions',{timeout:180000},async t=>{
+ const app=await decisionMixedActionsApp146();t.after(()=>app.dispose());
+ const {ctx}=app,account='e@example.com',read=gateReads2435(app);
+ const verdicts=[];
+ assert.equal(vm.runInContext(`DecisionProjection.evidenceIssue(state,${JSON.stringify(account)})`,ctx),null,'positive control: the fixture passes the gate');
+ // The fixture leaves every open task answered; new tasks give the scan
+ // candidates to answer.
+ for(let i=0;i<6;i++)ctx.addTask('Mixed answer task '+i);
+ ctx.onAction('start-scan',{dataset:{}});
+ for(const act of ['no','yes','no','cant','no','yes','dislodge','no']){
+  const control=act==='dislodge'?{dataset:{benchmark:vm.runInContext('benchmark()?.id',ctx)}}:{dataset:{candidate:vm.runInContext('offeredCandidateId()',ctx),benchmark:vm.runInContext('benchmark()?.id',ctx)}};
+  if(!control.dataset.benchmark||act!=='dislodge'&&!control.dataset.candidate){ctx.onAction('start-scan',{dataset:{}});continue;}
+  const before=ctx.state.decisionEvents.length;
+  ctx.onAction(act,control);vm.runInContext('answerCatchUp.flush()',ctx);
+  const added=new Set(ctx.state.decisionEvents.slice(before).map(event=>event.id));
+  assert.ok(added.size>0,'positive control: the '+act+' records its decision');
+  const full=vm.runInContext(`decisionEvidenceIssue(state,${JSON.stringify(account)})`,ctx);
+  read.clear();
+  const gate=vm.runInContext(`DecisionProjection.evidenceIssue(state,${JSON.stringify(account)})`,ctx);
+  verdicts.push({act,full,gate,read:read.size,others:[...read].filter(id=>!added.has(id)).length});
+ }
+ t.diagnostic(JSON.stringify(verdicts));
+ for(const row of verdicts)assert.equal(row.gate,row.full,'the gate gives the full check’s verdict after a '+row.act+': '+JSON.stringify(row));
+ assert.ok(verdicts.every(row=>row.full===null),'positive control: every answer leaves the fixture coherent');
+ // The first answer after Start follows a check of a Start the projection
+ // does not extend; every later answer is extended from it.
+ assert.deepEqual(verdicts.slice(1).map(row=>row.others),verdicts.slice(1).map(()=>0),'every later answer’s gate reads only its own decisions: '+JSON.stringify(verdicts));
+});
+
+// #2435: the incremental replay gives the board, the draw count and the key
+// order of its marks exactly as the whole-board replay does, and the gate
+// gives the full check's verdict, after every action. Two copies of the app
+// open the same board with the same ids, random draws and clock, and take
+// the same actions; one forgets its projection before each action, so it
+// replays the whole board and runs the full check every time. A scripted run
+// covers the cases the replay handles itself (Yes, No, Dislodge after Can't
+// and Worked on it, a benchmark Can't after its Yes, expired holds, a Start's
+// pass, a scan mode chosen later) and those it hands to the whole-board
+// replay (Done, Undo, Rescan, Postpone, Pause and Resume); a seeded run mixes
+// them at random.
+function seededCrypto2435(){let n=0;return {getRandomValues:webcrypto.getRandomValues.bind(webcrypto),subtle:webcrypto.subtle,
+ randomUUID:()=>'00000000-0000-4000-8000-'+(++n).toString(16).padStart(12,'0')};}
+// account: the board's own (null: a board that was never signed in, sync off).
+async function twinApps2435(t,{tasks=14,seed=2435,account=ACCOUNT2408.email}={}){
+ const board=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,...(account?{syncAccount:account}:{}),
+  tasks:Array.from({length:tasks},(_,i)=>({...syncTask('twin-2435-'+i,'Twin task '+i),ctx:['home'],createdAt:1000+i})),
+  settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8,theme:'system'}});
+ if(!account)delete board.syncAccount;
+ const raw=JSON.stringify(board),apps=[];
+ for(let i=0;i<2;i++){const app=await loadApp({seed,cryptoProvider:seededCrypto2435(),seedStorage:{[SYNC_STORE_KEY]:raw}});t.after(()=>app.dispose());apps.push(app);}
+ // Each copy's own work (its device saves draw ids too) runs on one fake
+ // clock from the same time, once its opening has settled.
+ for(const app of apps){setFakeTime(app.ctx,Date.parse('2026-11-20T15:00:00Z'));await syncSettled(app.ctx,{within:20000});}
+ const clocks=apps.map(app=>{const clock=answerClock2408(app.ctx,{store:0,digests:0,marks:()=>''});clock.install();return clock;});
+ const at=async ms=>{for(const clock of clocks)await clock.advance(ms);};
+ const read={replay:0,gate:0};
+ apps[0].ctx.__twin2435=read;
+ vm.runInContext(`(()=>{const read=__twin2435,check=supportedDecisionEvent;supportedDecisionEvent=function(event){
+  const limit=Error.stackTraceLimit;Error.stackTraceLimit=Infinity;const stack=new Error().stack;Error.stackTraceLimit=limit;
+  if(/\\n\\s*at Object\\.replay \\(/.test(stack))read.replay++;else if(/\\n\\s*at Object\\.evidenceIssue \\(/.test(stack))read.gate++;
+  return check.apply(this,arguments);};})()`,apps[0].ctx);
+ const fast={settle:0,gate:0},steps=[];
+ const control=ctx=>({candidate:vm.runInContext('offeredCandidateId()',ctx)||null,benchmark:vm.runInContext('benchmark()?.id',ctx)||null});
+ function take(ctx,act){
+  const {candidate,benchmark}=control(ctx);
+  const scanner={dataset:{candidate,benchmark}};
+  switch(act){
+   case 'yes':case 'no':case 'cant':case 'cand-done':if(!candidate||!benchmark)return false;ctx.onAction(act,scanner);return true;
+   case 'cand-worked':if(!candidate)return false;ctx.onAction(act,{dataset:{id:candidate,candidate}});return true;
+   case 'bench-cant':case 'worked':case 'dislodge':case 'bench-done':if(!benchmark)return false;ctx.onAction(act,{dataset:{benchmark}});return true;
+   case 'postpone':if(!candidate)return false;ctx.onAction('postpone',{dataset:{candidate}});return true;
+   case 'pause':ctx.onAction('start-working',{});return true;
+   case 'resume':ctx.onAction('resume-scan',{dataset:{}});return true;
+   case 'halving':ctx.onAction('resume-scan',{dataset:{mode:'halving'}});return true;
+   case 'start':ctx.onAction('start-scan',{dataset:{}});return true;
+   case 'undo':ctx.onAction('undo',{});return true;
+   case 'rescan':ctx.onAction('rescan',{});return true;
+  }
+  throw new Error('unknown act '+act);
+ }
+ async function step(act,ms){
+  await at(ms);
+  vm.runInContext('DecisionProjection.forget()',apps[1].ctx);
+  read.replay=0;
+  const taken=apps.map(app=>take(app.ctx,act));
+  for(const app of apps)vm.runInContext('answerCatchUp.flush()',app.ctx);
+  await at(0);
+  const replayed=read.replay;read.gate=0;
+  const [gate,full]=[vm.runInContext(`DecisionProjection.evidenceIssue(state,${JSON.stringify(account)})`,apps[0].ctx),
+   vm.runInContext(`decisionEvidenceIssue(state,${JSON.stringify(account)})`,apps[1].ctx)];
+  const [a,b]=apps.map(app=>JSON.stringify(app.ctx.state)),[ga,gb]=apps.map(app=>vm.runInContext('chanceGeneration',app.ctx));
+  steps.push(act+(taken[0]?'':'(not offered)')+':'+(replayed<=1&&['yes','no','dislodge'].includes(act)&&taken[0]?'fast':'')+':'+gate);
+  if(['yes','no','dislodge'].includes(act)&&taken[0]&&replayed===1)fast.settle++;
+  if(read.gate<=1)fast.gate++;
+  assert.deepEqual(taken,[taken[0],taken[0]],'both copies take the '+act);
+  if(a!==b){
+   const pa=JSON.parse(a),pb=JSON.parse(b),keys=[...new Set([...Object.keys(pa),...Object.keys(pb)])].filter(key=>JSON.stringify(pa[key])!==JSON.stringify(pb[key]));
+   assert.fail('after '+steps.join(' ')+': the incremental replay leaves a different board in '+keys.join(', ')+': '+keys.map(key=>JSON.stringify(pa[key])?.slice(0,300)+' | '+JSON.stringify(pb[key])?.slice(0,300)).join(' / '));
+  }
+  assert.equal(ga,gb,'after '+steps.join(' ')+': the same draw count');
+  assert.equal(gate,full,'after '+steps.join(' ')+': the gate gives the full check’s verdict');
+ }
+ return {apps,step,fast,steps};
+}
+test('RISK decision evidence replay: the incremental replay leaves the board, draw count and mark order the whole-board replay leaves, and the gate the full check’s verdict, after every action',{timeout:300000},async t=>{
+ const twin=await twinApps2435(t);
+ const script=[['start',0],['yes',60000],['no',60000],['no',60000],['yes',60000],['bench-cant',60000],['no',60000],['yes',60000],
+  ['cant',60000],['no',60000],['worked',60000],['no',60000],['yes',60000],['dislodge',60000],['no',60000],
+  // A Can't held past its 30 minutes, a pass mode chosen later than Start's.
+  ['no',40*60000],['halving',60000],['no',60000],['yes',60000],['no',60000],['pause',60000],['resume',60000],['no',60000],
+  ['undo',60000],['no',60000],['yes',60000],['cand-done',60000],['no',60000],['rescan',60000],['no',60000],['postpone',60000],['no',60000],
+  ['bench-done',60000],['start',60000],['no',60000],['yes',60000],['cand-worked',60000],['no',60000]];
+ for(const [act,ms] of script)await twin.step(act,ms);
+ t.diagnostic(JSON.stringify({fast:twin.fast,steps:twin.steps}));
+ assert.ok(twin.fast.settle>=12,'positive control: most answers replay their own decision alone: '+JSON.stringify(twin.fast));
+ assert.ok(twin.fast.gate>=12,'positive control: and pass the gate without the full check: '+JSON.stringify(twin.fast));
+ // A seeded walk through every action, with gaps from a minute to an hour.
+ let seed=2435;const next=()=>{seed=(seed*1103515245+12345)%2147483648;return seed/2147483648;};
+ const acts=['yes','no','no','yes','no','cant','bench-cant','worked','cand-worked','dislodge','undo','pause','resume','halving','rescan','cand-done','bench-done','postpone','start'];
+ for(let i=0;i<80;i++){const act=acts[Math.floor(next()*acts.length)];await twin.step(act,60000+Math.floor(next()*3600000));}
+ t.diagnostic(JSON.stringify({fast:twin.fast}));
+});
+// #2435: an Undo of an answer leaves it cancelled in its pass, and every
+// whole-board replay of that pass writes the task's pass-start marks again
+// first, so the answers after it replay the whole board, as they did before
+// #2435. Their gate still reads only their own decisions, and the board is
+// the one the whole-board replay leaves.
+test('RISK decision evidence gate: after an Undo of an answer in the pass, later answers pass the gate reading only their own decisions, and the replay leaves the whole-board replay’s board',{timeout:300000},async t=>{
+ const twin=await twinApps2435(t);
+ for(const [act,ms] of [['start',0],['no',60000],['yes',60000],['no',60000],['undo',60000]])await twin.step(act,ms);
+ const gates=twin.fast.gate,later=[['no',60000],['yes',60000],['no',60000],['no',60000],['yes',60000]];
+ for(const [act,ms] of later)await twin.step(act,ms);
+ t.diagnostic(JSON.stringify({fast:twin.fast,steps:twin.steps}));
+ assert.ok(twin.steps.slice(-later.length).every(step=>!step.includes('(not offered)')),'positive control: every answer after the Undo is taken: '+twin.steps.join(' '));
+ assert.ok(twin.apps[0].ctx.state.decisionEvents.some(event=>event.kind==='undo'),'positive control: the Undo is recorded');
+ assert.equal(twin.fast.gate-gates,later.length,'every answer after the Undo passes the gate reading only its own decision: '+twin.steps.join(' '));
+});
+// #2435: a board that was never signed in (sync off) names no account; its
+// answers replay their own decisions alone too, and the board is the one the
+// whole-board replay leaves. It sends no change records, so the gate only
+// has to give the full check's verdict.
+test('RISK decision evidence replay: on a board with no account the incremental replay leaves the board, draw count and mark order the whole-board replay leaves',{timeout:300000},async t=>{
+ const twin=await twinApps2435(t,{account:null});
+ assert.equal(Object.hasOwn(twin.apps[0].ctx.state,'syncAccount')?twin.apps[0].ctx.state.syncAccount:null,null,'positive control: the board names no account');
+ for(const [act,ms] of [['start',0],['yes',60000],['no',60000],['no',60000],['yes',60000],['cant',60000],['no',60000],['dislodge',60000],['no',60000],
+  ['yes',60000],['bench-cant',60000],['no',60000],['no',60000],['yes',40*60000],['no',60000]])await twin.step(act,ms);
+ t.diagnostic(JSON.stringify({fast:twin.fast,steps:twin.steps}));
+ assert.ok(twin.apps[0].ctx.state.decisionEvents.every(event=>event.account===null),'positive control: its decisions name no account');
+ assert.ok(twin.fast.settle>=8,'positive control: its answers replay their own decision alone: '+JSON.stringify(twin.fast));
 });

@@ -71,7 +71,11 @@ defers adoption, and scanner controls remain bound to the tasks they displayed.
   shows no error; a refusal that a plain read of the counter does not repeat
   (contention) leaves records on. No record goes that a push would refuse, and
   a received record after which the board could not be pushed is skipped
-  whole, reported, and left to its sender's full copy. Undo of an answer
+  whole, reported, and left to its sender's full copy. A full copy names the
+  records its board holds, in number order, only up to the first one that
+  device skipped or could not read, so the cloud keeps that record until a
+  full copy that holds it names it; the skip is the page's own, so a reopened
+  app reads the record again. Undo of an answer
   saves its own device row, never sent, so a reopened app keeps the Undo
 - A pull that finds nothing new produces zero writes
 - Firestore revisions order copies and prevent concurrent writes from silently

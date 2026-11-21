@@ -139,10 +139,11 @@ took them. Other open devices apply it through the same merge as a full copy
 holding only that change, without downloading the board. Full copies stay the
 checkpoints: each names the records it includes, a device opening from one
 applies the records it does not name, and a record is removed only once the
-active full copy includes it. While every change since the board was last
-clean went up as a record the Sync session accepted, the board shows Synced and
-its next full copy waits for about 30 seconds without changes, or for the app
-to be hidden, instead of each 2-second pause.
+active full copy includes it. A device's full copy never names a record that
+device skipped or could not read, or any record after it. While every change
+since the board was last clean went up as a record the Sync session accepted,
+the board shows Synced and its next full copy waits for about 30 seconds
+without changes, or for the app to be hidden, instead of each 2-second pause.
 _Avoid_: Delta, patch, sync event
 
 **Settled (sync)**:
@@ -167,6 +168,17 @@ inputs each time. Retention is at most 2,048 keys and 256 Ki UTF-16 input units;
 changed calculators, Math or string methods, accessors, nonprimitive and
 oversized inputs use the ordinary calculation. It retains no saved object or
 source-validation result.
+
+**Verified decision projection**:
+What the last whole check or whole replay of a board's decision evidence found
+its decisions write on that board (ratings, chain, marks, pass and current
+choices), kept by the open app and extended by each new answer that observed
+every earlier decision. An answer's replay and the check before its change
+record use it only while the board still holds those exact values and
+decisions; any other change sends them back to the whole check, which makes a
+new one. It is never saved or sent, and it never names an issue itself: every
+issue is the whole check's.
+_Avoid_: Cached verdict, evidence cache
 
 - **Confirmed device cloud owner**: one process-local backend, account, identity and revision binding established by an accepted cloud read or acknowledgement. An acknowledgement binds it while its board saves on this device, and a refused save withdraws that binding. Device CAS repair may retain a higher confirmed revision only with current reconciliation authority, the same exact decision-base payload and unchanged owner. Sign-out or suspension invalidates the binding; a replacement backend needs a fresh accepted read. The binding retains no board graph or extra payload. Shared edits still require their own cloud confirmation.
 

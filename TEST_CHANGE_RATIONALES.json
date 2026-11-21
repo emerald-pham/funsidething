@@ -24845,6 +24845,49 @@
   {
     "baseCommit": "8cb7a646492f600979959b992ba8259a37c80112",
     "weakenedTestLines": [
+      "tests/persistence-recovery.test.js:-async function answerRunOnSlowPhone2408(t,{saveMs,gapMs,forMs=32000}){",
+      "tests/persistence-recovery.test.js:-async function answeringDevice2408(t,{board=answeringBoard2408(),docs=new Map(),indexedDB,dbName,storage,saveMs,signedIn=true,dropDatabase=false,worker=null}={}){",
+      "tests/persistence-recovery.test.js:-async function slowPhone2408(t,{saveMs}){",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{board,saveMs:0,worker:SilentWorker2427});",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{board,saveMs:0});",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{saveMs,signedIn:false,dropDatabase:true});",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{saveMs:0});",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{saveMs:0});",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{saveMs:0});",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{saveMs:1500});",
+      "tests/persistence-recovery.test.js:-const device=await slowPhone2408(t,{saveMs:3000});",
+      "tests/persistence-recovery.test.js:-const device=await slowPhone2408(t,{saveMs});",
+      "tests/persistence-recovery.test.js:-const run=await answerRunOnSlowPhone2408(t,{saveMs,gapMs});",
+      "tests/persistence-recovery.test.js:-const waiting=await answeringDevice2408(t,{saveMs:0});"
+    ],
+    "reason": "#2419 review fixes S1 (a full copy never names a change record its device skipped or could not read, so the cloud keeps that record until a full copy that holds it does), S2, S3, N1, N2, N3 and N4 add tests and extend two #2419 tests (the 30-second wait's hide part now holds the record listener after the app is shown again; the guidance test checks the new wording). No assertion is removed or weakened. The lines listed are the #2419 implementation's own weakenings (its entry above), still in this branch's diff against main; this entry records the review fixes' RED evidence. S2, N1 and N3 cover behavior the #2419 commit already had and cannot be RED on 8cb7a646, which never counted change records toward Synced, so their RED is a recorded mutation of the #2419 code; S3's is the 8cb7a646 session script.",
+    "previousBehavior": "On the #2419 commit 40741d59, a device that skipped a received change record (#2417 B1: its board could not hold the record's decisions, before or after drawing it) or could not read one (not JSON, or not a change in a format it knows) still moved its record position past it (applyHeardRecordsInPlace, absorbHeardRecordsHeld, applyHeardChangeRecords). Its next full copy named the record as included and the cloud removed it, while the answer's sender showed Synced and waited about 30 seconds, or until it was shown again, to send its own full copy: the cloud held the answer nowhere. The tests of the catch-up guard, the hide line and a record reply from a replaced connection could not fail when those were removed, and a full copy put back on the ordinary schedule with no push request waiting went at once.",
+    "intendedBehavior": "A device's record position moves on, in number order, only over records its board holds (applied, already held, or undone on that device) and stops at the first it skipped or could not read, in the position its board saves, the copy its Sync session knows and a read's result. So no full copy of that device names such a record, and the cloud keeps it until a full copy that holds it does; a reopened device, which has forgotten the skip, still does not name it. A full copy back on the ordinary schedule with no push request waiting waits the 2-second pause. Help and the changelog say the full copy goes when you next come back to the app, not when you leave it.",
+    "preservedCoverage": [
+      "Every assertion of the #2417 change-record tests and of the #2419 'full copies off the answer path' tests still runs unchanged; 35 of 35 pass with the fix (recorder green 2026-11-21T14-18-58-735Z-b8534dce).",
+      "The #2417 B1 test 'a record the receiving board cannot hold is skipped whole, reported, and sync goes on' still passes: a later record still applies in place and the laptop's own edits still reach the cloud, now with the skipped record kept.",
+      "The sync session tests (26 of 26, recorder green 2026-11-21T14-18-42-552Z-6394dd38) and the core guidance tests (87 of 87, recorder green 2026-11-21T14-34-14-920Z-624ba6d2) pass.",
+      "The 14 weakenings listed keep their own #2419 rationale entry; this diff weakens no other line."
+    ],
+    "replacementTests": [
+      "RISK full copies off the answer path: a full copy names no change record its device skipped, so the cloud keeps the record, also after that device reopens without it",
+      "RISK full copies off the answer path: a full copy names no change record its device took back after drawing it, when the whole-board replay found its board could not then be pushed",
+      "RISK full copies off the answer path: a full copy names no change record its device could not read, so an answer the cloud holds only as its record stays there while its sender is put away",
+      "RISK full copies off the answer path: a second answer does not show synced while it catches up, though the first answer’s record already shows Synced",
+      "RISK sync session: a change record’s reply from a replaced connection, with the owner binding unchanged, asks for a fresh read and ends read authority and the binding",
+      "RISK full copies off the answer path: while every change since the last full copy went up as a record, the full copy waits about 30 seconds without changes, counted as scheduled sync work, or until the app is hidden",
+      "RISK full copies off the answer path guidance: mounted Help and the changelog say an answer shows synced within about a second and the full copy waits for a longer pause, one feature per bullet",
+      "RISK full copies off the answer path: two open devices on the real schedule show Synced only while the cloud holds their answers, and both answers end in the full copy",
+      "RISK full copies off the answer path: a full copy back on the ordinary schedule while no push request waits still waits the 2-second pause"
+    ],
+    "redEvidence": {
+      "command": "node --max-old-space-size=8192 --test --test-name-pattern=<the test> tests/persistence-recovery.test.js (tests/core.test.js for the guidance test), each run through scripts/agent-tools/record-run.mjs into the #2419 review-fixes evidence directory: preimplementation-red 2026-11-21T14-13-52-906Z-1572a04b (S1 skipped and could not read), 2026-11-21T14-14-14-067Z-a1712b98 (S1 taken back), 2026-11-21T14-31-09-686Z-d19d35f9 (N4) and 2026-11-21T14-33-57-345Z-daf53fa9 (N2), all on 40741d59 with the new tests only; later-baseline-sensitivity 2026-11-21T14-18-25-274Z-901a0da0 (S3 with the 8cb7a646 cloud-sync-session.js), 2026-11-21T14-32-03-122Z-b9e1a019 (S2 with currentRecordCoverage's !answerCatchUp.pending() removed), 2026-11-21T14-32-25-071Z-650384b8 (N1 with suspendCloudSync's 'if(cloudTimer&&cloudTimerCheckpoint)pendingPush=true;' removed) and 2026-11-21T14-33-10-005Z-ec142273 (N3 with renderSync's Synced rule reverted to 8cb7a646's)",
+      "failure": "S1 on 40741d59: 'that full copy does not name the skipped record: {\"includedSeq\":1,\"seq\":1}', 'that full copy does not name the record it took back: {\"includedSeq\":1,\"seq\":1}' and 'not JSON: that full copy does not name the record the laptop could not read: 1'; after the read-path slice alone, 'a format it does not know: ... could not read: 1' (2026-11-21T14-15-13-138Z-1ac8a283). N4: 'the full copy waits for the 2-second pause after the latest push request: [1200]' (4 uploads, 3 expected). N2: the Help answer lacked 'or, if you leave the app, when you next come back to it'. S3 with the 8cb7a646 session script: 'the reply asks for a fresh read'. Mutations of the #2419 code: S2 'the second answer does not show synced while it catches up'; N1 'after the app is hidden and shown again the full copy goes without another wait' (0 uploads, 1 expected); N3 'the phone shows its answer synced by its record' (actual '☁ syncing')."
+    }
+  },
+  {
+    "baseCommit": "8cb7a646492f600979959b992ba8259a37c80112",
+    "weakenedTestLines": [
       "tests/persistence-recovery.test.js:-assert.equal(commits.length,2,'the answer’s save and the acknowledgement’s save are the only device saves');",
       "tests/persistence-recovery.test.js:-async function answerRunOnSlowPhone2408(t,{saveMs,gapMs,forMs=32000}){",
       "tests/persistence-recovery.test.js:-async function answeringDevice2408(t,{board=answeringBoard2408(),docs=new Map(),indexedDB,dbName,storage,saveMs,signedIn=true,dropDatabase=false,worker=null}={}){",
