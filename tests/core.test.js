@@ -4007,14 +4007,17 @@ test('RISK change records guidance: mounted Help and the changelog say a scanner
 // short pause, or at least every 20 seconds" with Synced within about a
 // second, keep #2408's timing only for a cloud that does not take the quick
 // updates yet, and say the full copy waits for a longer pause; one feature
-// per bullet.
+// per bullet. #2419 review N2: leaving the app ends that wait, but the full
+// copy goes once the app is shown again, so both say it goes when you next
+// come back to the app, not when you leave it.
 test('RISK full copies off the answer path guidance: mounted Help and the changelog say an answer shows synced within about a second and the full copy waits for a longer pause, one feature per bullet',async()=>{
  const {ctx,shim}=await loadApp();
  for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
  ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  const rapid=help.split('<dt>Does answering slow down with sync on?</dt><dd>')[1]?.split('</dd>')[0];assert.ok(rapid,'Data and backups answers whether answering slows down with sync on');
  assert.match(rapid,/the cloud button shows synced within about a second, however large the board is/,'an answer shows synced within about a second: '+rapid);
- assert.match(rapid,/A full copy of the board follows once you stop answering for about 30 seconds, or when you leave the app/);
+ assert.match(rapid,/A full copy of the board follows once you stop answering for about 30 seconds, or, if you leave the app, when you next come back to it/,'the full copy goes when you next come back to the app: '+rapid);
+ assert.doesNotMatch(rapid,/when you leave the app/,'not when you leave it');
  const fallback=rapid.indexOf('If the cloud doesn’t take these quick updates yet');
  assert.ok(fallback>0,'the answer names the cloud that does not take the quick updates yet');
  assert.ok(rapid.indexOf('after a short pause, or at least every 20 seconds or so')>fallback,'the short pause and the 20 seconds apply only to that cloud');
@@ -4027,8 +4030,9 @@ test('RISK full copies off the answer path guidance: mounted Help and the change
  assert.equal(synced.length,1,'one bullet says an answer shows synced within about a second');
  assert.match(synced[0],/instead of after a short pause, or up to 20 seconds while you keep answering/);assert.match(synced[0],/answers sync as before/);
  assert.doesNotMatch(synced[0],/30 seconds/,'the full copy\'s longer pause is its own feature');
- const lighter=items.filter(item=>/stop answering for about 30 seconds, or leave the app/.test(item));
- assert.equal(lighter.length,1,'one bullet says the full copy waits for a longer pause');
+ const lighter=items.filter(item=>/stop answering for about 30 seconds, or, if you leave the app, until you next come back to it/.test(item));
+ assert.equal(lighter.length,1,'one bullet says the full copy waits for a longer pause, or until you next come back to the app: '+JSON.stringify(items));
+ assert.ok(!items.some(item=>/or leave the app/.test(item)),'no bullet says the full copy goes when you leave the app');
  assert.match(lighter[0],/does less work on your phone/);assert.match(lighter[0],/Any other change still sends the full copy after a short pause/);
  assert.doesNotMatch(lighter[0],/within about a second/,'showing synced is its own feature');
 });

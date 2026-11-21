@@ -126,10 +126,11 @@ took them. Other open devices apply it through the same merge as a full copy
 holding only that change, without downloading the board. Full copies stay the
 checkpoints: each names the records it includes, a device opening from one
 applies the records it does not name, and a record is removed only once the
-active full copy includes it. While every change since the board was last
-clean went up as a record the Sync session accepted, the board shows Synced and
-its next full copy waits for about 30 seconds without changes, or for the app
-to be hidden, instead of each 2-second pause.
+active full copy includes it. A device's full copy never names a record that
+device skipped or could not read, or any record after it. While every change
+since the board was last clean went up as a record the Sync session accepted,
+the board shows Synced and its next full copy waits for about 30 seconds
+without changes, or for the app to be hidden, instead of each 2-second pause.
 _Avoid_: Delta, patch, sync event
 
 **Settled (sync)**:
