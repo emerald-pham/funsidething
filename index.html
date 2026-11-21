@@ -5824,15 +5824,25 @@ function supportDiagnosticsObserve(stage,status,role,operation,durationMs,schema
       if(SUPPORT_DIAGNOSTICS_RECORD_OUTCOMES.has(cloudDetails.recordOutcome))metadata.recordOutcome=cloudDetails.recordOutcome;
       if(Number.isSafeInteger(cloudDetails.recordSeq)&&cloudDetails.recordSeq>=1)metadata.recordSeq=cloudDetails.recordSeq;
       if(Number.isSafeInteger(cloudDetails.recordBytes)&&cloudDetails.recordBytes>=0&&cloudDetails.recordBytes<=16777216)metadata.recordBytes=cloudDetails.recordBytes;
-      // #2419: the records an acknowledgement by records covers, by number
-      // (the latest 64).
-      if(Array.isArray(cloudDetails.acknowledgedRecords))
-        metadata.acknowledgedRecords=cloudDetails.acknowledgedRecords.filter(seq=>Number.isSafeInteger(seq)&&seq>=1).slice(-64);
+      // #2419: the records an acknowledgement by records covers, by number:
+      // the latest 64, and (#2419 final review) how many earlier ones the
+      // report leaves out.
+      if(Array.isArray(cloudDetails.acknowledgedRecords)){
+        const named=cloudDetails.acknowledgedRecords.filter(seq=>Number.isSafeInteger(seq)&&seq>=1);
+        metadata.acknowledgedRecords=named.slice(-64);
+        if(named.length>64)metadata.acknowledgedRecordsLeftOut=named.length-64;
+      }
     }
     // #2419: the records a full copy's acknowledgement includes, through this number.
     if(stage==="push"&&status==="acknowledged"&&Number.isSafeInteger(pushDetails?.recordsThrough)&&pushDetails.recordsThrough>=0)
       metadata.recordsThrough=pushDetails.recordsThrough;
     if(Object.keys(metadata).length)event.metadata=metadata;
+    // #2419 final review: a long-used account's record numbers are large, and
+    // an event over its size loses every detail. It names fewer of the latest
+    // records instead, and counts the rest as left out.
+    while(metadata.acknowledgedRecords?.length&&supportDiagnosticsBytes(JSON.stringify(event))>SUPPORT_DIAGNOSTICS_EVENT_BYTES){
+      metadata.acknowledgedRecords.shift();metadata.acknowledgedRecordsLeftOut=(metadata.acknowledgedRecordsLeftOut??0)+1;
+    }
     if(supportDiagnosticsBytes(JSON.stringify(event))>SUPPORT_DIAGNOSTICS_EVENT_BYTES){
       delete event.metadata;delete event.durationMs;event.status="truncated";
       if(supportDiagnosticsBytes(JSON.stringify(event))>SUPPORT_DIAGNOSTICS_EVENT_BYTES){supportDiagnosticsDroppedEvents++;return false;}
@@ -5861,7 +5871,7 @@ function supportDiagnosticsObserveChangeRecord(recordOutcome,recordSeq=null,reco
 // they cover, as a full copy's acknowledgement does.
 function supportDiagnosticsObserveRecordAcknowledgement(entry){
   const coverage=recordsCoverBoard()?currentRecordCoverage():null;
-  const acknowledged=coverage?coverage.entries.map(row=>row.seq).filter(Number.isSafeInteger):null;
+  const acknowledged=coverage?recordsBeyondFullCopy(coverage):null;
   if(coverage){
     try{
       supportDiagnosticsLastAckGeneration=Math.max(supportDiagnosticsLastAckGeneration,coverage.generation);
@@ -6878,6 +6888,9 @@ function endQueuedCloudPullCount(){
 let cloudRetryTimer = null, cloudRetryAttempt = 0, cloudRetryAccount = null, cloudRetryOwner = null;
 let cloudConflictAttempts = 0;
 let cloudSuspended = !!document.hidden, cloudResumePending = false, cloudPageHidden = false;
+// #2419 final review: the full copy started as the app was hidden, while it
+// runs; sync suspends for the hidden app once it ends (suspendCloudSync).
+let hiddenFullCopy = null;
 let pendingCloudRevision=null, lastLiveCloudAttempt=-1, liveCloudTimer=null;
 let scannerGestureActive=false, scannerGestureTimer=null;
 function scheduleLiveCloudPull(){
@@ -7278,7 +7291,7 @@ function longestWaitPushDueAt(wait=CLOUD_PUSH_LONGEST_WAIT_MS){
    (recordsCoverBoard), the cloud already holds the board: its active full
    copy plus those records. The full copy is then only a checkpoint, so it
    waits for this long a pause without changes, or for the app to be hidden
-   (suspendCloudSync), instead of following each 2-second pause and the
+   (startHiddenFullCopy), instead of following each 2-second pause and the
    longest wait. A change that does not go as a record (or a record that does
    not go) puts the full copy back on that schedule. */
 const CLOUD_CHECKPOINT_WAIT_MS=30000;
@@ -7287,20 +7300,25 @@ const CLOUD_CHECKPOINT_WAIT_MS=30000;
 // full copies (one from before change records) saw none of the answers. So
 // the checkpoint has a longest wait of its own: it reaches the cloud at most
 // this long after the oldest push request it carries, as the 20-second
-// longest wait bounds the 2-second pause. A hidden app still sends it only
-// when it is next shown.
+// longest wait bounds the 2-second pause. #2419 final review: hiding the app
+// sends it at once (startHiddenFullCopy).
 const CLOUD_CHECKPOINT_LONGEST_WAIT_MS=120000;
 // The changes since the board was last clean (syncDirty false), while each
 // went up, or is going up, as a change record: {board, edits, generation,
-// entries}. edits is the boardEditSerial every in-place change so far is
-// explained by (markBoardEdited); generation the save requests they made,
-// each followed by its record (noteRecordCoverage); entries the outbox entries
-// of those records. Anything else ends it: a save with no record, an in-place
-// change markBoardEdited did not make, or a new board. Declared with
+// entries, saves, fullCopyThrough}. edits is the boardEditSerial every
+// in-place change so far is explained by (markBoardEdited); generation the
+// save requests they made, each followed by its record (noteRecordCoverage);
+// entries the outbox entries of those records, and saves the save request
+// each came with. fullCopyThrough is the save request through which the
+// active full copy holds the board (#2419 final review: a full copy this
+// device published while the board was not clean, noteFullCopyCoverage), so
+// the entries after it are those the board reached the cloud by beyond that
+// copy. Anything else ends it: a save with no record, an in-place change
+// markBoardEdited did not make, or a new board. Declared with
 // boardEditSerial, since renderSync reads it.
 function noteBoardEditCoverage(savesBefore){
   const coverage=recordCoverage;
-  if(state.syncDirty===false)recordCoverage={board:state,edits:boardEditSerial+1,generation:savesBefore,entries:[]};
+  if(state.syncDirty===false)recordCoverage={board:state,edits:boardEditSerial+1,generation:savesBefore,entries:[],saves:[],fullCopyThrough:savesBefore};
   else if(coverage&&coverage.board===state&&coverage.edits===boardEditSerial)coverage.edits=boardEditSerial+1;
   else recordCoverage=null;
 }
@@ -7308,9 +7326,23 @@ function noteBoardEditCoverage(savesBefore){
 function noteRecordCoverage(entry){
   const coverage=recordCoverage;
   if(entry&&coverage&&coverage.board===state&&coverage.edits===boardEditSerial&&coverage.generation===saveRequestGeneration-1){
-    coverage.generation=saveRequestGeneration;coverage.entries.push(entry);return true;
+    coverage.generation=saveRequestGeneration;coverage.entries.push(entry);coverage.saves.push(saveRequestGeneration);return true;
   }
   recordCoverage=null;return false;
+}
+// #2419 final review: the cloud acknowledged a full copy of this board that
+// holds it through save request `through`: the records that came with those
+// saves are in that copy, so an acknowledgement by records names only later
+// ones (supportDiagnosticsObserveRecordAcknowledgement). Only the report reads
+// it; what shows the board synced is unchanged.
+function noteFullCopyCoverage(board,through){
+  const coverage=recordCoverage;
+  if(coverage&&coverage.board===board&&Number.isSafeInteger(through))coverage.fullCopyThrough=Math.max(coverage.fullCopyThrough??0,through);
+}
+// The records an acknowledgement by records covers: the coverage's entries
+// beyond the active full copy, by number.
+function recordsBeyondFullCopy(coverage){
+  return coverage.entries.filter((entry,index)=>!(coverage.saves?.[index]<=coverage.fullCopyThrough)).map(entry=>entry.seq).filter(Number.isSafeInteger);
 }
 // The coverage, while every change on this board went as a record and is
 // still covered by it: no save or in-place change since, and no answer still
@@ -7588,7 +7620,9 @@ async function heldSourceStillHolds(heldSource,stillCurrent){
    enough to destroy the remote document. A write only means something once
    we know what it would be overwriting, so until this session has read the
    cloud we hold the write and go read first. cloudPull() releases it. */
-async function sendPush(){
+// #2419 final review: whileHidden, the full copy started as the app is
+// hidden (startHiddenFullCopy), which goes before sync suspends for it.
+async function sendPush({whileHidden=false}={}){
   // #2407: a push carries every answer given, with its History.
   answerCatchUp.flush();
   // #2378: counted from the call until it returns or throws.
@@ -7601,7 +7635,7 @@ async function sendPush(){
   if(cloudSourceRecoveryBusy){recoveryReadDeferredPush=true;return;}
   if(deviceRecoveryCloudHold){await publishHeldAutomaticRecovery();return;}
   if(!cloudReady()) return;
-  if(cloudSuspended || document.hidden || cloudResumePending){pendingPush=true;return;}
+  if(cloudSuspended || document.hidden&&!whileHidden || cloudResumePending){pendingPush=true;return;}
   // An immediate release of a pending write supersedes its debounced copy.
   // Leaving that timer alive can bypass the conflict retry's delay/limit.
   if(cloudTimer){ clearSyncTimeout(cloudTimer); cloudTimer=null; }
@@ -7816,6 +7850,7 @@ async function sendPush(){
         const unedited=!!payloadSource&&state===payloadSource.board&&saveRequestGeneration===payloadSource.generation&&
           boardEditSerial===payloadSource.edits;
         state.syncDirty = unedited ? false : payload!==cloudPayload();
+        noteFullCopyCoverage(state,pushedThrough);
         if(!state.syncDirty)clearCloudRetry({preserveAutomaticSource:true});
         if(Number.isFinite(res.serverUpdatedAt)) state.lastCloudServerAt=res.serverUpdatedAt;
         /* BUG FIX: this used to stop at the assignment, leaving the new
@@ -10861,18 +10896,59 @@ async function cloudPull({records=false}={}){
   }
   }finally{syncWork.end();}
 }
+/* #2419 final review: a full copy waiting on its checkpoint pause (the board
+   held by this device's accepted change records) goes as the app is hidden,
+   with every check an ordinary push makes, before sync suspends for the
+   hidden app. Waiting for the app to be shown left a phone put away, or
+   closed while hidden, with its answers only as records, which an app copy
+   from before change records never reads. Sync suspends once that push ends;
+   what it did not get into the cloud goes after the read showing the app
+   again starts. Only one that sendPush can send at once starts: no push or
+   read running, and this page reconciled.
+   It runs for CLOUD_HIDDEN_FULL_COPY_LIMIT_MS at most, half the 20 seconds a
+   cloud step may take (CLOUD_SYNC_TIMEOUT_MS). A phone can freeze the hidden
+   page while it runs. Woken, the push is stopped, as hiding stopped it before,
+   by showing the app or by this limit, which falls due before any of the
+   push's own 20-second limits, so no timeout is reported for a push that was
+   only frozen (the 2026-09-30 PWA resume fix). The limit is not counted as
+   sync work: it lives only while the push it bounds runs, which counts
+   itself. */
+const CLOUD_HIDDEN_FULL_COPY_LIMIT_MS=10000;
+function startHiddenFullCopy(){
+  if(!document.hidden||!cloudTimer||!cloudTimerCheckpoint||hiddenFullCopy||cloudPushInFlight||pushesRunning>0||pulling||!reconciled())return false;
+  clearSyncTimeout(cloudTimer);cloudTimer=null;
+  const run={limit:null};hiddenFullCopy=run;
+  run.limit=setTimeout(()=>stopHiddenFullCopy(run),CLOUD_HIDDEN_FULL_COPY_LIMIT_MS);
+  sendPush({whileHidden:true}).finally(()=>stopHiddenFullCopy(run));
+  return true;
+}
+// The push ended, ran past its limit, or the app is shown while it still
+// runs (on a phone the page was frozen meanwhile). The limit and showing stop
+// it as hiding stopped sync work before: a write that may or may not have
+// landed, never a timeout reported for it, and resuming reconnects and reads
+// before any write.
+function stopHiddenFullCopy(run,{shown=false}={}){
+  if(hiddenFullCopy!==run)return;
+  hiddenFullCopy=null;clearTimeout(run.limit);
+  if(state?.syncDirty===true)pendingPush=true;
+  if(shown||document.hidden)suspendCloudSync();
+}
 // A Home Screen PWA can freeze with a read/write and its timeout still pending.
 // Release those slots on hide; on return, reconnect and read before any write.
 // A cancelled write is uncertain, never an acknowledgement or an empty cloud.
 function suspendCloudSync(){
   if(cloudSuspended && cloudResumePending) return;
+  // #2419 final review: a full copy waiting on its checkpoint pause goes as
+  // the app is hidden, and sync suspends once it ends.
+  if(hiddenFullCopy||startHiddenFullCopy())return;
   cloudSuspended=true;cloudResumePending=true;
   syncSession?.requireRead("page-hidden");
   pendingDeviceCloudBackup=null;
   if(deviceCloudBackupTimer!==null){clearSyncTimeout(deviceCloudBackupTimer);deviceCloudBackupTimer=null;}
   cloudAdoptionHeld=true;lastPushed="";
-  // #2419: hiding the app ends a full copy's checkpoint pause: it goes as
-  // soon as sync resumes, after the read that resuming starts.
+  // #2419: hiding the app ends a full copy's checkpoint pause. One that could
+  // not start as the app was hidden (startHiddenFullCopy) goes as soon as
+  // sync resumes, after the read that resuming starts.
   if(cloudTimer&&cloudTimerCheckpoint)pendingPush=true;
   automaticCloudRecovery=null;
   // #2254 review (S2): hiding the page stops any adoption run of this page,
@@ -10887,6 +10963,7 @@ function suspendCloudSync(){
 }
 function resumeCloudSync(event){
   if(document.hidden) return;
+  if(hiddenFullCopy)stopHiddenFullCopy(hiddenFullCopy,{shown:true});
   if(["pageshow","focus","online","visibilitychange"].includes(event?.type))automaticCloudSourceResumeRequested=true;
   // pageshow also covers restoration from the mobile page cache. Ordinary
   // initial pageshow must not restart a connection already opened at startup.

@@ -18120,24 +18120,105 @@ test('RISK full copies off the answer path: while every change since the last fu
  assert.ok(uploads()[0].at>=secondAt+CHECKPOINT_WAIT2419-1000,'at '+(uploads()[0].at-secondAt)+' ms after it');
  assert.deepEqual(decisionsAbout2417(JSON.parse(uploads()[0].payload),[second]),['no:'+second],'carrying both answers');
  await clock.settle();
- // Hiding the app ends the wait: the full copy goes once sync resumes.
+ // #2419 final review: hiding the app ends the wait, and the full copy goes
+ // as the app is hidden, before sync suspends for it, so the cloud's full
+ // copy holds the answer while the app stays hidden, put away or closed
+ // there, for an app copy that reads only full copies too. It went only once
+ // the app was shown again.
  uploads=uploadsFrom();const third=device.tap('no');await clock.advance(5000);
+ const revision=device.docs.get('users/owner').rev;
  assert.deepEqual(uploads(),[],'positive control: no full copy before the app is hidden');
  device.shim.document.hidden=true;device.shim.document.dispatchEvent({type:'visibilitychange'});
+ const hiddenAt=clock.now;
  await clock.advance(1000);
- // #2419 review N1: the record listener showing the app starts again hears
- // nothing yet, so only the hide's own end of the wait (suspendCloudSync)
- // sends the full copy, not records heard again after the read.
- const heard=holdHeardRecords2419(device);
+ assert.equal(uploads().length,1,'the full copy goes as the app is hidden: '+JSON.stringify(uploads().map(upload=>upload.at-hiddenAt)));
+ assert.deepEqual(decisionsAbout2417(JSON.parse(uploads()[0].payload),[third]),['no:'+third],'carrying the answer');
+ assert.equal(device.docs.get('users/owner').rev,revision+1,'and the cloud publishes it while the app stays hidden');
+ assert.deepEqual(decisionsAbout2417(await cloudCopy2408(device.docs),[third]),['no:'+third],'so a reader of full copies alone finds the answer');
+ await clock.settle();
+ const hidden=session.snapshot();
+ assert.ok([...hidden.waiting].some(item=>item.kind==='read'),'then sync suspends for the hidden app, owing a read once it is shown: '+JSON.stringify(hidden.waiting));
+ assert.ok(![...hidden.waiting].some(item=>item.kind==='push'),'with nothing left to push: '+JSON.stringify(hidden.waiting));
+ device.shim.document.hidden=false;device.shim.document.dispatchEvent({type:'visibilitychange'});
+ await clock.settle();
+ assert.equal(uploads().length,1,'showing the app again sends no second full copy');
+ assert.equal(syncText2419(device),'☁ synced','and sync ends synced');
+});
+
+// #2419 final review: a full copy started as the app is hidden that has not
+// finished when the app is shown again (on a phone, the page was frozen while
+// it ran) stops as the app is shown, as sync work stopped when the app was
+// hidden: a write that may or may not have landed, never a timeout reported
+// for it. Sync then reconnects and reads the cloud before any write, and the
+// full copy goes after that read. #2419 review N1: the record listener showing
+// the app starts again hears nothing yet, so the full copy that goes is the
+// one the hidden app owed, not one that records heard again ask for.
+// The publication of the full copy the hidden app starts is held; showing the
+// app ends that hold for later publications.
+async function heldHiddenFullCopy2419(t){
+ const device=await answeringDevice2408(t,{saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {counters,clock,faults,docs}=device,from=counters.uploads.length;
+ const answered=device.tap('no');await clock.advance(5000);
+ assert.equal(syncText2419(device),'☁ synced','positive control: the answer shows synced by its record');
+ assert.equal(counters.uploads.length,from,'positive control: its full copy waits on the longer pause');
+ const revision=docs.get('users/owner').rev,frozen=deferredSyncFixture();
+ faults.publishPending=frozen.promise;
+ device.shim.document.hidden=true;device.shim.document.dispatchEvent({type:'visibilitychange'});
+ await clock.advance(1000);
+ assert.equal(faults.publicationStarted,true,'positive control: the full copy started as the app was hidden');
+ delete faults.publishPending;
+ return {device,answered,revision,frozen,uploads:()=>counters.uploads.slice(from)};
+}
+test('RISK full copies off the answer path: a full copy started as the app is hidden that has not finished when the app is shown again goes after the read that showing starts, with no sync error',{timeout:180000},async t=>{
+ const {device,answered,revision,frozen,uploads}=await heldHiddenFullCopy2419(t);
+ const {clock,backend,docs}=device;
+ t.after(()=>frozen.resolve());
+ const heard=holdHeardRecords2419(device),network=backend.network.length;
  device.shim.document.hidden=false;device.shim.document.dispatchEvent({type:'visibilitychange'});
  const shownAt=clock.now;
  await clock.advance(3000);
+ assert.equal(uploads().length,2,'the full copy goes again once the app is shown: '+JSON.stringify(uploads().map(upload=>upload.at-shownAt)));
+ assert.ok(uploads()[1].at>=shownAt,'after it is shown');
  assert.ok(heard.held>0,'positive control: the record listener started on showing has heard nothing yet');
- assert.equal(uploads().length,1,'after the app is hidden and shown again the full copy goes without another wait');
- assert.ok(uploads()[0].at<=shownAt+3000,'within 3 seconds of showing: '+(uploads()[0].at-shownAt)+' ms');
- assert.deepEqual(decisionsAbout2417(JSON.parse(uploads()[0].payload),[third]),['no:'+third],'carrying the answer');
- heard.release();
+ const sinceShown=backend.network.slice(network);
+ assert.ok(sinceShown.includes('enable')&&sinceShown.some(path=>path.startsWith('server:')),'after reconnecting and reading the cloud: '+JSON.stringify(sinceShown));
+ assert.equal(docs.get('users/owner').rev,revision+1,'the cloud publishes it once');
+ assert.deepEqual(decisionsAbout2417(await cloudCopy2408(docs),[answered]),['no:'+answered],'holding the answer');
+ assert.equal(backend.CS.errorCode??null,null,'no sync error is reported for the full copy the hidden app started');
+ heard.release();frozen.resolve();
  await clock.settle();
+ assert.equal(docs.get('users/owner').rev,revision+1,'the publication the hidden app started does not land after it');
+ assert.equal(backend.CS.errorCode??null,null,'still no sync error');
+ assert.equal(syncText2419(device),'☁ synced','and sync ends synced');
+});
+
+// #2419 final review: a full copy started as the app is hidden runs for at
+// most 10 seconds, half the 20 seconds a cloud step may take, before sync
+// suspends for the hidden app and stops it. A phone that froze the page while
+// it ran, woken, so stops it before any of the push's own limits can report a
+// timeout; on a computer, a slow upload in a hidden tab stops there too. What
+// it did not finish goes once the app is shown again.
+test('RISK full copies off the answer path: a full copy started as the app is hidden that runs past 10 seconds stops, and sync suspends for the hidden app with no sync error; it goes once the app is shown again',{timeout:180000},async t=>{
+ const {device,answered,revision,frozen,uploads}=await heldHiddenFullCopy2419(t);
+ const {ctx,clock,backend,docs}=device,session=vm.runInContext('syncSession',ctx);
+ t.after(()=>frozen.resolve());
+ await clock.advance(8000);
+ assert.ok([...session.snapshot().work].some(item=>item.kind==='push'),'positive control: 9 seconds after the app was hidden its full copy still runs: '+JSON.stringify(session.snapshot().work));
+ await clock.advance(2000);
+ const hidden=session.snapshot();
+ assert.ok(![...hidden.work].some(item=>item.kind==='push'),'10 seconds after the app was hidden its full copy has stopped: '+JSON.stringify(hidden.work));
+ assert.ok([...hidden.waiting].some(item=>item.kind==='push'&&item.reason==='hidden'),'and the full copy waits for the app to be shown: '+JSON.stringify(hidden.waiting));
+ assert.equal(backend.CS.errorCode??null,null,'with no sync error reported');
+ await clock.settle();
+ assert.equal(docs.get('users/owner').rev,revision,'positive control: its publication has not landed');
+ assert.equal(backend.CS.errorCode??null,null,'still no sync error');
+ device.shim.document.hidden=false;device.shim.document.dispatchEvent({type:'visibilitychange'});
+ await clock.settle();
+ assert.equal(uploads().length,2,'the full copy goes again once the app is shown');
+ assert.equal(docs.get('users/owner').rev,revision+1,'and the cloud publishes it');
+ assert.deepEqual(decisionsAbout2417(await cloudCopy2408(docs),[answered]),['no:'+answered],'holding the answer');
+ assert.equal(backend.CS.errorCode??null,null,'with no sync error reported');
  assert.equal(syncText2419(device),'☁ synced','and sync ends synced');
 });
 
@@ -18264,6 +18345,104 @@ test('RISK full copies off the answer path: the support report shows which chang
  await clock.settle();
  const pushes=device.report().events.filter(event=>event.stage==='push'&&event.status==='acknowledged');
  assert.equal(pushes.at(-1)?.metadata?.recordsThrough,2,'the full copy’s acknowledgement names the records it includes: '+JSON.stringify(pushes.at(-1)));
+});
+
+// #2419 final review: on rules with change records, a second answer given
+// while the full copy that the longer pause sent for a first answer uploads.
+// The second answer's record is held until the test releases it. When this
+// returns, the cloud's ok for that full copy, which lacks the second answer,
+// has been taken.
+async function answeredDuringFullCopy2419(t){
+ const device=await answeringDevice2408(t,{board:answeringBoard2408({tasks:20,padBytes:0}),saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock,counters,backend}=device;
+ const cleared=[];ctx.__cleared2419=()=>cleared.push(clock.now);
+ vm.runInContext('(()=>{const clear=clearCloudRetry;clearCloudRetry=function(){__cleared2419();return clear.apply(this,arguments);};})()',ctx);
+ const first=device.tap('no');await clock.advance(1500);
+ assert.deepEqual(recordAcks2419(device).map(event=>event.metadata.recordSeq),[1],'positive control: the first answer went up as its record');
+ const held=deferredSyncFixture(),append=backend.CS.appendChangeRecord;
+ backend.CS.appendChangeRecord=async record=>{await held.promise;return append(record);};
+ const push=backend.CS.push,uploads=counters.uploads.length,revision=ctx.state.syncRev;let gap=null;
+ backend.CS.push=async(...args)=>{
+  const result=await push(...args);
+  if(!gap)gap={candidate:device.tap('no'),cleared:cleared.length};
+  return result;
+ };
+ for(let waited=0;!gap;waited+=1000){
+  assert.ok(waited<=CHECKPOINT_WAIT2419+5000,'positive control: the first answer’s full copy goes after the longer pause');
+  await clock.advance(1000);
+ }
+ await clock.advance(1000);
+ backend.CS.push=push;
+ assert.equal(counters.uploads.length-uploads,1,'positive control: one full copy is uploaded');
+ assert.equal(ctx.state.syncRev,revision+1,'positive control: and acknowledged');
+ const pushed=JSON.parse(counters.uploads.at(-1).payload);
+ assert.deepEqual([decisionsAbout2417(pushed,[first]),decisionsAbout2417(pushed,[gap.candidate])],[['no:'+first],[]],'positive control: it carries the first answer, not the second');
+ assert.equal(ctx.state.considered?.[gap.candidate],'no','positive control: the second answer shows');
+ return {device,first,gap,cleared,release(){backend.CS.appendChangeRecord=append;held.resolve();}};
+}
+
+// #2419 final review: #2427's guarantee that an answer given while a push
+// uploads keeps the board unsynced until it is sent ran only on rules without
+// change records (its push follows the 2-second pause). It holds on the
+// records path too: the full copy's ok lacks the answer, so the board stays
+// unsynced and is not shown synced until the answer's own record is accepted,
+// and the next full copy then holds it.
+test('RISK full copies off the answer path: an answer given while a full copy uploads keeps the board unsynced, and not shown synced, until its own record is accepted, and then reaches the cloud',{timeout:180000},async t=>{
+ const {device,gap,cleared,release}=await answeredDuringFullCopy2419(t);
+ const {ctx,clock,docs}=device;
+ assert.equal(ctx.state.syncDirty,true,'the acknowledgement leaves the board unsynced: it lacks the answer given during the upload');
+ assert.notEqual(syncText2419(device),'☁ synced','and the board is not shown synced while that answer’s record waits');
+ assert.deepEqual(cleared.slice(gap.cleared),[],'and no sync retry is cleared before that answer is sent');
+ release();
+ await clock.advance(1000);
+ assert.deepEqual(recordAcks2419(device).map(event=>event.metadata.recordSeq),[1,2],'positive control: the answer’s record is accepted');
+ assert.equal(syncText2419(device),'☁ synced','and then the board shows synced');
+ await clock.settle();
+ assert.deepEqual(decisionsAbout2417(await cloudCopy2408(docs),[gap.candidate]),['no:'+gap.candidate],'and the next full copy holds the answer');
+ assert.equal(ctx.state.syncDirty,false,'and the board is synced');
+});
+
+// #2419 final review: the records each acknowledgement covers carried on past
+// a full copy's acknowledgement that left the board unsynced, so the next
+// record's acknowledgement also named records that full copy holds. It names
+// exactly those the board reached the cloud by beyond the active full copy.
+test('RISK full copies off the answer path: after a full copy’s acknowledgement leaves the board unsynced, the support report’s next record acknowledgement names only the records beyond that full copy',{timeout:180000},async t=>{
+ const {device,release}=await answeredDuringFullCopy2419(t);
+ release();
+ await device.clock.advance(1000);
+ assert.deepEqual(recordAcks2419(device).map(event=>[event.metadata.recordSeq,event.metadata.acknowledgedRecords]),[[1,[1]],[2,[2]]],
+  'the second record’s acknowledgement names only itself: the full copy holds the first answer');
+ assert.equal(device.report().save.serverAcknowledgement.value,'acknowledged','positive control: the save section records the Cloud acknowledgement');
+});
+
+// #2419 final review: the report keeps a bound on the records it names (the
+// latest 64, and fewer where their numbers would not fit one event), and now
+// says how many earlier ones it leaves out. An event over its size lost every
+// detail, the records' numbers included.
+test('RISK full copies off the answer path: the support report names the latest records an acknowledgement covers, at most 64 and as many as fit its event, and says how many earlier ones it leaves out',{timeout:300000},async t=>{
+ for(const [label,counter] of [['small numbers',0],['large numbers',9999000]])await t.test(label,async t=>{
+  // A long-used account's records have large numbers: the cloud's counter
+  // never goes back.
+  const docs=new Map();
+  if(counter)docs.set('users/owner/changeLog/head',{seq:counter,lastId:'earlier-2419'});
+  const device=await answeringDevice2408(t,{docs,board:answeringBoard2408({tasks:80,padBytes:0}),saveMs:0,dropDatabase:true});
+  await startAnswering2408(device);
+  const {clock,counters}=device,from=counters.uploads.length,answers=66;
+  for(let i=0;i<answers;i++){device.tap('no');await clock.advance(1000);}
+  assert.equal(counters.uploads.length,from,'positive control: no full copy went during the run');
+  const truncated=device.report().events.filter(event=>event.stage==='change-record'&&event.status==='truncated');
+  assert.deepEqual(truncated,[],'no record acknowledgement loses its details');
+  const last=recordAcks2419(device).at(-1);
+  assert.equal(last?.metadata?.recordSeq,counter+answers,'positive control: the last answer’s record acknowledgement is reported: '+JSON.stringify(last));
+  const named=last.metadata.acknowledgedRecords;
+  assert.ok(Array.isArray(named)&&named.length>0&&named.length<=64,'it names at most 64 records: '+JSON.stringify(last));
+  assert.deepEqual(named,Array.from({length:named.length},(_,i)=>counter+answers-named.length+1+i),'the latest ones it covers');
+  assert.equal(last.metadata.acknowledgedRecordsLeftOut,answers-named.length,'and says how many earlier ones it leaves out: '+JSON.stringify(last));
+  if(!counter)assert.equal(named.length,64,'64 of them');
+  else assert.ok(named.length<64,'fewer where their numbers would not fit one event: '+named.length);
+  await device.close();
+ });
 });
 
 // #2419 review S1: a full copy names, as its includedSeq, the change records
@@ -18621,8 +18800,11 @@ test('RISK full copies off the answer path: a full copy names no change record i
   unreadableHeardRecords2419(laptop,parts);
   const answered=phone.tap('no');await phone.clock.advance(1000);
   assert.equal(syncText2419(phone),'☁ synced',label+': positive control: the phone shows the answer synced by its record');
-  // The phone is put away and closed before its full copy goes.
+  // The phone is put away and closed before its full copy goes: #2419 final
+  // review, the full copy it starts as it is hidden never finishes.
+  const frozen=deferredSyncFixture();t.after(()=>frozen.resolve());phone.faults.publishPending=frozen.promise;
   phone.shim.document.hidden=true;phone.shim.document.dispatchEvent({type:'visibilitychange'});await phone.clock.advance(100);
+  assert.equal(phone.faults.publicationStarted,true,label+': positive control: the phone’s full copy started as it was hidden, and does not finish');
   await phone.close();
   await laptop.clock.advance(1000);
   assert.ok(recordEvents2417(laptop).includes('received:1'),label+': positive control: the laptop hears the record: '+JSON.stringify(recordEvents2417(laptop)));
