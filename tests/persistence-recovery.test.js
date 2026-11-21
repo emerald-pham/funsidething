@@ -18573,3 +18573,77 @@ test('RISK push work: the push’s texts are byte for byte the board’s device 
  board.decisionBase={...board.decisionBase,revision:4};
  assert.equal(ctx.boardPushTexts(board).text,JSON.stringify(board),'a replaced decision base');
 });
+
+// #2435: the decision events one scanner answer's decision-evidence checks
+// replay, with sync on, counted and never timed (responsiveness guidance), in
+// the two places an answer checks its board's whole decision evidence:
+// - tap: the answer's own replay before the paint (BoardDecision's settle);
+// - gate: the sender's check on its change record (changeRecordOutbox.record),
+//   which keeps the #2417 rule that a record carries nothing the board's own
+//   full copy could not push.
+// Every replay and check reads a decision event through the app's own event
+// check, supportedDecisionEvent. The counter wraps that check in place and
+// counts each event once per answer and place, by its caller on the stack.
+// The rest of an answer's work (#2428) and its push (#2427) have their own
+// counts; a push's checks have no change record on their stack.
+function evidenceReplays2435(device){
+ const {ctx}=device,read={tap:new Set(),gate:new Set()},calls={tap:0,gate:0};
+ ctx.__replays2435={read,calls};
+ vm.runInContext(`(()=>{const r=__replays2435,check=supportedDecisionEvent;
+  supportedDecisionEvent=function(event){
+   const limit=Error.stackTraceLimit;Error.stackTraceLimit=Infinity;const stack=new Error().stack;Error.stackTraceLimit=limit;
+   const place=/\\n\\s*at settle \\(/.test(stack)?'tap':/\\n\\s*at Object\\.record \\([^\\n]*\\n\\s*at storeCommit \\(/.test(stack)?'gate':null;
+   if(place){r.calls[place]++;if(typeof event?.id==='string')r.read[place].add(event.id);}
+   return check.apply(this,arguments);};})()`,ctx);
+ return {reset(){for(const place of ['tap','gate']){read[place].clear();calls[place]=0;}},
+  now:()=>({tap:read.tap.size,gate:read.gate.size,tapCalls:calls.tap,gateCalls:calls.gate}),
+  // The events read that the counted answer did not make.
+  others:answered=>Object.fromEntries(['tap','gate'].map(place=>[place,[...read[place]].filter(id=>!answered.includes(id)).length]))};
+}
+// A signed-in device with sync on, scanning on the board, settled, with an
+// earlier No answered, its change record sent and its push gone, as answers
+// follow each other. Then a No and a Yes are answered, each counted from its
+// tap until its change record is written.
+async function countedAnswers2435(t,label,board,{before=[]}={}){
+ const device=await answeringDevice2408(t,{board,saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock}=device;
+ for(const act of [...before,'no']){device.tap(act);await clock.advance(1500);}
+ await clock.advance(3000);
+ const replays=evidenceReplays2435(device),counted={};
+ for(const act of ['no','yes']){
+  const records=recordsWritten2417(device),from=ctx.state.decisionEvents.length;
+  replays.reset();
+  const candidate=device.tap(act);
+  assert.ok(act==='no'?ctx.state.considered?.[candidate]==='no':ctx.state.chain.at(-1)===candidate,label+': positive control: the '+act+' is taken');
+  await clock.advance(1500);
+  assert.equal(recordsWritten2417(device)-records,1,label+': positive control: the sender’s gate lets the '+act+'’s change record go');
+  const answered=ctx.state.decisionEvents.slice(from).map(event=>event.id);
+  counted[act]={...replays.now(),answered:answered.length,others:replays.others(answered),log:ctx.state.decisionEvents.length};
+  // The yes pushes at once and the no after the push debounce; both are done
+  // before the next answer.
+  await clock.advance(3000);
+ }
+ return {counted,device};
+}
+test('RISK decision evidence work: a No and a Yes with sync on replay the same decision events in the tap and in the sender’s gate on a 20-task board as on the large board',{timeout:300000},async t=>{
+ // A Yes first gives the 20-task board's answers a benchmark whose rating
+ // they move, as on the large board.
+ const twenty=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
+  tasks:Array.from({length:20},(_,i)=>({...syncTask('twenty-2435-'+i,'Twenty task '+i),ctx:['home'],createdAt:1000+i}))});
+ const small=await countedAnswers2435(t,'20 tasks',twenty,{before:['yes']});
+ await small.device.close();
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const large=await countedAnswers2435(t,'large board',JSON.parse(fixture.payload));
+ t.diagnostic(JSON.stringify({small:small.counted,large:large.counted}));
+ for(const [label,{counted}] of [['20 tasks',small],['large board',large]])for(const act of ['no','yes']){
+  // The answer's own replay reads at least the decision it records.
+  assert.ok(counted[act].tap>=1,label+': positive control: the tap’s replay reads the '+act+'’s own decision: '+JSON.stringify(counted[act]));
+  assert.ok(counted[act].log>counted[act].answered,label+': positive control: the board holds earlier decisions');
+ }
+ for(const act of ['no','yes']){
+  const strip=({log,...rest})=>rest;
+  assert.deepEqual(strip(large.counted[act]),strip(small.counted[act]),'a '+act+' replays the same decision events on the large board as on a 20-task board');
+  assert.deepEqual(large.counted[act].others,{tap:0,gate:0},'and none but the '+act+'’s own');
+ }
+});
