@@ -112,8 +112,11 @@ push of a saved board that already has its row records its acknowledgement
 with a whole-board save. The row names the head it belongs to, applies to that
 head only, and goes with the next head this device writes.
 Every reader of the saved board, recovery included, reads the head and its row
-together through one read, and every write made on condition of the saved board
-checks the two together.
+together through one read, except the recovery that opens a local working board
+from earlier captures when the head is unreadable: it reads each captured head
+alone, so that board is one acknowledged revision behind in its device-only
+bookkeeping only, with every decision. Every write made on condition of the
+saved board checks the two together.
 _Avoid_: Device head alone, last whole-board save
 
 **Sync session**:
@@ -145,9 +148,10 @@ active full copy includes it. A device's full copy never names a record that
 device skipped or could not read, or any record after it. While every change
 since the board was last clean went up as a record the Sync session accepted,
 the board shows Synced and its next full copy waits for about 30 seconds
-without changes, and at most about 2 minutes after the first change it carries,
-instead of each 2-second pause; if the app is hidden, it goes when you next
-come back to the app.
+without changes, and at most about 2 minutes after the oldest push request it
+carries, instead of each 2-second pause. It goes as the app is hidden, before
+sync suspends for the hidden app; one that cannot finish then goes once the
+app is shown again.
 _Avoid_: Delta, patch, sync event
 
 **Settled (sync)**:

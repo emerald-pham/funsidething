@@ -53,8 +53,12 @@ defers adoption, and scanner controls remain bound to the tasks they displayed.
   (below) whose reply the Sync session accepted, the board shows Synced and the
   full copy is only a checkpoint: it waits for 30 seconds without changes, and
   at most 2 minutes after the oldest push request it carries, or for the app to
-  be hidden (it goes after the read that showing the app again starts),
-  instead of each 2-second pause and the 20-second longest wait. Any
+  be hidden, instead of each 2-second pause and the 20-second longest wait. As
+  the app is hidden it goes at once, with every check a push makes, and sync
+  suspends for the hidden app once it ends. Showing the app, or 10 seconds
+  (half a cloud step's 20-second limit, so a page frozen meanwhile reports no
+  timeout for it), stops one still running, and what it did not get into the
+  cloud goes after the read that showing the app starts. Any
   other change, or a record that does not go, puts it back on that schedule.
   A record's reply from an obsolete connection leaves the change pending and
   starts a fresh read, after which the record is sent again under its own id
