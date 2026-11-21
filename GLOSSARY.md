@@ -95,8 +95,10 @@ _Avoid_: Loading any readable backup
 
 **Cloud acknowledgement**:
 Confirmation that the current saved board reached the person's cloud account,
-separate from device-local saving or reading a cloud copy. It does not establish
-that unavailable historical changes have been recovered.
+separate from device-local saving or reading a cloud copy. The board has reached
+it when the active full copy plus this device's accepted change records hold
+it. It does not establish that unavailable historical changes have been
+recovered.
 _Avoid_: Synced badge
 
 **Sync session**:
@@ -111,8 +113,10 @@ holds the page's read authority, the exact cloud copy last read or acknowledged
 and the Confirmed device cloud owner, and it is the one place a cloud reply is
 accepted as a Cloud acknowledgement: only while the reply still belongs to the
 connection its push started under, is not older than this device's revision,
-and this device has saved the acknowledged board. It starts empty each time the
-app opens.
+and this device has saved the acknowledged board. A change record's reply is
+accepted there with the same checks (this device has saved the record); one from
+an obsolete connection leaves the change pending and asks for a fresh read. It
+starts empty each time the app opens.
 _Avoid_: Sync manager, cloud cache
 
 **Change record**:
@@ -122,14 +126,18 @@ took them. Other open devices apply it through the same merge as a full copy
 holding only that change, without downloading the board. Full copies stay the
 checkpoints: each names the records it includes, a device opening from one
 applies the records it does not name, and a record is removed only once the
-active full copy includes it.
+active full copy includes it. While every change since the board was last
+clean went up as a record the Sync session accepted, the board shows Synced and
+its next full copy waits for about 30 seconds without changes, or for the app
+to be hidden, instead of each 2-second pause.
 _Avoid_: Delta, patch, sync event
 
 **Settled (sync)**:
 The Sync session's report that no sync step is running (a cloud read or
 write, sending or applying a change record, a device save or a recovery flow)
 and none is scheduled (an answer's catch-up still queued, a save debounce, a
-push waiting on its debounce or its longest wait, a live, backup or change
+push waiting on its debounce, its longest wait or a full copy's longer pause
+after change records, a live, backup or change
 record read, or a retry), so the app will do no more sync work on its own. Work that waits on something outside the app, such as
 an open editor, a hidden page or a read still owed, is listed as waiting and
 does not count. Only tests read it; nothing in the app or on screen does.

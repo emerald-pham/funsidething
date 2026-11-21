@@ -24804,5 +24804,42 @@
       "command": "node --max-old-space-size=8192 --test --test-name-pattern=\"Worker that never answers\" tests/persistence-recovery.test.js (on e79f939a with the new test and the worker option)",
       "failure": "AssertionError [ERR_ASSERTION]: the board records the acknowledged revision within a second of the ok; actual: 2, expected: 3"
     }
+  },
+  {
+    "baseCommit": "8cb7a646492f600979959b992ba8259a37c80112",
+    "weakenedTestLines": [
+      "tests/persistence-recovery.test.js:-async function answeringDevice2408(t,{board=answeringBoard2408(),docs=new Map(),indexedDB,dbName,storage,saveMs,signedIn=true,dropDatabase=false,worker=null}={}){",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{saveMs:0});",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{saveMs:0});",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{saveMs:0});",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{saveMs:1500});",
+      "tests/persistence-recovery.test.js:-const waiting=await answeringDevice2408(t,{saveMs:0});",
+      "tests/persistence-recovery.test.js:-async function slowPhone2408(t,{saveMs}){",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{saveMs,signedIn:false,dropDatabase:true});",
+      "tests/persistence-recovery.test.js:-async function answerRunOnSlowPhone2408(t,{saveMs,gapMs,forMs=32000}){",
+      "tests/persistence-recovery.test.js:-const device=await slowPhone2408(t,{saveMs});",
+      "tests/persistence-recovery.test.js:-const run=await answerRunOnSlowPhone2408(t,{saveMs,gapMs});",
+      "tests/persistence-recovery.test.js:-const device=await slowPhone2408(t,{saveMs:3000});",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{board,saveMs:0,worker:SilentWorker2427});",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{board,saveMs:0});"
+    ],
+    "reason": "#2419 moves full copies off the answer path: while every change since the board was last clean went up as a change record the Sync session accepted, the full copy waits about 30 seconds without changes (or until the app is hidden) instead of following each 2-second pause and the 20-second longest wait, and a Yes that goes as a record asks for no immediate full copy. Six #2408 scheduling tests and two #2427 push-work tests (which wait for a No's push within its 2-second pause) asserted that full-copy schedule on a board whose answers now go as records, where the spec changes it. Each now runs on rules without change records (answeringDevice2408 and the slow-phone helpers take changeRecords:false, which makes the fake cloud refuse records as such rules do), where the spec keeps today's schedule exactly. No assertion is removed or weakened; only the device each test opens changes, plus one positive control that the device syncs without records.",
+    "previousBehavior": "These tests opened a device whose rules accepted change records, and asserted the 2-second debounce, the 20-second longest wait and an immediate push for a single Yes, for answers that also went up as records.",
+    "intendedBehavior": "With rules that accept records, an answer shows Synced once its record is accepted and its full copy waits about 30 seconds without changes or until the app is hidden; any change that does not go as a record, and every change on rules without records, keeps the 2-second debounce, the 20-second longest wait and the immediate Yes push these tests check.",
+    "preservedCoverage": [
+      "Every assertion of the six #2408 scheduling tests and the two #2427 push-work tests still runs unchanged, on rules without change records, where the full-copy schedule they check still applies.",
+      "Every other caller of answeringDevice2408, slowPhone2408 and answerRunOnSlowPhone2408 keeps the default changeRecords:true and its behavior.",
+      "The record path's own schedule is covered by the new full copies off the answer path tests, including the 2-second pause after a change that does not go as a record."
+    ],
+    "replacementTests": [
+      "RISK full copies off the answer path: after a single No or Yes with nothing else pending, the sync status shows Synced once its change record is accepted, before any full copy is published",
+      "RISK full copies off the answer path: while every change since the last full copy went up as a record, the full copy waits about 30 seconds without changes, counted as scheduled sync work, or until the app is hidden",
+      "RISK full copies off the answer path: once a change since the last full copy did not go as a record, the full copy keeps the 2-second pause",
+      "RISK full copies off the answer path: during a run of answers 3 seconds apart on the large board, whole-board device saves and full-copy uploads per answer fall well below their counts when every pause brings a full copy"
+    ],
+    "redEvidence": {
+      "command": "node --max-old-space-size=8192 --test --test-name-pattern=\"full copies off the answer path\" tests/persistence-recovery.test.js (recorder preimplementation-red 2026-11-21T11-49-08-997Z-d927198d, on 8cb7a646 with the new tests only); then the #2408 cohort on the implementation before these tests moved to rules without records",
+      "failure": "RED before the implementation: 'no: the sync status shows Synced' (actual '☁ syncing'), 'no full copy 2 seconds, or 20 seconds, after the answer' (an upload at 3000 ms), 'with change records no full copy is uploaded during the run' (12 saves and 6 uploads for 6 answers either way). After it, on records: 'a single Yes with nothing else syncing still pushes at once', 'when No answers keep arriving past the longest wait', 'a push whose board is already the durable device head', 'the support report records a push dropped', 'answers every 1 to 2 s ... within the 20 s longest wait' and 'a push that starts while the answer’s own device save is still running' failed on the full-copy timing the spec changes, as did the push-work 'close: positive control: the No is pushed' and 'positive control: the first answer is pushed'."
+    }
   }
 ]
