@@ -18812,8 +18812,11 @@ async function twinApps2435(t,{tasks=14,seed=2435}={}){
   settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8,theme:'system'}});
  const raw=JSON.stringify(board),apps=[];
  for(let i=0;i<2;i++){const app=await loadApp({seed,cryptoProvider:seededCrypto2435(),seedStorage:{[SYNC_STORE_KEY]:raw}});t.after(()=>app.dispose());apps.push(app);}
- let now=Date.parse('2026-11-20T15:00:00Z');
- const at=ms=>{now+=ms;for(const app of apps)setFakeTime(app.ctx,now);};at(0);
+ // Each copy's own work (its device saves draw ids too) runs on one fake
+ // clock from the same time, once its opening has settled.
+ for(const app of apps){setFakeTime(app.ctx,Date.parse('2026-11-20T15:00:00Z'));await syncSettled(app.ctx,{within:20000});}
+ const clocks=apps.map(app=>{const clock=answerClock2408(app.ctx,{store:0,digests:0,marks:()=>''});clock.install();return clock;});
+ const at=async ms=>{for(const clock of clocks)await clock.advance(ms);};
  const read={replay:0,gate:0};
  apps[0].ctx.__twin2435=read;
  vm.runInContext(`(()=>{const read=__twin2435,check=supportedDecisionEvent;supportedDecisionEvent=function(event){
@@ -18840,12 +18843,12 @@ async function twinApps2435(t,{tasks=14,seed=2435}={}){
   throw new Error('unknown act '+act);
  }
  async function step(act,ms){
-  at(ms);
+  await at(ms);
   vm.runInContext('DecisionProjection.forget()',apps[1].ctx);
   read.replay=0;
   const taken=apps.map(app=>take(app.ctx,act));
   for(const app of apps)vm.runInContext('answerCatchUp.flush()',app.ctx);
-  await new Promise(resolve=>setImmediate(resolve));
+  await at(0);
   const replayed=read.replay;read.gate=0;
   const [gate,full]=[vm.runInContext(`DecisionProjection.evidenceIssue(state,${JSON.stringify(ACCOUNT2408.email)})`,apps[0].ctx),
    vm.runInContext(`decisionEvidenceIssue(state,${JSON.stringify(ACCOUNT2408.email)})`,apps[1].ctx)];
