@@ -101,6 +101,19 @@ it. It does not establish that unavailable historical changes have been
 recovered.
 _Avoid_: Synced badge
 
+**Saved board**:
+What this device holds as the board: its device head together with the
+acknowledgement row recorded beside that head, when there is one. When a
+push's own device save holds exactly the board it uploads and nothing changes
+before the cloud's acknowledgement arrives, the acknowledgement's device-only
+bookkeeping (the revision, the decision base and the rest) is recorded as that
+row instead of in a second whole-board save. The row names the head it belongs
+to, applies to that head only, and goes with the next head this device writes.
+Every reader of the saved board, recovery included, reads the head and its row
+together through one read, and every write made on condition of the saved board
+checks the two together.
+_Avoid_: Device head alone, last whole-board save
+
 **Sync session**:
 The one owner, while the app is open, of what this device knows about its cloud
 copies. Each read of the cloud copy reports what it found to the session,

@@ -193,6 +193,60 @@ bytes keep their recovery roles. Automatic history rotates before and at the
 quota boundary. If mandatory recovery or the primary device save cannot finish,
 replacement and cloud publication remain held, and unsaved work is reported.
 
+### The saved board: the head and its acknowledgement row (#2436)
+
+The board this device has saved is its device head plus, when the cloud
+acknowledged exactly that head, an acknowledgement row beside it in the same
+meta store (GLOSSARY: Saved board). A push whose own save holds exactly the
+board it uploaded records the cloud's acknowledgement as that row, provided
+nothing changed the board meanwhile, no device save is running or waiting, the
+account is the same, and no recovery hold, save issue or other step a save
+carries is outstanding. Anything else records it with a whole-board save, as
+before. Each recovery guarantee holds against the head and its row together:
+
+- **Durable before it counts.** A Cloud acknowledgement counts only once its
+  row, or its whole-board save, is written. A row that is refused or fails
+  falls back to the whole-board save. A cold reopen opens on the acknowledged
+  revision and decision base.
+- **One read.** The device store's head read returns the head with its row
+  applied: the exact text a whole-board save would have written, made by
+  slicing the head's text, so reading it costs no parse or serialization of
+  the board. The opening, a save's own checks, a conflict repair, recovery and
+  every other reader of the saved board use that read; none applies the row
+  by itself. A cloud recovery, which also compares this device's stored rows
+  with that board, first writes a saved board with a row as a head of its
+  own, the same text in one whole-board save, so the head alone is the saved
+  board for each of its comparisons.
+- **Compared as one, ordered by revision.** The row is written only while the
+  saved board is still the one the push uploaded, in the same transaction as
+  that check. The saved board's identity is then the hash of its own text, as
+  a head's is, so a later save of the same text keeps it. A write made on
+  condition of the saved board (another tab's save, a backup, a change record,
+  a recovery step) is refused on the head's old identity and repairs onto the
+  saved board, exactly as after a whole-board acknowledgement save. The row
+  records the revision the cloud gave; nothing orders by a clock.
+- **Replaced, never stale.** The next head this device writes, a save's or a
+  recovery's, removes the row in the same transaction, and a row that names
+  another head never applies. A row that names the head but does not fit it
+  makes the saved board unreadable, as a corrupt head does, and recovery keeps
+  every source.
+- **Bookkeeping only.** The row holds only the board's device-only keys
+  (revision, account, identity, decision base, change-record position, the
+  unsynced flag, server time and protected recovery IDs), never a task,
+  decision, History row or setting. It cannot add, drop or reorder a decision,
+  and Undo, change records and conflict repair work on the same board as before.
+- **Recovery sources.** Raw captures of device storage (recovery originals,
+  recovery archives, the raw data export) hold the row as one more meta row and
+  so keep the saved board exactly. No automatic copy is written for the row:
+  the latest copy holds the same board with the bookkeeping from before the
+  acknowledgement.
+- **Older versions.** An app version from before #2436 reads the head alone,
+  the board one acknowledged revision behind; its first cloud read reconciles
+  that as a higher cloud revision and keeps every decision. The head it then
+  writes stands on its own, since the row names an earlier head. A page whose
+  cached device store has no rows records the acknowledgement with a
+  whole-board save. No row is recorded while a recovery hold is stored.
+
 Decision capability rules must deploy before the new application shell. Against
 old rules the new writer safely holds and preserves its local board until the
 compatible rule is available; after activation, old writers cannot erase decision
