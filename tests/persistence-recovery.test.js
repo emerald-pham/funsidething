@@ -37,7 +37,7 @@ import { markupButtons } from "./shared.js";
 import { commitSetting } from "./shared.js"; // #2422: Settings toggles in the older and current apps
 import { benchmarkEdit } from "./shared.js";
 import { woopFields2421, woopBoard2421, woopSnapshot2421 } from "./shared.js"; // #2421 saved WOOP data
-import { decisionMixedActionsApp146 } from "./shared.js"; // #2435: every kind of recorded choice, for the decision evidence gate
+import { decisionMixedActionsApp146 } from "./shared.js"; // #2435: every kind of recorded choice, for the check before a change record
 import v8 from "node:v8"; // #2435 review: a collection, to show a replaced board's decision data is let go
 
 test('RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap',async t=>{
@@ -20104,7 +20104,7 @@ async function countedAnswers2435(t,label,board,{before=[]}={}){
  }
  return {counted,device};
 }
-test('RISK decision evidence work: a No and a Yes with sync on replay the same decision events in the tap and in the sender’s gate on a 20-task board as on the large board',{timeout:300000},async t=>{
+test('RISK decision evidence work: a No and a Yes with sync on replay the same decision events in the tap and in the check before their change records on a 20-task board as on the large board',{timeout:300000},async t=>{
  // A Yes first gives the 20-task board's answers a benchmark whose rating
  // they move, as on the large board.
  const twenty=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
@@ -20247,7 +20247,7 @@ function staleDecisionBase2435(ctx,change){
 }
 const staleOpenTask2435=ctx=>ctx.state.tasks.find(task=>!task.done&&!ctx.state.chain.includes(task.id)&&task.id!==ctx.state.candidateId&&!Object.hasOwn(ctx.state.considered,task.id));
 const PassChain2435=(ctx,event)=>vm.runInContext('(event=>PassChain.read(event))',ctx)(event);
-test('RISK decision evidence gate: a stale projection is caught and the gate gives the full check’s verdict for every error code it names',{timeout:300000},async t=>{
+test('RISK verified decision projection: one its board no longer holds is caught, and the check before a change record gives the whole check’s verdict for every error code it names',{timeout:300000},async t=>{
  const named=new Set();
  for(const [code,label,change] of STALE2435)await t.test(label,async t=>{
   const board=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
@@ -20290,7 +20290,7 @@ test('RISK decision evidence gate: a stale projection is caught and the gate giv
 // where its decisions still extend the checked ones), and then its record's
 // gate does. The record goes exactly when the full check finds nothing on the
 // board the answer left, and the gate after it gives that check's verdict.
-test('RISK decision evidence gate: a stale projection met first by the next answer is caught, and its record goes exactly when the full check finds nothing',{timeout:300000},async t=>{
+test('RISK verified decision projection: one its board no longer holds, met first by the next answer, is caught, and its record goes exactly when the whole check finds nothing',{timeout:300000},async t=>{
  for(const [code,label,change] of STALE2435)await t.test(label,async t=>{
   const board=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
    tasks:Array.from({length:12},(_,i)=>({...syncTask('verdict-2435-'+i,'Verdict task '+i),ctx:['home'],createdAt:1000+i}))});
@@ -20300,7 +20300,7 @@ test('RISK decision evidence gate: a stale projection met first by the next answ
   for(const act of ['yes','no','cant','no','yes']){device.tap(act);await clock.advance(1500);}
   await clock.advance(3000);
   change(ctx);
-  // The full check is pure: asking it leaves the stale projection in place.
+  // The full check is pure: asking it leaves in place the projection the board no longer holds.
   assert.equal(gateVerdict2435(ctx,'decisionEvidenceIssue'),code,'positive control: the full check’s verdict on the changed board');
   ctx.render();await clock.advance(300);
   const records=recordsWritten2417(device),from=ctx.state.decisionEvents.length;
@@ -20328,7 +20328,7 @@ const TARGETS2435=[
  ['the benchmark’s title',(ctx,mixed)=>{const task=ctx.state.tasks.find(row=>row.id===mixed.benchmark);assert.equal(task.title,'Mixed retained benchmark title','positive control: the recorded title');task.title+=' renamed';}],
  ['a scene that cannot be read',ctx=>{assert.ok(ctx.state.settings.scene,'positive control: the recorded scene');ctx.state.settings.scene=null;}],
 ];
-test('RISK decision evidence gate: a recorded choice’s target changed with no decision, asked first or met first by the next answer, gets the full check’s verdict',{timeout:300000},async t=>{
+test('RISK verified decision projection: a recorded choice’s target changed with no decision, asked first or met first by the next answer, gets the whole check’s verdict',{timeout:300000},async t=>{
  for(const [label,change] of TARGETS2435)for(const order of ['gate first','answer first'])await t.test(label+', '+order,async t=>{
   const app=await decisionMixedActionsApp146();t.after(()=>app.dispose());
   const {ctx,mixed}=app,account=JSON.stringify('e@example.com'),run=src=>vm.runInContext(src,ctx);
@@ -20357,7 +20357,7 @@ test('RISK decision evidence gate: a recorded choice’s target changed with no 
 // Undo, every kind of choice the app records), answers after it pass the gate
 // as the full check does, and the gate reads only each answer's own decision
 // once a full check has verified the board.
-test('RISK decision evidence gate: on the mixed decision fixture, answers pass the gate with the full check’s verdict and read only their own decisions',{timeout:180000},async t=>{
+test('RISK verified decision projection: on the mixed decision fixture, answers pass the check before their change records with the whole check’s verdict and read only their own decisions',{timeout:180000},async t=>{
  const app=await decisionMixedActionsApp146();t.after(()=>app.dispose());
  const {ctx}=app,account='e@example.com',read=gateReads2435(app);
  const verdicts=[];
@@ -20461,7 +20461,7 @@ async function twinApps2435(t,{tasks=14,seed=2435,account=ACCOUNT2408.email}={})
  }
  return {apps,step,fast,steps};
 }
-test('RISK decision evidence replay: the incremental replay leaves the board, draw count and mark order the whole-board replay leaves, and the gate the full check’s verdict, after every action',{timeout:300000},async t=>{
+test('RISK decision evidence replay: the incremental replay leaves the board, draw count and mark order the whole-board replay leaves, and the check before a change record the whole check’s verdict, after every action',{timeout:300000},async t=>{
  const twin=await twinApps2435(t);
  const script=[['start',0],['yes',60000],['no',60000],['no',60000],['yes',60000],['bench-cant',60000],['no',60000],['yes',60000],
   ['cant',60000],['no',60000],['worked',60000],['no',60000],['yes',60000],['dislodge',60000],['no',60000],
@@ -20484,7 +20484,7 @@ test('RISK decision evidence replay: the incremental replay leaves the board, dr
 // first, so the answers after it replay the whole board, as they did before
 // #2435. Their gate still reads only their own decisions, and the board is
 // the one the whole-board replay leaves.
-test('RISK decision evidence gate: after an Undo of an answer in the pass, later answers pass the gate reading only their own decisions, and the replay leaves the whole-board replay’s board',{timeout:300000},async t=>{
+test('RISK verified decision projection: after an Undo of an answer in the pass, later answers pass the check before their change records reading only their own decisions, and the replay leaves the whole replay’s board',{timeout:300000},async t=>{
  const twin=await twinApps2435(t);
  for(const [act,ms] of [['start',0],['no',60000],['yes',60000],['no',60000],['undo',60000]])await twin.step(act,ms);
  const gates=twin.fast.gate,later=[['no',60000],['yes',60000],['no',60000],['no',60000],['yes',60000]];
@@ -20500,7 +20500,7 @@ test('RISK decision evidence gate: after an Undo of an answer in the pass, later
 // stays in memory, whether the new board comes in through replaceState
 // (adoption, restore, reset, an account switch) or is installed directly, as
 // several recovery and adoption paths do.
-test('RISK decision evidence projection: a replaced board’s decisions are not kept in memory once the board is gone',{timeout:120000},async t=>{
+test('RISK verified decision projection: a replaced board’s decisions are not kept in memory once the board is gone',{timeout:120000},async t=>{
  // Later realms must not see a gc global, so the flag is only on while the
  // collector is fetched.
  v8.setFlagsFromString('--expose-gc');const collect=vm.runInNewContext('gc');v8.setFlagsFromString('--no-expose-gc');
