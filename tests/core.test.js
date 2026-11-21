@@ -4087,6 +4087,37 @@ test('RISK push acknowledgement guidance: the November 21 changelog says the app
  assert.doesNotMatch(noted[0],/within about a second|30 seconds/,'showing synced and the full copy’s pause are their own features');
 });
 
+// #2419 final review (AGENTS.md FAQ duty): the #2435 and #2436 changelog
+// bullets state outcomes and limits people notice, so the extended FAQ answers
+// them too, each with its own group, in what the person sees.
+const helpAnswer2435=(help,question)=>help.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0];
+const helpWords2435=text=>text.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
+test('RISK decision evidence guidance: mounted Help says a Yes, No or Dislodge on a large board checks only its own decision, and which answers still check them all',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ await app.ctx.onAction('help',{});const help=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answer=helpAnswer2435(help,'Why do some answers take longer on a large board?');
+ assert.ok(answer,'Scanning answers why some answers take longer on a large board');
+ assert.ok(help.indexOf('<dt>Why do some answers take longer on a large board?</dt>')<help.indexOf('<summary><h3>Contexts</h3>'),'with the scanning answers');
+ assert.match(answer,/^A Yes, No or Dislodge checks only its own decision before it shows and, with sync on, before it goes to your other devices\./);
+ assert.match(answer,/Some answers still check every decision the board holds before they show: the first after the app opens, and, after you undo an answer, each one for the rest of that pass\./,'the answers that still check them all');
+ assert.match(answer,/answers that came over from signed-out use or another account, by signing in, an import or a restore, once one of them is undone, every answer checks them all from then on/,'and the boards where every answer does');
+ assert.match(answer,/What is saved and synced is the same either way\.$/);
+ assert.doesNotMatch(answer,/projection|replay|gate|change record|evidence/i,'the answer says what the person sees, not how it works');
+ assert.ok(helpWords2435(answer)<=130,'the answer stays within the 130-word limit');
+});
+test('RISK push acknowledgement guidance: mounted Help says the app no longer saves the whole board again to note a full copy the cloud confirmed, and that an app closed right after opens on that copy',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ await app.ctx.onAction('help',{});const help=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answer=helpAnswer2435(help,'Does syncing a large board pause the app?');
+ assert.ok(answer,'Data and backups answers whether syncing a large board pauses the app');
+ assert.ok(help.indexOf('<dt>Does syncing a large board pause the app?</dt>')>help.indexOf('<summary><h3>Data and backups</h3>'),'with the data and backups answers');
+ assert.match(answer,/once the cloud confirms a full copy of your board, the app notes it on this device without saving the whole board again/);
+ assert.match(answer,/so it pauses less right after a large board syncs/);
+ assert.match(answer,/An app closed right after still opens on the copy the cloud confirmed/,'with its limit');
+ assert.doesNotMatch(answer,/acknowledg|\brow\b|\bhead\b|serializ/i,'the answer says what the person sees, not how it works');
+ assert.ok(helpWords2435(answer)<=130,'the answer stays within the 130-word limit');
+});
+
 test('RISK sync responsiveness guidance: mounted Help explains large boards and bounded damaged-source recovery',async()=>{
  const {ctx,shim}=await loadApp();
  for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
