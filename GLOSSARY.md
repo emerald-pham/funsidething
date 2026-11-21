@@ -156,6 +156,17 @@ changed calculators, Math or string methods, accessors, nonprimitive and
 oversized inputs use the ordinary calculation. It retains no saved object or
 source-validation result.
 
+**Verified decision projection**:
+What the last whole check or whole replay of a board's decision evidence found
+its decisions write on that board (ratings, chain, marks, pass and current
+choices), kept by the open app and extended by each new answer that observed
+every earlier decision. An answer's replay and the check before its change
+record use it only while the board still holds those exact values and
+decisions; any other change sends them back to the whole check, which makes a
+new one. It is never saved or sent, and it never names an issue itself: every
+issue is the whole check's.
+_Avoid_: Cached verdict, evidence cache
+
 - **Confirmed device cloud owner**: one process-local backend, account, identity and revision binding established by an accepted cloud read or acknowledgement. An acknowledgement binds it while its board saves on this device, and a refused save withdraws that binding. Device CAS repair may retain a higher confirmed revision only with current reconciliation authority, the same exact decision-base payload and unchanged owner. Sign-out or suspension invalidates the binding; a replacement backend needs a fresh accepted read. The binding retains no board graph or extra payload. Shared edits still require their own cloud confirmation.
 
 - **Push response authority**: the captured backend, account, UID and current process-local owner binding for a conditional write. Storage preparation and the returned acknowledgement must still belong to that exact connection and reconciliation lifetime. An obsolete reply leaves work pending and requires a fresh current-owner read; it cannot mint a witness for the replacement connection.
