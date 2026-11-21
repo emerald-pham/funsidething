@@ -145,7 +145,9 @@ active full copy includes it. A device's full copy never names a record that
 device skipped or could not read, or any record after it. While every change
 since the board was last clean went up as a record the Sync session accepted,
 the board shows Synced and its next full copy waits for about 30 seconds
-without changes, or for the app to be hidden, instead of each 2-second pause.
+without changes, and at most about 2 minutes after the first change it carries,
+instead of each 2-second pause; if the app is hidden, it goes when you next
+come back to the app.
 _Avoid_: Delta, patch, sync event
 
 **Settled (sync)**:
