@@ -24841,5 +24841,28 @@
       "command": "node --max-old-space-size=8192 --test --test-name-pattern=\"full copies off the answer path\" tests/persistence-recovery.test.js (recorder preimplementation-red 2026-11-21T11-49-08-997Z-d927198d, on 8cb7a646 with the new tests only); then the #2408 cohort on the implementation before these tests moved to rules without records",
       "failure": "RED before the implementation: 'no: the sync status shows Synced' (actual '☁ syncing'), 'no full copy 2 seconds, or 20 seconds, after the answer' (an upload at 3000 ms), 'with change records no full copy is uploaded during the run' (12 saves and 6 uploads for 6 answers either way). After it, on records: 'a single Yes with nothing else syncing still pushes at once', 'when No answers keep arriving past the longest wait', 'a push whose board is already the durable device head', 'the support report records a push dropped', 'answers every 1 to 2 s ... within the 20 s longest wait' and 'a push that starts while the answer’s own device save is still running' failed on the full-copy timing the spec changes, as did the push-work 'close: positive control: the No is pushed' and 'positive control: the first answer is pushed'."
     }
+  },
+  {
+    "baseCommit": "8cb7a646492f600979959b992ba8259a37c80112",
+    "weakenedTestLines": [
+      "tests/persistence-recovery.test.js:-assert.equal(commits.length,2,'the answer’s save and the acknowledgement’s save are the only device saves');",
+      "tests/persistence-recovery.test.js:-assert.ok(fullCopies.uploads>=answers-1&&fullCopies.saves>=2*answers-1,'positive control: when every pause brings a full copy, each answer costs about one upload and two device saves: '+JSON.stringify(fullCopies));"
+    ],
+    "reason": "#2436 records a push's acknowledgement as a row beside the device head when this device still holds exactly the board the push uploaded, instead of a second whole-board device save (GLOSSARY: Saved board). Three existing tests counted that second save as part of an ordinary push, which the model change removes: the #2408 test that a push waits for the answer's own save counted the answer's save and the acknowledgement's save as the only two device saves; the #2419 large-board comparison's positive control expected about two device saves per answer when every pause brings a full copy; and the #2408 review test that counts the serializations of the save recording an acknowledgement found no such save after the upload. The first two now expect one device save where the acknowledgement's save was counted; the third runs on a page whose cached device store records no acknowledgement rows (the store's recordAcknowledgement removed), where that whole-board save still records the acknowledgement, so its count is unchanged. One stale comment in the #2427 push-work test, which said the acknowledgement is still recorded by one whole-board save, now names the row.",
+    "previousBehavior": "Every acknowledged push saved the whole board again on this device to record its revision, account and decision base: two device saves for an answer and its push, about two per answer when every pause brings a full copy, and a save after the upload whose serializations the #2408 review test counted.",
+    "intendedBehavior": "An ordinary push whose own save holds exactly the board it uploaded records its acknowledgement beside that head with no whole-board save: one device save for an answer and its push, about one per answer when every pause brings a full copy. The whole-board acknowledgement save remains wherever the row cannot be recorded (a cached device store without rows, a save running or due, a recovery publication, a refused or failed row), and it still serializes the board once.",
+    "preservedCoverage": [
+      "Every other assertion of the three tests runs unchanged: the push still waits for the answer's save, saves the answer's board once, repairs onto no save of this tab and uploads once after that save returned; the large-board comparison still requires change records to cost well under half the full-copy counts; and the whole-board acknowledgement save is still serialized once for its save-loop check, its missing-task check and its write.",
+      "The acknowledgement's durability, which the counted save stood for, is asserted by the new counted push test's cold reopen (sync on and off) and by the #2427 cold-reopen test, both now on the row."
+    ],
+    "replacementTests": [
+      "RISK push work: after its upload, a push records its acknowledgement with no whole-board device save and at most one whole-board serialization, the same on a 20-task board as on the large board, and a cold reopen opens on the acknowledged revision",
+      "RISK push work: another tab of this device that opened before a push’s acknowledgement was recorded saves onto the acknowledged board, keeping its revision and decision base with that tab’s edit",
+      "RISK push work: right after a push’s acknowledgement is recorded beside the head, Review cloud recovery applies this device’s board and the device shows synced"
+    ],
+    "redEvidence": {
+      "command": "node --max-old-space-size=8192 --test tests/persistence-recovery.test.js (recorder green attempt 2026-11-21T14-30-14-201Z-b07378b2 on 3513362d, the implementation before these tests changed)",
+      "failure": "'the answer’s save and the acknowledgement’s save are the only device saves' (1 !== 2); 'positive control: when every pause brings a full copy, each answer costs about one upload and two device saves: {\"saves\":9,\"uploads\":6}'; 'positive control: a save after the upload records the acknowledgement' (no device save after the upload)."
+    }
   }
 ]

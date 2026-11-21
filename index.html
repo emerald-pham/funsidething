@@ -6436,8 +6436,10 @@ function cloudSaveLoopContent(){
 // (null when signed out, or when it ran outside a cloud read's merge and a push
 // as the first run of a save request). boardText gives the board's text when
 // the check needs it; a lane save passes its own, so the board is serialized
-// once for the check and the save together (#2408 review).
-function cloudSaveLoopCheck(boardText=()=>JSON.stringify(state)){
+// once for the check and the save together (#2408 review). contentText gives
+// the content it compares; a push's acknowledgement row passes the one its
+// push's texts make (#2436).
+function cloudSaveLoopCheck(boardText=()=>JSON.stringify(state),contentText=cloudSaveLoopContent){
   try{
     if(!state||!cloudReady()){cloudSaveLoopGuard=null;return {allowed:true,cloudStep:null};}
     const inStep=pulling||cloudPushInFlight?cloudSaveStep():null;
@@ -6460,7 +6462,7 @@ function cloudSaveLoopCheck(boardText=()=>JSON.stringify(state)){
     // (before each push, so also each bounded retry of a failed one) does not.
     // After a stop, such a run inside a cloud step is the stopped loop again.
     if(boardText()===lastPersistedRaw&&(!guard.stopped||inStep===null))return {allowed:true,cloudStep:inStep};
-    const content=cloudSaveLoopContent();
+    const content=contentText();
     if(guard.content!==content){
       Object.assign(guard,{content,runs:0,step:null,stopped:false,afterStop:0});return {allowed:true,cloudStep:inStep};
     }
@@ -7822,8 +7824,13 @@ async function sendPush(){
         // #2436: when this device still holds exactly the board this push
         // uploaded, and nothing changed it, the acknowledgement is recorded
         // beside that head instead, with no whole-board save; it counts once
-        // that row is written (recordPushAcknowledgement).
-        if(!ackSavedAdoption&&unedited&&await recordPushAcknowledgement(payloadSource,pushAccount))return trimAfterAcknowledgedPush=true;
+        // that row is written (recordPushAcknowledgement). A push that
+        // publishes a recovery keeps the whole-board save, so a recovery always
+        // ends on a head of its own. A row the save-loop guard refuses is
+        // refused as that save would be.
+        const recorded=!ackSavedAdoption&&!recovery&&unedited?await recordPushAcknowledgement(payloadSource,pushAccount):false;
+        if(recorded==="refused")return trimAfterAcknowledgedPush=false;
+        if(recorded===true)return trimAfterAcknowledgedPush=true;
         return trimAfterAcknowledgedPush=await deviceSaveLane.request({backupAlreadySafe:!!ackSavedAdoption}).done===true;
       }});
       if(outcome.accepted)return;
@@ -7913,7 +7920,9 @@ function ownPublishedCopyHeld(own){
    recovery hold or other step a save carries (a completion upgrade's source,
    a Restore's safety rows, a deferred cloud backup) is outstanding, with the
    saved random draw and account. Otherwise, or when the row is refused or
-   fails, it returns false and the caller saves the whole board as before. */
+   fails, it returns false and the caller saves the whole board as before.
+   It returns "refused" when the cloud save-loop guard stops the write, as it
+   would have stopped that save: the acknowledgement then does not count. */
 async function recordPushAcknowledgement(source,account){
   const saved=source?.saved,store=deviceStore;
   if(!saved||typeof store?.recordAcknowledgement!=="function"||state!==source.board||saveRequestGeneration!==source.generation||
@@ -7930,12 +7939,20 @@ async function recordPushAcknowledgement(source,account){
   // and what proves the live board is that text while nothing changes it.
   const recordsHeld=changeRecordOutbox.order(),proof={raw:text,board:state,generation:saveRequestGeneration,edits:boardEditSerial,
     keys:Object.keys(state).join("\u0000"),locals:DEVICE_LOCAL_KEYS.map(key=>state[key])};
+  // The row is the bookkeeping write the whole-board save was, so it counts
+  // toward the cloud save-loop guard as that save did, compared by the same
+  // content, which the push's texts already hold (#2348).
+  const check=cloudSaveLoopCheck(()=>text,()=>saveLoopContentOf(saved.texts));
+  if(!check.allowed)return "refused";
+  const startedAt=supportDiagnosticsNow();
   let result=null;
   // The saved board's identity is the hash of its text, as a head's is; the
   // digest runs in the browser's crypto, not in this page's JavaScript.
   try{result=await deviceWriteBeforeDiagnostics("recordAcknowledgement",{expectedHash:saved.hash,hash:await ChainStorageV2.hashPayload(text),...row},store);}
   catch{return false;}
   if(result?.ok!==true||typeof result.hash!=="string")return false;
+  cloudSaveLoopLastSaveFailed=false;
+  if(check.cloudStep)supportDiagnosticsObserveCloudStep("cloud-save","durable",startedAt,state?.syncRev,"unknown",{cloudStep:check.cloudStep});
   // A save of this tab that began after the bookkeeping above and committed
   // after the row holds it too, and is then the board this tab last saved.
   if(deviceStore===store&&lastPersistedRaw===saved.raw&&deviceHeadHash===saved.hash){
@@ -7946,6 +7963,18 @@ async function recordPushAcknowledgement(source,account){
   }
   changeRecordOutbox.saved(recordsHeld);
   return true;
+}
+// #2436: the content the cloud save-loop guard compares
+// (cloudSaveLoopContent), byte for byte, joined from the push's texts of a
+// board nothing has changed since they were made.
+function saveLoopContentOf(texts){
+  const parts=[];
+  for(const key of Object.keys(state)){
+    if(key==="updatedAt"||DEVICE_LOCAL_KEYS.includes(key))continue;
+    const piece=texts.pieces.get(key);
+    if(piece!==undefined)parts.push(JSON.stringify(key)+":"+piece);
+  }
+  return "{"+parts.join(",")+"}";
 }
 /* #2436: what proves, without serializing it, that the live board is exactly
    the saved board an acknowledgement row made (savedBoardMatches). */

@@ -16526,6 +16526,11 @@ test('RISK one save per answer: a device save hashes the board once for the writ
 test('RISK one save per answer: the save that records a Cloud acknowledgement serializes the board once for its save-loop check, its missing-task check and its write',{timeout:90000},async t=>{
  const device=await answeringDevice2408(t,{saveMs:0});
  await startAnswering2408(device);
+ // #2436: on a page whose cached device store records no acknowledgement
+ // rows, a whole-board save still records the push's acknowledgement; this
+ // counts that save. The row that replaces it elsewhere is counted by the
+ // push work tests.
+ delete device.ctx.window.ScannerDeviceStore.recordAcknowledgement;
  const {ctx,counters,clock}=device,passes=[];
  const json=vm.runInContext('JSON',ctx),stringify=json.stringify;
  json.stringify=function(...args){const text=stringify.apply(this,args);
@@ -16643,7 +16648,8 @@ test('RISK one save per answer: a push that starts while the answer’s own devi
  assert.equal(uploads.length,1,'one push goes out');
  assert.ok(uploads[0].at>=saving[0].endedAt,'once the answer’s save has returned');
  assert.equal(answeredDecisions2408(JSON.parse(uploads[0].payload),counters.taps.slice(-1)).length,1,'carrying the answer');
- assert.equal(commits.length,2,'the answer’s save and the acknowledgement’s save are the only device saves');
+ // #2436: the acknowledgement is recorded beside the head that save wrote.
+ assert.equal(commits.length,1,'the answer’s save is the only device save: the push proves it holds its board and records its acknowledgement beside it');
 });
 
 // ---------- #2407: the answer shows first ----------
@@ -18122,7 +18128,8 @@ test('RISK full copies off the answer path: during a run of answers 3 seconds ap
  };
  const fullCopies=await run(false),records=await run(true);
  t.diagnostic(JSON.stringify({answers,fullCopies,records,largeBoardBytes:fixture.stats.serializedBytes}));
- assert.ok(fullCopies.uploads>=answers-1&&fullCopies.saves>=2*answers-1,'positive control: when every pause brings a full copy, each answer costs about one upload and two device saves: '+JSON.stringify(fullCopies));
+ // #2436: each full copy's acknowledgement is recorded beside the head, not by a second device save.
+ assert.ok(fullCopies.uploads>=answers-1&&fullCopies.saves>=answers,'positive control: when every pause brings a full copy, each answer costs about one upload and one device save: '+JSON.stringify(fullCopies));
  assert.equal(records.uploads,0,'with change records no full copy is uploaded during the run');
  assert.ok(records.saves<=answers,'and at most one whole-board device save per answer: '+JSON.stringify(records));
  assert.ok(2*(records.saves+records.uploads)<=fullCopies.saves+fullCopies.uploads,'well below the counts with a full copy after every pause: '+JSON.stringify({fullCopies,records}));

@@ -201,8 +201,10 @@ meta store (GLOSSARY: Saved board). A push whose own save holds exactly the
 board it uploaded records the cloud's acknowledgement as that row, provided
 nothing changed the board meanwhile, no device save is running or waiting, the
 account is the same, and no recovery hold, save issue or other step a save
-carries is outstanding. Anything else records it with a whole-board save, as
-before. Each recovery guarantee holds against the head and its row together:
+carries is outstanding. A push that publishes a recovery, and anything else,
+records it with a whole-board save, as before. The row counts toward the cloud
+save-loop guard as that save did. Each recovery guarantee holds against the
+head and its row together:
 
 - **Durable before it counts.** A Cloud acknowledgement counts only once its
   row, or its whole-board save, is written. A row that is refused or fails
