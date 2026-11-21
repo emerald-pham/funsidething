@@ -19193,6 +19193,49 @@ test('RISK push work: the device store refuses an acknowledgement row that does 
  });
 });
 
+// #2436 review N3: the row's part of #2419 review S1. A full copy never names
+// a change record its device skipped, and what keeps that device from naming
+// it once reopened, before it hears the record again, is the position its
+// saved board records: the revision the cloud gave and the record the copy
+// stopped at, below the skipped one. When the full copy's acknowledgement is
+// recorded beside the head, the row records that position, and a cold reopen
+// opens on it. It is read before the reopened device's first cloud read,
+// which repairs a position that went too far, so a row that recorded one
+// fails here instead of being repaired out of sight. The laptop's first full
+// copy also lets go of the safety copy its adoption kept, which is a
+// whole-board save; its second is recorded beside the head.
+test('RISK push work: a full copy whose acknowledgement is recorded beside the head records the change-record position it stopped at before a record its device skipped, and a cold reopen opens on that position before any cloud read',{timeout:300000},async t=>{
+ const docs=new Map();
+ const phone=await answeringDevice2408(t,{board:answeringBoard2408({tasks:20,padBytes:0}),docs,saveMs:0,dropDatabase:true});
+ phone.ctx.onAction('start-scan',{dataset:{}});
+ await syncSettled(phone.ctx,{within:60000});
+ const laptop=await answeringDevice2408(t,{docs,storage:sharedScannerStorage(),saveMs:0});
+ await settledTogether([phone,laptop],[],{within:60000});
+ holdFullCopy2417(t,phone);
+ const sent=await phone.backend.CS.appendChangeRecord({id:'unholdable-2436',parts:JSON.stringify(unholdableRecord2419(laptop.ctx.state))});
+ assert.equal(sent.ok,true,'positive control: the record is in the cloud');
+ assert.equal(sent.seq,1,'positive control: as the first record');
+ await until2417(()=>recordEvents2417(laptop).includes('skipped:'+sent.seq),'positive control: the laptop skips it: '+JSON.stringify(recordEvents2417(laptop)));
+ await syncSettled(laptop.ctx,{within:60000});
+ // Each change goes by the laptop's full copy once its own save is done.
+ laptop.ctx.window.CLOUD_PUSH_DELAY_MS=1500;
+ for(const title of ['Added on the laptop after the skip','Added on the laptop again']){
+  laptop.ctx.addTask(title,false);
+  await syncSettled(laptop.ctx,{within:60000,synced:true});
+ }
+ const root=docs.get('users/owner'),store=laptop.ctx.window.ScannerDeviceStore;
+ assert.ok((await cloudCopy2408(docs)).tasks.some(task=>task.title==='Added on the laptop again'),'positive control: the laptop’s second full copy is the active one');
+ assert.ok(!(root.includedSeq>=sent.seq),'positive control: it does not name the skipped record: '+JSON.stringify({includedSeq:root.includedSeq,seq:sent.seq}));
+ const meta=(await store.readRawExportSnapshot()).stores.meta,row=meta.values[meta.keys.indexOf('acknowledgement')];
+ assert.ok(row&&row.head===meta.values[meta.keys.indexOf('head')]?.hash,'positive control: its acknowledgement is recorded beside the head');
+ const position=JSON.stringify({revision:root.rev,through:0});
+ assert.equal(JSON.stringify(JSON.parse((await store.readHead()).payload).syncRecords),position,'the saved board records the position the full copy stopped at, below the skipped record');
+ await laptop.close();
+ const reopened=await answeringDevice2408(t,{docs,indexedDB:laptop.indexedDB,dbName:laptop.dbName,storage:laptop.storage,saveMs:0,signedIn:false});
+ assert.equal(reopened.ctx.state.syncRev,root.rev,'a cold reopen opens on the acknowledged revision');
+ assert.equal(JSON.stringify(reopened.ctx.state.syncRecords),position,'and on that position, before any cloud read');
+});
+
 // #2436 (older versions): the supported floor and the release base read the
 // head alone. Each opens a device whose push acknowledgement is recorded
 // beside its head on the board one acknowledged revision behind, with every
