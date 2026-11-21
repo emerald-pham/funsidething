@@ -19140,6 +19140,59 @@ test('RISK push work: a second push of the unchanged board after its acknowledge
  });
 });
 
+// #2436 review S1: the device store records an acknowledgement row only when,
+// in the same transaction as its check of the saved board, the row fits the
+// head's own text and holds only the board's device-only bookkeeping: it sets
+// no other key and keeps every other key of the head. Otherwise it refuses the
+// row and writes nothing, so the saved board stays the head, readable, and the
+// push records its acknowledgement with the whole-board save it falls back to.
+// Each case runs on a store of its own, holding one saved head.
+test('RISK push work: the device store refuses an acknowledgement row that does not fit its head, sets a key other than the board’s device-only bookkeeping or leaves out a key of the board, and the saved board stays the head',async t=>{
+ const board=syncState({v:2,tasks:[syncTask('fit-a','Fit task A'),syncTask('fit-b','Fit task B')],considered:{},syncAccount:'e@example.com',syncIdentity:'owner',syncRev:3,syncDirty:true});
+ const payload=JSON.stringify(board);
+ // Where each top-level value of a board lies in its text.
+ const spansOf=object=>{const spans=[];let at=1;for(const key of Object.keys(object)){const value=JSON.stringify(object[key]);if(value===undefined)continue;if(spans.length)at++;
+  const start=at+JSON.stringify(key).length+1;spans.push([key,start,start+value.length]);at=start+value.length;}return spans;};
+ const sha=async text=>Buffer.from(await webcrypto.subtle.digest('SHA-256',new TextEncoder().encode(text))).toString('hex');
+ // A row setting these values over the head, with the board's keys in order.
+ const rowOf=(values,{keys=Object.keys(board),headKeys=spansOf(board)}={})=>({headKeys,keys,values:Object.fromEntries(Object.entries(values).map(([key,value])=>[key,JSON.stringify(value)]))});
+ const opened=async sub=>{
+  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory();
+  const store=loadStorageV2({indexedDB}).createDeviceStore({indexedDB,crypto:webcrypto,dbName:'acknowledgement-fit-'+Math.random()});
+  await store.open();sub.after(()=>store.close());
+  assert.equal((await store.commitHead({expectedHash:null,payload,account:'e@example.com'})).ok,true,'positive control: the head is saved');
+  return {store,head:await store.readHead()};
+ };
+ const refused={
+  'a row whose places do not fit the head’s text':rowOf({syncRev:4},{headKeys:spansOf({...board,syncRev:12345})}),
+  'a row that sets the board’s tasks':rowOf({syncRev:4,tasks:[]}),
+  'a row that sets an answer':rowOf({syncRev:4,considered:{'fit-a':'no'}}),
+  'a row that leaves the board’s tasks out':rowOf({syncRev:4},{keys:Object.keys(board).filter(key=>key!=='tasks')}),
+ };
+ for(const [label,row] of Object.entries(refused))await t.test(label,async sub=>{
+  const {store,head}=await opened(sub);
+  const result=await store.recordAcknowledgement({expectedHash:head.hash,hash:await sha('{"made":"for this row"}'),...row});
+  assert.notEqual(result?.ok,true,'the row is refused: '+JSON.stringify(result));
+  let saved=null,error=null;
+  try{saved=await store.readHead();}catch(e){error=e?.message??String(e);}
+  assert.equal(error,null,'the saved board stays readable');
+  assert.equal(saved?.payload,payload,'and is the head');
+  assert.equal(saved?.hash,head.hash,'with the head’s identity');
+ });
+ // Positive control: a row that fits the head and sets only device-only
+ // bookkeeping is recorded, and the saved board is the head with it applied.
+ await t.test('a fitting row of bookkeeping',async sub=>{
+  const {store,head}=await opened(sub);
+  const expected=JSON.stringify({...board,syncRev:4,syncDirty:false}),id=await sha(expected);
+  const result=await store.recordAcknowledgement({expectedHash:head.hash,hash:id,...rowOf({syncRev:4,syncDirty:false})});
+  assert.equal(result?.ok,true,'positive control: the row is recorded: '+JSON.stringify(result));
+  assert.equal(result.hash,id,'positive control: under the identity the caller made');
+  const saved=await store.readHead();
+  assert.equal(saved.payload,expected,'positive control: the saved board is the head with the row applied');
+  assert.equal(saved.hash,id,'positive control: under its own identity');
+ });
+});
+
 // #2436 (older versions): the supported floor and the release base read the
 // head alone. Each opens a device whose push acknowledgement is recorded
 // beside its head on the board one acknowledged revision behind, with every

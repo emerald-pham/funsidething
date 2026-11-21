@@ -16,6 +16,10 @@
   // (GLOSSARY: Saved board). No new store, so older app versions still open
   // this database; they read the head alone.
   const ACKNOWLEDGEMENT_KEY="acknowledgement";
+  // #2436 review S1: the board's device-only keys (the app's
+  // DEVICE_LOCAL_KEYS), the only values an acknowledgement row may set: an
+  // acknowledgement changes the board's bookkeeping and nothing else of it.
+  const ACKNOWLEDGEMENT_VALUE_KEYS=new Set(["syncRev","syncAccount","syncIdentity","lastCloudServerAt","syncDirty","protectedBackupIds","decisionBase","syncRecords"]);
   const RECOVERY_TRIM_KEPT_PREFIXES=Object.freeze(["unreadable-generation-record:","device-recovery-original:","device-recovery-file:","cloud-generation-recovery:","cloud-generation-recovery-summary:"]);
   // #2281 review: a recovery archive's summary. Archives are kept forever and
   // never replaced, and the previous release copied every earlier prepared
@@ -77,7 +81,10 @@
      value the row sets. Every other key of the saved board takes its value's
      text from the head's, so the saved board's text is made by slicing the
      head's text, with no parse or serialization of the board. The row's shape
-     is checked here without reading the head. */
+     is checked here without reading the head. #2436 review S1: so is that it
+     is only bookkeeping: it sets no value but a device-only key's, and keeps
+     every other key the head's text holds. A row that is not, as stored,
+     names no head and never applies. */
   const HASH_PATTERN=/^[0-9a-f]{64}$/;
   const own=(object,key)=>Object.prototype.hasOwnProperty.call(object,key);
   function acknowledgementParts(row){
@@ -91,8 +98,8 @@
     }
     const keys=new Set(row.keys);
     if(row.keys.some(key=>typeof key!=="string")||keys.size!==row.keys.length)return false;
-    return Object.keys(row.values).every(key=>keys.has(key)&&typeof row.values[key]==="string"&&!!row.values[key])&&
-      row.keys.every(key=>own(row.values,key)||named.has(key));
+    return Object.keys(row.values).every(key=>ACKNOWLEDGEMENT_VALUE_KEYS.has(key)&&keys.has(key)&&typeof row.values[key]==="string"&&!!row.values[key])&&
+      row.keys.every(key=>own(row.values,key)||named.has(key))&&[...named].every(key=>ACKNOWLEDGEMENT_VALUE_KEYS.has(key)||keys.has(key));
   }
   function acknowledgementRow(row){
     return !!row&&typeof row==="object"&&row.v===1&&typeof row.head==="string"&&HASH_PATTERN.test(row.head)&&
@@ -1391,7 +1398,7 @@
       const id=hash;
       noteOwnHead(id);
       try{
-        const tx=await beginTransaction("meta","readwrite"),done=transactionDone(tx),store=tx.objectStore("meta");
+        const tx=await beginTransaction(["meta","snapshots"],"readwrite"),done=transactionDone(tx),store=tx.objectStore("meta");
         try{
           const [head,row,holdKey]=await Promise.all([requestResult(store.get("head")),requestResult(store.get(ACKNOWLEDGEMENT_KEY)),
             requestResult(store.getKey("recoveryCloudHold"))]);
@@ -1400,8 +1407,17 @@
           // saved board is the head with that row, whose text is not the
           // head's: a row made from it would not fit the head. The push that
           // re-sent the unchanged board records it with a whole-board save.
-          if(!head||typeof head.hash!=="string"||current!==expectedHash||holdKey!==undefined||acknowledgementNames(row,head)){tx.abort();try{await done;}catch{}return {conflict:true,hash:current};}
-          store.put({v:1,head:head.hash,id,headKeys:headKeys.map(span=>[...span]),keys:[...keys],values:{...values}},ACKNOWLEDGEMENT_KEY);
+          const stale=!head||typeof head.hash!=="string"||current!==expectedHash||holdKey!==undefined||acknowledgementNames(row,head);
+          // #2436 review S1: and the row must fit the head's own text, read
+          // here under the head's hash, so a row is never written that would
+          // make the saved board unreadable. Checking it only slices that
+          // text. Otherwise the push falls back to the whole-board save.
+          const snapshot=stale?null:await requestResult(tx.objectStore("snapshots").get(head.hash));
+          const next=stale?null:{v:1,head:head.hash,id,headKeys:headKeys.map(span=>[...span]),keys:[...keys],values:{...values}};
+          if(stale||snapshot?.hash!==head.hash||typeof snapshot.payload!=="string"||acknowledgedBoardText(snapshot.payload,next)===null){
+            tx.abort();try{await done;}catch{}return {conflict:true,hash:current};
+          }
+          store.put(next,ACKNOWLEDGEMENT_KEY);
           await done;return {ok:true,hash:id};
         }catch(error){try{tx.abort();}catch{}try{await done;}catch{}throw error;}
       }catch(error){
