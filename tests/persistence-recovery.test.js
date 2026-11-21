@@ -38,6 +38,7 @@ import { commitSetting } from "./shared.js"; // #2422: Settings toggles in the o
 import { benchmarkEdit } from "./shared.js";
 import { woopFields2421, woopBoard2421, woopSnapshot2421 } from "./shared.js"; // #2421 saved WOOP data
 import { decisionMixedActionsApp146 } from "./shared.js"; // #2435: every kind of recorded choice, for the decision evidence gate
+import v8 from "node:v8"; // #2435 review: a collection, to show a replaced board's decision data is let go
 
 test('RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap',async t=>{
  if(process.env.CHAIN_RECOVERY_MEMORY_CHILD!=='1'){
@@ -19707,7 +19708,54 @@ const STALE2435=[
  [null,'an older copy reorders the chain, which the full check does not compare',ctx=>{
   const chain=ctx.state.chain;assert.ok(chain.length>=3,'positive control: the chain has dots to reorder');
   ctx.state.chain=[...chain.slice(0,-2),chain.at(-1),chain.at(-2)];}],
+ // The changes below arrive with the effects a record from that device
+ // carries, applied as values, so only the decision itself is wrong for
+ // this board.
+ ['decision-account-mismatch','another account’s Can’t arrives with its marks',ctx=>{
+  const task=staleOpenTask2435(ctx),at=ctx.state.decisionEvents.at(-1).at+1;
+  ctx.state.decisionEvents=[...ctx.state.decisionEvents,{...staleDecisionBase2435(ctx,'foreign-cant'),account:'foreign@example.com',kind:'current-choice',
+   target:{type:'task',id:task.id,property:'disposition'},value:{kind:'cant',at},after:{present:true},before:{present:false},taskContextIds:{[task.id]:task.ctx||[]}}];
+  ctx.state.considered[task.id]='cant';ctx.state.cantAt[task.id]=at;delete ctx.state.workedAt[task.id];}],
+ ['unprojectable-decision-evidence','a No made against another decision baseline arrives with its rating change and mark',ctx=>{
+  const benchmark=ctx.state.tasks.find(task=>task.id===ctx.state.chain.at(-1)),candidate=staleOpenTask2435(ctx);
+  ctx.state.decisionEvents=[...ctx.state.decisionEvents,{...staleDecisionBase2435(ctx,'other-baseline'),baselineId:'dlb2:stale-2435-not-this-baseline',
+   kind:'no',meaning:'benchmark-preferred',candidateId:candidate.id,benchmarkId:benchmark.id,candidateContextIds:candidate.ctx||[],benchmarkContextIds:benchmark.ctx||[],ratingApplied:true}];
+  const winner={mu:benchmark.mu,sigma:benchmark.sigma},loser={mu:candidate.mu,sigma:candidate.sigma};
+  vm.runInContext('((winner,loser)=>updatePair(winner,loser))',ctx)(winner,loser);
+  Object.assign(benchmark,winner);Object.assign(candidate,loser);
+  ctx.state.considered[candidate.id]='no';delete ctx.state.cantAt[candidate.id];delete ctx.state.workedAt[candidate.id];}],
+ ['unsupported-decision-evidence','a newer version’s decision (v:2) arrives',ctx=>{
+  ctx.state.decisionEvents=[...ctx.state.decisionEvents,{...nextDecision2435(ctx,'future'),v:2}];}],
+ ['unprojectable-decision-evidence','a decision arrives that observed the newest one and one this board never held',ctx=>{
+  const next=nextDecision2435(ctx,'unseen');
+  ctx.state.decisionEvents=[...ctx.state.decisionEvents,{...next,observedActionIds:[...next.observedActionIds,'stale-2435-never-held']}];}],
+ ['unprojectable-decision-evidence','a Can’t arrives with its marks that observed a decision this board never held',ctx=>{
+  const task=staleOpenTask2435(ctx),base=staleDecisionBase2435(ctx,'unseen-cant'),at=base.at;
+  ctx.state.decisionEvents=[...ctx.state.decisionEvents,{...base,observedActionIds:[...base.observedActionIds,'stale-2435-never-held'],kind:'current-choice',
+   target:{type:'task',id:task.id,property:'disposition'},value:{kind:'cant',at},after:{present:true},before:{present:false},taskContextIds:{[task.id]:task.ctx||[]}}];
+  ctx.state.considered[task.id]='cant';ctx.state.cantAt[task.id]=at;delete ctx.state.workedAt[task.id];}],
+ // The next answer writes History on its own two tasks, which replaces their
+ // lists; on any other task the list the replay checked is still there.
+ ['unrepresented-legacy-learning','a History row records a rating change no decision made, on a task the next answer leaves alone',ctx=>{
+  const answered=new Set([ctx.state.candidateId,ctx.state.chain.at(-1)]);
+  const task=ctx.state.tasks.find(row=>!answered.has(row.id)&&(row.ratingHistory||[]).some(entry=>entry.before&&entry.before.mu!==entry.after.mu));
+  assert.ok(task,'positive control: a task outside the next answer has History that moved its rating');
+  const row=JSON.parse(JSON.stringify(task.ratingHistory.find(entry=>entry.before&&entry.before.mu!==entry.after.mu)));
+  task.ratingHistory=[...task.ratingHistory,{...row,id:'stale-2435-history-elsewhere'}];}],
+ ['unprojectable-decision-evidence','an older copy moves the Start’s pass start time',ctx=>{
+  const pass=vm.runInContext('PassChain.passId(state)',ctx);
+  assert.ok(ctx.state.decisionEvents.some(event=>PassChain2435(ctx,event)?.kind==='start'&&PassChain2435(ctx,event).passId===pass),'positive control: a Start began this pass');
+  ctx.state.passStartedAt+=1;}],
 ];
+// A decision of this board's own pass and account, observing its newest one.
+function staleDecisionBase2435(ctx,change){
+ const last=ctx.state.decisionEvents.at(-1),id='stale-2435-'+change;
+ assert.ok(vm.runInContext('Array.isArray(state.decisionEvents)',ctx),'positive control: the board holds decisions');
+ return {v:1,id,actionId:id,at:last.at+1,account:ctx.state.syncAccount,baseId:last.baseId??null,passId:vm.runInContext('PassChain.passId(state)',ctx),
+  passAt:ctx.state.passStartedAt,scanMode:ctx.state.scanMode,chainIds:ctx.state.chain.slice(),observedActionIds:vm.runInContext('decisionActionFrontier(state.decisionEvents)',ctx)};
+}
+const staleOpenTask2435=ctx=>ctx.state.tasks.find(task=>!task.done&&!ctx.state.chain.includes(task.id)&&task.id!==ctx.state.candidateId&&!Object.hasOwn(ctx.state.considered,task.id));
+const PassChain2435=(ctx,event)=>vm.runInContext('(event=>PassChain.read(event))',ctx)(event);
 test('RISK decision evidence gate: a stale projection is caught and the gate gives the full check’s verdict for every error code it names',{timeout:300000},async t=>{
  const named=new Set();
  for(const [code,label,change] of STALE2435)await t.test(label,async t=>{
@@ -19742,6 +19790,75 @@ test('RISK decision evidence gate: a stale projection is caught and the gate giv
  });
  assert.deepEqual([...named].sort(),['ambiguous-legacy-completion','conflicting-decision-evidence','decision-account-mismatch','unprojectable-decision-evidence',
   'unprojectable-decision-undo','unrepresented-legacy-learning','unsupported-decision-evidence'],'every error code the full check names is covered');
+});
+// #2435 review: the same stale changes, met first by the next answer. The
+// test above asks the gate between the change and the answer, which runs the
+// full check and makes a new projection, so the answer never met the stale
+// one. Here nothing runs between them: the answer's replay meets the stale
+// projection (it replays the whole board, keeping the projection checked
+// where its decisions still extend the checked ones), and then its record's
+// gate does. The record goes exactly when the full check finds nothing on the
+// board the answer left, and the gate after it gives that check's verdict.
+test('RISK decision evidence gate: a stale projection met first by the next answer is caught, and its record goes exactly when the full check finds nothing',{timeout:300000},async t=>{
+ for(const [code,label,change] of STALE2435)await t.test(label,async t=>{
+  const board=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
+   tasks:Array.from({length:12},(_,i)=>({...syncTask('verdict-2435-'+i,'Verdict task '+i),ctx:['home'],createdAt:1000+i}))});
+  const device=await answeringDevice2408(t,{board,saveMs:0,dropDatabase:true});
+  await startAnswering2408(device);
+  const {ctx,clock}=device;
+  for(const act of ['yes','no','cant','no','yes']){device.tap(act);await clock.advance(1500);}
+  await clock.advance(3000);
+  change(ctx);
+  // The full check is pure: asking it leaves the stale projection in place.
+  assert.equal(gateVerdict2435(ctx,'decisionEvidenceIssue'),code,'positive control: the full check’s verdict on the changed board');
+  ctx.render();await clock.advance(300);
+  const records=recordsWritten2417(device),from=ctx.state.decisionEvents.length;
+  device.tap('no');await clock.advance(1500);
+  assert.ok(ctx.state.decisionEvents.length>from,'positive control: the answer is taken');
+  const atGate=gateVerdict2435(ctx,'decisionEvidenceIssue'),sent=recordsWritten2417(device)-records;
+  t.diagnostic(JSON.stringify({code,atGate,sent}));
+  assert.equal(sent,atGate===null?1:0,'the answer sends its change record exactly when the full check finds nothing: '+atGate);
+  assert.equal(gateVerdict2435(ctx,'DecisionProjection.evidenceIssue'),atGate,'the gate after the answer gives the full check’s verdict');
+ });
+});
+
+// #2435 review: a recorded choice's target changed with no decision
+// recorded (an older copy's merge), on the mixed decision fixture, whose
+// board holds a choice of every kind: the theme, the date format, the scene's
+// season, a context's name and the benchmark's title, and a scene that cannot
+// be read at all. The gate gives the full check's verdict when it is asked
+// first, and after the next answer when that answer meets the stale
+// projection first.
+const TARGETS2435=[
+ ['the theme',ctx=>{const theme=ctx.state.settings.theme;ctx.state.settings.theme=theme==='dark'?'light':'dark';}],
+ ['the date format',ctx=>{assert.equal(ctx.state.settings.dateFormat,'ymd','positive control: the recorded date format');ctx.state.settings.dateFormat='dmy';}],
+ ['the scene’s season',ctx=>{assert.equal(ctx.state.settings.scene?.season,'autumn','positive control: the recorded season');ctx.state.settings.scene.season='winter';}],
+ ['a context’s name',ctx=>{const context=ctx.state.contexts.find(row=>row.name==='Mixed shared context');assert.ok(context,'positive control: the recorded context');context.name+=' renamed';}],
+ ['the benchmark’s title',(ctx,mixed)=>{const task=ctx.state.tasks.find(row=>row.id===mixed.benchmark);assert.equal(task.title,'Mixed retained benchmark title','positive control: the recorded title');task.title+=' renamed';}],
+ ['a scene that cannot be read',ctx=>{assert.ok(ctx.state.settings.scene,'positive control: the recorded scene');ctx.state.settings.scene=null;}],
+];
+test('RISK decision evidence gate: a recorded choice’s target changed with no decision, asked first or met first by the next answer, gets the full check’s verdict',{timeout:300000},async t=>{
+ for(const [label,change] of TARGETS2435)for(const order of ['gate first','answer first'])await t.test(label+', '+order,async t=>{
+  const app=await decisionMixedActionsApp146();t.after(()=>app.dispose());
+  const {ctx,mixed}=app,account=JSON.stringify('e@example.com'),run=src=>vm.runInContext(src,ctx);
+  const answer=act=>{
+   const control={dataset:{candidate:run('offeredCandidateId()'),benchmark:run('benchmark()?.id')}};
+   assert.ok(control.dataset.candidate&&control.dataset.benchmark,'positive control: the scanner offers a '+act);
+   const from=ctx.state.decisionEvents.length;ctx.onAction(act,control);run('answerCatchUp.flush()');
+   assert.ok(ctx.state.decisionEvents.length>from,'positive control: the '+act+' is recorded');
+  };
+  for(let i=0;i<6;i++)ctx.addTask('Mixed target task '+i);
+  ctx.onAction('start-scan',{dataset:{}});
+  for(const act of ['no','yes','no'])answer(act);
+  assert.equal(run(`DecisionProjection.evidenceIssue(state,${account})`),null,'positive control: the warm board passes the gate');
+  change(ctx,mixed);
+  const full=run(`decisionEvidenceIssue(state,${account})`);
+  if(order==='answer first'){answer('no');}
+  const now=run(`decisionEvidenceIssue(state,${account})`),gate=run(`DecisionProjection.evidenceIssue(state,${account})`);
+  t.diagnostic(JSON.stringify({label,order,full,now,gate}));
+  assert.notEqual(full,null,'positive control: the full check holds the changed board');
+  assert.equal(gate,now,'the gate gives the full check’s verdict');
+ });
 });
 
 // #2435: with the mixed decision fixture (#146: settings, scene, context,
@@ -19885,6 +20002,49 @@ test('RISK decision evidence gate: after an Undo of an answer in the pass, later
  assert.ok(twin.steps.slice(-later.length).every(step=>!step.includes('(not offered)')),'positive control: every answer after the Undo is taken: '+twin.steps.join(' '));
  assert.ok(twin.apps[0].ctx.state.decisionEvents.some(event=>event.kind==='undo'),'positive control: the Undo is recorded');
  assert.equal(twin.fast.gate-gates,later.length,'every answer after the Undo passes the gate reading only its own decision: '+twin.steps.join(' '));
+});
+// #2435 review: the incremental projection keeps what it needs from the
+// board it verified: the decision baseline and the decisions themselves. Once
+// that board is replaced and nothing else holds it, none of its decision data
+// stays in memory, whether the new board comes in through replaceState
+// (adoption, restore, reset, an account switch) or is installed directly, as
+// several recovery and adoption paths do.
+test('RISK decision evidence projection: a replaced board’s decisions are not kept in memory once the board is gone',{timeout:120000},async t=>{
+ // Later realms must not see a gc global, so the flag is only on while the
+ // collector is fetched.
+ v8.setFlagsFromString('--expose-gc');const collect=vm.runInNewContext('gc');v8.setFlagsFromString('--no-expose-gc');
+ for(const [label,source] of [['through replaceState','replaceState(JSON.parse(JSON.stringify(state)))'],['installed directly','state=JSON.parse(JSON.stringify(state))']])
+  await t.test(label,async()=>{
+   const account='e@example.com';
+   const board=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,syncAccount:account,
+    tasks:Array.from({length:10},(_,i)=>({...syncTask('kept-2435-'+i,'Kept task '+i),ctx:['home'],createdAt:1000+i}))});
+   const app=await loadApp({seed:2435,seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(board)}});
+   try{
+    const {ctx}=app,run=src=>vm.runInContext(src,ctx),read=gateReads2435(app);
+    ctx.onAction('start-scan',{dataset:{}});
+    for(const act of ['yes','no','no','yes']){
+     const control={dataset:{candidate:run('offeredCandidateId()'),benchmark:run('benchmark()?.id')}};
+     assert.ok(control.dataset.candidate&&control.dataset.benchmark,'positive control: the scanner offers a '+act);
+     ctx.onAction(act,control);run('answerCatchUp.flush()');
+    }
+    assert.equal(run(`DecisionProjection.evidenceIssue(state,${JSON.stringify(account)})`),null,'positive control: the board passes the gate');
+    read.clear();
+    assert.equal(run(`DecisionProjection.evidenceIssue(state,${JSON.stringify(account)})`),null,'positive control: and again');
+    assert.equal(read.size,0,'positive control: the projection is warm, so the gate reads no decision');
+    const baseline=new WeakRef(run('state.decisionBaseline')),decision=new WeakRef(run('state.decisionEvents.at(-1)'));
+    // Something of the old board the projection never kept, to show the old
+    // board itself is gone.
+    const contexts=new WeakRef(run('state.contexts'));
+    run(source);run('render()');
+    assert.notEqual(run('state.decisionBaseline'),baseline.deref(),'positive control: the new board has its own decision data');
+    for(let round=0;round<50&&(contexts.deref()!==undefined||baseline.deref()!==undefined||decision.deref()!==undefined);round++){
+     await new Promise(resolve=>setTimeout(resolve,10));collect();
+    }
+    assert.equal(contexts.deref(),undefined,'positive control: nothing holds the replaced board');
+    assert.equal(baseline.deref(),undefined,'its decision baseline is not kept');
+    assert.equal(decision.deref(),undefined,'nor its decisions');
+   }finally{await app.dispose?.();}
+  });
 });
 // #2435: a board that was never signed in (sync off) names no account; its
 // answers replay their own decisions alone too, and the board is the one the
