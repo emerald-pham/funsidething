@@ -3990,7 +3990,12 @@ test('RISK change records guidance: mounted Help and the changelog say a scanner
  assert.match(answer,/saved on this device first; if it can’t be saved, it isn’t sent/);
  assert.match(answer,/Offline answers go up when you reconnect, and a long run of them goes as one copy of the board/);
  assert.match(answer,/while you tap the scanner or edit waits until you finish/);
- assert.match(answer,/An app copy from before this update syncs as before/);assert.match(answer,/until the cloud accepts these quick updates, answers reach other devices as before/);
+ // #2419 final review: an app copy from before this update reads only full
+ // copies, which now wait for a longer pause, so it does not sync as before:
+ // it shows this device's answers once the full copy of the board goes.
+ assert.match(answer,/An app copy from before this update shows answers from this device only once the full copy of the board goes/,'what an older app copy sees: '+answer);
+ assert.doesNotMatch(answer,/syncs as before/,'not that it syncs as before');
+ assert.match(answer,/until the cloud accepts these quick updates, answers reach other devices as before/);
  assert.doesNotMatch(answer,/change record|sequence|includedSeq|listener/i,'the answer says what the person sees, not how it works');
  assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
  const current=shim.document.getElementById('appChangelogCurrent').innerHTML.split('<h3>November 17, 2026</h3>')[1]?.split('</ul>')[0]||'';
