@@ -18134,6 +18134,44 @@ test('RISK full copies off the answer path: while every change since the last fu
  assert.equal(syncText2419(device),'☁ synced','and sync ends synced');
 });
 
+// #2419 second review: each answer restarted the 30-second pause, so while
+// someone kept answering the full copy never went, and an app copy that reads
+// only full copies (one from before this update) saw none of the answers. The
+// full copy now goes at most about 2 minutes after the first answer it carries.
+test('RISK full copies off the answer path: while you keep answering, the full copy still goes about 2 minutes after the first answer it carries, counted as scheduled sync work',{timeout:300000},async t=>{
+ const device=await answeringDevice2408(t,{board:answeringBoard2408({tasks:40,padBytes:0}),saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,counters,clock}=device,session=vm.runInContext('syncSession',ctx),from=counters.uploads.length,uploads=()=>counters.uploads.slice(from);
+ // An answer every 10 seconds, each sooner than the 30-second pause.
+ const answers=[],start=clock.now;
+ const answer=()=>{answers.push({id:device.tap('no'),at:clock.now});};
+ answer();
+ while(clock.now-start<110000){await clock.advance(10000);answer();}
+ await clock.advance(1000);
+ assert.equal(syncText2419(device),'☁ synced','positive control: every answer shows synced by its record');
+ assert.deepEqual(uploads().map(upload=>upload.at-start),[],'no full copy 111 seconds into the run');
+ assert.ok([...session.snapshot().work].some(item=>item.kind==='push-debounce'&&item.state==='scheduled'),'Settled (sync) counts the full copy still to come as a scheduled push: '+JSON.stringify(session.snapshot().work));
+ await clock.advance(8000);
+ assert.deepEqual(uploads().map(upload=>upload.at-start),[],'none 119 seconds after the first answer');
+ await clock.advance(2000);
+ assert.equal(uploads().length,1,'the full copy goes about 2 minutes after the first answer, while the answers go on: '+JSON.stringify(uploads().map(upload=>upload.at-start)));
+ assert.ok(uploads()[0].at>=start+119000&&uploads()[0].at<=start+121000,'at '+(uploads()[0].at-start)+' ms');
+ const carried=answers.filter(row=>row.at<uploads()[0].at).map(row=>row.id);
+ assert.deepEqual(decisionsAbout2417(JSON.parse(uploads()[0].payload),carried),carried.map(id=>'no:'+id).sort(),'carrying every answer given before it');
+ // The run goes on, then stops: the next full copy waits for the pause after
+ // the last answer, which comes before 2 minutes from the first answer it carries.
+ while(clock.now-start<160000){await clock.advance(10000);answer();}
+ const lastAt=clock.now;
+ await clock.advance(CHECKPOINT_WAIT2419-1000);
+ assert.equal(uploads().length,1,'no other full copy while the pause after the last answer runs');
+ await clock.advance(2000);
+ assert.equal(uploads().length,2,'the next full copy follows the pause after the last answer: '+JSON.stringify(uploads().map(upload=>upload.at-start)));
+ assert.ok(uploads()[1].at>=lastAt+CHECKPOINT_WAIT2419-1000,'at '+(uploads()[1].at-lastAt)+' ms after it');
+ assert.deepEqual(decisionsAbout2417(JSON.parse(uploads()[1].payload),[answers.at(-1).id]),['no:'+answers.at(-1).id],'carrying the last answer');
+ await clock.settle();
+ assert.equal(syncText2419(device),'☁ synced','and sync ends synced');
+});
+
 test('RISK full copies off the answer path: once a change since the last full copy did not go as a record, the full copy keeps the 2-second pause',{timeout:120000},async t=>{
  const device=await answeringDevice2408(t,{saveMs:0,dropDatabase:true});
  await startAnswering2408(device);
@@ -18259,6 +18297,30 @@ function holdHeardRecords2419(device){
  rewriteHeardRecords2419(device,(snapshot,next)=>{if(holding)held.push(()=>next(snapshot));else next(snapshot);});
  return {get held(){return held.length;},release(){holding=false;for(const deliver of held.splice(0))deliver();}};
 }
+// #2419 second review: holds this device's record-apply timer, the one that
+// applies what its change-record listener heard, until release(). The
+// listener runs, so the app knows the records and its full copy names the
+// records it includes, but it has not applied them yet, as on a busy phone.
+// The held timer is not counted as sync work while it is held, so the device
+// settles without it.
+function holdRecordApply2419(device){
+ const {ctx}=device,setTimer=ctx.setTimeout,clearTimer=ctx.clearTimeout,count=ctx.countSyncTimer,held=[];
+ let holding=true,last=null;
+ ctx.setTimeout=(fn,ms,...args)=>{const id=setTimer(fn,ms,...args);last={id,run:()=>fn(...args)};return id;};
+ ctx.countSyncTimer=(kind,timer)=>{
+  if(holding&&kind==='record-apply'&&last?.id===timer){clearTimer(timer);held.push(last.run);last=null;return timer;}
+  return count(kind,timer);
+ };
+ return {get held(){return held.length;},release(){holding=false;ctx.setTimeout=setTimer;ctx.countSyncTimer=count;for(const run of held.splice(0))run();}};
+}
+// #2419 second review: the #2419 commit 40741d59 and Stable #2417 moved a
+// board's record position past the records it skipped, and saved it so.
+// Saves the live board on its device with its record position at `through`,
+// as those apps did.
+async function saveRecordPositionAsOlderApp2419(device,through){
+ vm.runInContext('state.syncRecords={revision:state.syncRev,through:'+JSON.stringify(through)+'}',device.ctx);
+ assert.equal(await device.ctx.persist(),true,'positive control: the board is saved with its record position at '+through);
+}
 // The #2417 B1 test's record: a No naming a learning baseline no board has.
 function unholdableRecord2419(board){
  const [first,second]=board.tasks.filter(task=>!task.done&&!board.considered?.[task.id]&&task.id!==board.candidateId).map(task=>task.id);
@@ -18281,28 +18343,191 @@ test('RISK full copies off the answer path: a full copy names no change record i
  laptop.ctx.addTask('Added on the laptop after the skip',false);
  await syncSettled(laptop.ctx,{within:60000,synced:true});
  assert.ok((await cloudCopy2408(docs)).tasks.some(task=>task.title==='Added on the laptop after the skip'),'positive control: the laptop’s full copy is the active one');
- assert.ok(!(docs.get('users/owner').includedSeq>=sent.seq),'that full copy does not name the skipped record: '+JSON.stringify({includedSeq:docs.get('users/owner').includedSeq,seq:sent.seq}));
+ assert.equal(docs.get('users/owner').includedSeq,sent.seq-1,'that full copy names the records before the skipped one, and not that one: '+JSON.stringify({includedSeq:docs.get('users/owner').includedSeq,seq:sent.seq}));
  assert.deepEqual(cloudRecordIds2419(docs),['unholdable-2419'],'so the cloud keeps the record');
- // Reopened, the laptop has forgotten the skip, and its listener has not
- // heard the record again when its next full copy goes: only what it saved
- // keeps that copy from naming the record.
+ // Reopened, the laptop has forgotten the skip. Its listener hears the record
+ // again, so its next full copy names the records it includes, but the timer
+ // that applies what the listener heard has not run when that copy goes: the
+ // copy names the position the board saved, or what its read found. #2419
+ // second review: with the listener held, no full copy named any record, so
+ // this could not fail.
  await laptop.close();
  const reopened=await answeringDevice2408(t,{docs,indexedDB:laptop.indexedDB,dbName:laptop.dbName,storage:laptop.storage,saveMs:0,signedIn:false});
- const heard=holdHeardRecords2419(reopened);
+ const applying=holdRecordApply2419(reopened);
  reopened.signIn();await syncSettled(reopened.ctx,{within:20000});
+ await until2417(()=>recordEvents2417(reopened).includes('received:'+sent.seq),'positive control: the reopened laptop’s listener hears the record: '+JSON.stringify(recordEvents2417(reopened)));
+ await syncSettled(reopened.ctx,{within:20000});
+ assert.equal(reopened.backend.CS.changeRecords,'available','positive control: so its full copy names the records it includes');
+ assert.ok(applying.held>0,'positive control: and the timer that applies what it heard has not run');
  reopened.ctx.addTask('Added on the laptop after reopening',false);
  await syncSettled(reopened.ctx,{within:60000,synced:true});
- assert.ok(heard.held>0,'positive control: the reopened laptop’s listener was sent the record and has not heard it');
  assert.ok((await cloudCopy2408(docs)).tasks.some(task=>task.title==='Added on the laptop after reopening'),'positive control: the reopened laptop’s full copy is the active one');
- assert.ok(!(docs.get('users/owner').includedSeq>=sent.seq),'reopened: its full copy does not name the record either: '+JSON.stringify({includedSeq:docs.get('users/owner').includedSeq,seq:sent.seq}));
+ assert.equal(docs.get('users/owner').includedSeq,sent.seq-1,'reopened: its full copy names the records before the skipped one, and not that one: '+JSON.stringify({includedSeq:docs.get('users/owner').includedSeq,seq:sent.seq}));
  assert.deepEqual(cloudRecordIds2419(docs),['unholdable-2419'],'reopened: the cloud keeps the record');
- // Once it hears the record again it skips it again, and still never names it.
- heard.release();
+ // Once that timer has run the record stays skipped, and is still never named.
+ applying.release();
  await until2417(()=>recordEvents2417(reopened).includes('skipped:'+sent.seq),'positive control: the reopened laptop skips the record again: '+JSON.stringify(recordEvents2417(reopened)));
  reopened.ctx.addTask('Added on the laptop after hearing the record again',false);
  await syncSettled(reopened.ctx,{within:60000,synced:true});
- assert.ok(!(docs.get('users/owner').includedSeq>=sent.seq),'heard again: its full copy does not name the record');
+ assert.equal(docs.get('users/owner').includedSeq,sent.seq-1,'heard again: its full copy does not name the record: '+JSON.stringify({includedSeq:docs.get('users/owner').includedSeq,seq:sent.seq}));
  assert.deepEqual(cloudRecordIds2419(docs),['unholdable-2419'],'heard again: the cloud keeps the record');
+});
+
+// #2419 second review: a record whose earlier value is not this board's
+// conflicts with it, so the board does not take it in place: a read applies
+// it as a full copy holding only that change would be merged, and skips it
+// there when the board could not then be pushed (M9). A board an older app
+// saved past such a record, as 40741d59 and Stable #2417 did, is equal to
+// what that read finds, and kept its saved position: its next full copy
+// named the record, and the cloud removed it.
+function conflictingUnholdableRecord2419(board){
+ const record=unholdableRecord2419(board),[first]=Object.keys(record.after.considered);
+ return {...record,before:{considered:{[first]:'cant'}}};
+}
+test('RISK full copies off the answer path: a full copy names no change record a read skipped, also from a board an older app saved with its record position past that record',{timeout:300000},async t=>{
+ const docs=new Map();
+ const phone=await answeringDevice2408(t,{board:answeringBoard2408({tasks:20,padBytes:0}),docs,saveMs:0,dropDatabase:true});
+ phone.ctx.onAction('start-scan',{dataset:{}});
+ await syncSettled(phone.ctx,{within:60000});
+ // The laptop keeps its database, so it can reopen.
+ const laptop=await answeringDevice2408(t,{docs,storage:sharedScannerStorage(),saveMs:0});
+ await settledTogether([phone,laptop],[],{within:60000});
+ holdFullCopy2417(t,phone);
+ const change=conflictingUnholdableRecord2419(laptop.ctx.state);
+ laptop.ctx.__crafted2419=change;
+ assert.deepEqual([...vm.runInContext('(()=>{const board=JSON.parse(JSON.stringify(state)),clean=applyChangeRecordTo(JSON.parse(JSON.stringify(state)),JSON.parse(JSON.stringify(__crafted2419)),{cleanOnly:true});applyChangeRecordTo(board,JSON.parse(JSON.stringify(__crafted2419)));return [clean,changeRecordHoldable(board,window.CloudSync.user)];})()',laptop.ctx)],
+  [null,false],'positive control: the record conflicts with the laptop’s board, and a board holding it could not be pushed');
+ const sent=await phone.backend.CS.appendChangeRecord({id:'conflicting-unholdable-2419',parts:JSON.stringify(change)});
+ assert.equal(sent.ok,true,'positive control: the record is in the cloud');
+ await until2417(()=>recordEvents2417(laptop).includes('skipped:'+sent.seq),'positive control: the laptop’s read skips it: '+JSON.stringify(recordEvents2417(laptop)));
+ // The read that skipped it finishes before the laptop's own change.
+ await syncSettled(laptop.ctx,{within:30000});
+ laptop.ctx.addTask('Added on the laptop after the skip',false);
+ await syncSettled(laptop.ctx,{within:60000,synced:true});
+ assert.ok((await cloudCopy2408(docs)).tasks.some(task=>task.title==='Added on the laptop after the skip'),'positive control: the laptop’s full copy is the active one');
+ assert.equal(docs.get('users/owner').includedSeq,sent.seq-1,'that full copy does not name the record the read skipped: '+JSON.stringify({includedSeq:docs.get('users/owner').includedSeq,seq:sent.seq}));
+ assert.deepEqual(cloudRecordIds2419(docs),['conflicting-unholdable-2419'],'so the cloud keeps the record');
+ // The board as an older app saved it, its record position past the record.
+ await saveRecordPositionAsOlderApp2419(laptop,sent.seq);
+ await laptop.close();
+ const reopened=await answeringDevice2408(t,{docs,indexedDB:laptop.indexedDB,dbName:laptop.dbName,storage:laptop.storage,saveMs:0,signedIn:false});
+ reopened.signIn();await syncSettled(reopened.ctx,{within:20000});
+ await until2417(()=>recordEvents2417(reopened).includes('skipped:'+sent.seq),'positive control: the reopened laptop’s read skips the record again: '+JSON.stringify(recordEvents2417(reopened)));
+ await syncSettled(reopened.ctx,{within:20000});
+ reopened.ctx.addTask('Added on the laptop after reopening',false);
+ await syncSettled(reopened.ctx,{within:60000,synced:true});
+ assert.ok((await cloudCopy2408(docs)).tasks.some(task=>task.title==='Added on the laptop after reopening'),'positive control: the reopened laptop’s full copy is the active one');
+ assert.equal(docs.get('users/owner').includedSeq,sent.seq-1,'reopened from that board: its full copy does not name the record: '+JSON.stringify({includedSeq:docs.get('users/owner').includedSeq,seq:sent.seq}));
+ assert.deepEqual(cloudRecordIds2419(docs),['conflicting-unholdable-2419'],'reopened from that board: the cloud keeps the record');
+ // Such a board that also holds a change its full copy has not sent yet
+ // differs from what the read finds, and goes up as soon as it reopens.
+ holdFullCopy2417(t,reopened);
+ reopened.ctx.addTask('Added on the laptop and not sent',false);
+ await until2417(()=>reopened.faults.publicationStarted===true,'positive control: the change is saved on the laptop and its full copy is held');
+ await saveRecordPositionAsOlderApp2419(reopened,sent.seq);
+ await reopened.close();
+ const unsent=await answeringDevice2408(t,{docs,indexedDB:laptop.indexedDB,dbName:laptop.dbName,storage:laptop.storage,saveMs:0,signedIn:false});
+ assert.ok(unsent.ctx.state.tasks.some(task=>task.title==='Added on the laptop and not sent'),'positive control: the board reopens with the change');
+ assert.ok(!(await cloudCopy2408(docs)).tasks.some(task=>task.title==='Added on the laptop and not sent'),'positive control: which the cloud does not hold');
+ unsent.signIn();
+ await syncSettled(unsent.ctx,{within:60000,synced:true});
+ assert.ok((await cloudCopy2408(docs)).tasks.some(task=>task.title==='Added on the laptop and not sent'),'positive control: the change goes up in the laptop’s full copy');
+ assert.ok(recordEvents2417(unsent).includes('skipped:'+sent.seq),'positive control: the laptop’s read skipped the record again: '+JSON.stringify(recordEvents2417(unsent)));
+ assert.equal(docs.get('users/owner').includedSeq,sent.seq-1,'with a change not yet sent: its full copy does not name the record: '+JSON.stringify({includedSeq:docs.get('users/owner').includedSeq,seq:sent.seq}));
+ assert.deepEqual(cloudRecordIds2419(docs),['conflicting-unholdable-2419'],'with a change not yet sent: the cloud keeps the record');
+});
+
+// #2419 second review: a record a device skipped is still in the cloud when
+// that device next reads another device's full copy, so the read finds it
+// again and must not count it as held (M7).
+test('RISK full copies off the answer path: a full copy names no change record its device skipped, also after that device reads another device’s full copy',{timeout:300000},async t=>{
+ const {phone,laptop,docs}=await twoOpenDevices2417(t,answeringBoard2408({tasks:20,padBytes:0}));
+ const sent=await phone.backend.CS.appendChangeRecord({id:'unholdable-2419',parts:JSON.stringify(unholdableRecord2419(laptop.ctx.state))});
+ assert.equal(sent.ok,true,'positive control: the record is in the cloud');
+ for(const [name,device] of [['phone',phone],['laptop',laptop]])
+  await until2417(()=>recordEvents2417(device).includes('skipped:'+sent.seq),'positive control: the '+name+' skips it: '+JSON.stringify(recordEvents2417(device)));
+ await settledTogether([phone,laptop],[],{within:30000});
+ // The phone's change goes by its full copy, which the laptop then reads.
+ phone.ctx.addTask('Added on the phone after the skip',false);
+ await syncSettled(phone.ctx,{within:60000,synced:true});
+ assert.ok((await cloudCopy2408(docs)).tasks.some(task=>task.title==='Added on the phone after the skip'),'positive control: the phone’s full copy is the active one');
+ assert.equal(docs.get('users/owner').includedSeq,sent.seq-1,'the phone’s full copy does not name the record: '+JSON.stringify({includedSeq:docs.get('users/owner').includedSeq,seq:sent.seq}));
+ // The fake cloud's root listener is driven by the test, as Firestore's would deliver it.
+ laptop.ctx.window.dispatchEvent({type:'cloudboardchange',detail:{user:'e@example.com',rev:docs.get('users/owner').rev}});
+ await until2417(()=>laptop.ctx.state.tasks.some(task=>task.title==='Added on the phone after the skip'),'positive control: the laptop reads the phone’s full copy');
+ await syncSettled(laptop.ctx,{within:30000});
+ assert.equal(laptop.ctx.state.syncRev,docs.get('users/owner').rev,'positive control: the laptop holds the phone’s full copy');
+ laptop.ctx.addTask('Added on the laptop after reading it',false);
+ await syncSettled(laptop.ctx,{within:60000,synced:true});
+ assert.ok((await cloudCopy2408(docs)).tasks.some(task=>task.title==='Added on the laptop after reading it'),'positive control: the laptop’s full copy is the active one');
+ assert.equal(docs.get('users/owner').includedSeq,sent.seq-1,'the laptop’s full copy does not name the record it skipped either: '+JSON.stringify({includedSeq:docs.get('users/owner').includedSeq,seq:sent.seq}));
+ assert.deepEqual(cloudRecordIds2419(docs),['unholdable-2419'],'so the cloud keeps the record');
+});
+
+// The listener hears nothing until release(), then only the latest snapshot
+// it was sent, as a listener on a slow connection catches up all at once.
+function holdLatestHeardRecords2419(device){
+ let latest=null,holding=true;
+ rewriteHeardRecords2419(device,(snapshot,next)=>{if(holding)latest={snapshot,next};else next(snapshot);});
+ return {get records(){return latest?latest.snapshot.docs.length:0;},release(){holding=false;const held=latest;latest=null;held?.next(held.snapshot);}};
+}
+// #2419 second review: this device's own answer and, just after it, a record
+// it cannot hold, heard in one delivery: the copy this page knows moves on
+// over its own record and stops at the skipped one, not at the last record
+// heard (M12).
+test('RISK full copies off the answer path: a full copy names no change record its device skipped when its own answer comes just before it in one delivery',{timeout:300000},async t=>{
+ const {phone,laptop,docs}=await twoOpenDevices2417(t,answeringBoard2408({tasks:20,padBytes:0}));
+ holdFullCopy2417(t,phone);
+ await realSchedule2419(laptop);
+ const heard=holdLatestHeardRecords2419(laptop);
+ const answered=laptop.tap('no');await laptop.clock.advance(1000);
+ assert.ok(recordEvents2417(laptop).includes('sent:1'),'positive control: the laptop’s answer went up as record 1: '+JSON.stringify(recordEvents2417(laptop)));
+ const sent=await phone.backend.CS.appendChangeRecord({id:'unholdable-2419',parts:JSON.stringify(unholdableRecord2419(laptop.ctx.state))});
+ assert.equal(sent.seq,2,'positive control: the record the laptop cannot hold comes just after it');
+ await until2417(()=>heard.records===2,'positive control: the laptop’s listener is sent both records at once');
+ heard.release();
+ await laptop.clock.advance(1000);
+ assert.ok(recordEvents2417(laptop).includes('skipped:2'),'positive control: the laptop skips the second record: '+JSON.stringify(recordEvents2417(laptop)));
+ laptop.ctx.addTask('Added on the laptop after the skip',false);
+ await laptop.clock.advance(5000);await laptop.clock.settle();
+ const cloud=await cloudCopy2408(docs);
+ assert.ok(cloud.tasks.some(task=>task.title==='Added on the laptop after the skip'),'positive control: the laptop’s full copy is the active one');
+ assert.deepEqual(decisionsAbout2417(cloud,[answered]),['no:'+answered],'positive control: holding its own answer');
+ assert.equal(docs.get('users/owner').includedSeq,1,'that full copy names the laptop’s own record and not the one after it: '+JSON.stringify({includedSeq:docs.get('users/owner').includedSeq}));
+ assert.deepEqual(cloudRecordIds2419(docs),['unholdable-2419'],'so the cloud keeps the skipped record');
+});
+
+// Writes a change record as the cloud's counter numbers one, in a row format
+// this app's listing does not read (v 2, as a later app version might), so
+// this app hears no record at that number: a gap.
+async function appendRecordInAnotherFormat2419(backend,id){
+ const {sdk}=backend,doc=(...parts)=>sdk.doc({},'users','owner',...parts);
+ return sdk.runTransaction({},async tx=>{
+  const seq=((await tx.get(doc('changeLog','head'))).data()?.seq??0)+1;
+  tx.set(doc('changeLog','head'),{seq,lastId:id});
+  tx.set(doc('changeRecords',id),{v:2,seq,parts:JSON.stringify({v:2,later:true}),createdAt:sdk.serverTimestamp()});
+  return seq;
+ });
+}
+// #2419 second review: a record this app's listing cannot read leaves a gap
+// in the records it hears. A device's position never moves past the gap, so
+// its full copy names no record it never had (M13).
+test('RISK full copies off the answer path: a full copy names no change record its device cannot list, or any after it',{timeout:300000},async t=>{
+ const {phone,laptop,docs}=await twoOpenDevices2417(t,answeringBoard2408({tasks:20,padBytes:0}));
+ holdFullCopy2417(t,phone);
+ await realSchedule2419(laptop);
+ const later=await appendRecordInAnotherFormat2419(phone.backend,'later-format-2419');
+ assert.equal(later,1,'positive control: the cloud numbers the record 1');
+ const answered=laptop.tap('no');await laptop.clock.advance(1000);
+ assert.ok(recordEvents2417(laptop).includes('sent:2'),'positive control: the laptop’s answer went up as record 2: '+JSON.stringify(recordEvents2417(laptop)));
+ await until2417(()=>recordEvents2417(laptop).includes('received:2'),'positive control: the laptop hears its own record after the gap: '+JSON.stringify(recordEvents2417(laptop)));
+ await laptop.clock.advance(1000);
+ // The full copy follows its longer pause.
+ await laptop.clock.advance(31000);await laptop.clock.settle();
+ const cloud=await cloudCopy2408(docs);
+ assert.deepEqual(decisionsAbout2417(cloud,[answered]),['no:'+answered],'positive control: the laptop’s full copy is the active one, holding its answer');
+ assert.equal(docs.get('users/owner').includedSeq,later-1,'that full copy names no record from the one the laptop cannot list on: '+JSON.stringify({includedSeq:docs.get('users/owner').includedSeq,later}));
+ assert.ok(cloudRecordIds2419(docs).includes('later-format-2419'),'so the cloud keeps the record the laptop cannot list');
 });
 
 test('RISK full copies off the answer path: a full copy names no change record its device took back after drawing it, when the whole-board replay found its board could not then be pushed',{timeout:300000},async t=>{
@@ -18328,6 +18553,56 @@ test('RISK full copies off the answer path: a full copy names no change record i
  await syncSettled(laptop.ctx,{within:60000,synced:true});
  assert.ok((await cloudCopy2408(docs)).tasks.some(task=>task.title==='Added on the laptop after taking it back'),'positive control: the laptop’s full copy is the active one');
  assert.ok(!(docs.get('users/owner').includedSeq>=sent.seq),'that full copy does not name the record it took back: '+JSON.stringify({includedSeq:docs.get('users/owner').includedSeq,seq:sent.seq}));
+ assert.deepEqual(cloudRecordIds2419(docs),['taken-back-2419'],'so the cloud keeps the record');
+});
+
+// #2419 second review: a record drawn in place is taken back only by the
+// whole-board replay that follows the drawing. Records heard again in
+// between (here the listener delivers its snapshot again, as Firestore can
+// after a reconnect) found the drawn record on the board and counted it as
+// held, so the copy this page knows took it in: the next full copy named the
+// record it took back, or, as here, the laptop's next push found that copy
+// could not be pushed and stopped with a cloud error.
+test('RISK full copies off the answer path: a full copy names no change record its device took back after drawing it, also when the records are heard again before the whole-board replay',{timeout:300000},async t=>{
+ const {phone,laptop,docs}=await twoOpenDevices2417(t,answeringBoard2408({tasks:20,padBytes:0}));
+ holdFullCopy2417(t,phone);
+ // As above: only the whole-board replay refuses a board holding the record.
+ const id=laptop.ctx.state.tasks.at(-1).id,now=vm.runInContext('Date.now',laptop.ctx);
+ await saveEditorChoice(laptop,id,Date.now(),{title:'Edited on the laptop'});
+ laptop.ctx.__now2419=now;vm.runInContext('Date.now=__now2419',laptop.ctx);
+ await syncSettled(laptop.ctx,{within:60000,synced:true});
+ // The record also brings a History row, which carries its own identity, so
+ // a board that has drawn it holds the record.
+ const change={v:1,before:{tasks:[{id,title:'Edited on the laptop'}]},after:{tasks:[{id,title:'Changed by a record'}],
+  workLog:[{id:'record-history-2419',taskId:id,title:'Changed by a record',kind:'worked',at:now()}]}};
+ laptop.ctx.__crafted2419=change;
+ assert.deepEqual([...vm.runInContext('(()=>{const board=JSON.parse(JSON.stringify(state)),parts=JSON.parse(JSON.stringify(__crafted2419));applyChangeRecordTo(board,parts,{cleanOnly:true});return [changeRecordHoldableBounded(board,window.CloudSync.user),changeRecordHoldable(board,window.CloudSync.user),changeRecordIncluded(board,parts)];})()',laptop.ctx)],
+  [true,false,true],'positive control: only the whole-board replay refuses a board holding the record, and a board that has drawn it holds it');
+ // The laptop's listener delivers its latest snapshot again once the laptop
+ // has drawn the record, before the replay (the next task) runs.
+ let last=null;const again=[],render=laptop.ctx.render,title=()=>laptop.ctx.state.tasks.find(task=>task.id===id).title;
+ rewriteHeardRecords2419(laptop,(snapshot,next)=>{last={snapshot,next};next(snapshot);});
+ laptop.ctx.render=function(...args){
+  const result=render.apply(this,args);
+  if(!again.length&&last&&title()==='Changed by a record'){
+   const held=last;again.push('drawn');
+   setImmediate(()=>{again.push(title()==='Changed by a record'?'heard again while drawn':'heard again after the replay');held.next(held.snapshot);});
+  }
+  return result;
+ };
+ const sent=await phone.backend.CS.appendChangeRecord({id:'taken-back-2419',parts:JSON.stringify(change)});
+ assert.equal(sent.ok,true,'positive control: the record is in the cloud');
+ await until2417(()=>recordEvents2417(laptop).includes('skipped:'+sent.seq),'positive control: the laptop takes it back: '+JSON.stringify(recordEvents2417(laptop)));
+ await syncSettled(laptop.ctx,{within:30000});
+ assert.deepEqual(again,['drawn','heard again while drawn'],'positive control: the records were heard again after the drawing and before the replay');
+ assert.equal(title(),'Edited on the laptop','positive control: none of it stays on the laptop');
+ laptop.ctx.addTask('Added on the laptop after taking it back',false);
+ await syncSettled(laptop.ctx,{within:60000});
+ // The copy this page knows holds what its board holds: not the record.
+ assert.notEqual(laptop.backend.CS.status,'error','the laptop’s change goes up with no cloud error: '+laptop.backend.CS.errorCode);
+ await syncSettled(laptop.ctx,{within:60000,synced:true});
+ assert.ok((await cloudCopy2408(docs)).tasks.some(task=>task.title==='Added on the laptop after taking it back'),'positive control: the laptop’s full copy is the active one');
+ assert.equal(docs.get('users/owner').includedSeq,sent.seq-1,'that full copy does not name the record it took back: '+JSON.stringify({includedSeq:docs.get('users/owner').includedSeq,seq:sent.seq}));
  assert.deepEqual(cloudRecordIds2419(docs),['taken-back-2419'],'so the cloud keeps the record');
 });
 
