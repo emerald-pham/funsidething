@@ -24804,5 +24804,50 @@
       "command": "node --max-old-space-size=8192 --test --test-name-pattern=\"Worker that never answers\" tests/persistence-recovery.test.js (on e79f939a with the new test and the worker option)",
       "failure": "AssertionError [ERR_ASSERTION]: the board records the acknowledged revision within a second of the ok; actual: 2, expected: 3"
     }
+  },
+  {
+    "baseCommit": "8cb7a646492f600979959b992ba8259a37c80112",
+    "weakenedTestLines": [
+      "tests/core.test.js:-assert.match(answer,/An app copy from before this update syncs as before/);assert.match(answer,/until the cloud accepts these quick updates, answers reach other devices as before/);",
+      "tests/persistence-recovery.test.js:-assert.equal(commits.length,2,'the answer’s save and the acknowledgement’s save are the only device saves');",
+      "tests/persistence-recovery.test.js:-async function answerRunOnSlowPhone2408(t,{saveMs,gapMs,forMs=32000}){",
+      "tests/persistence-recovery.test.js:-async function answeringDevice2408(t,{board=answeringBoard2408(),docs=new Map(),indexedDB,dbName,storage,saveMs,signedIn=true,dropDatabase=false,worker=null}={}){",
+      "tests/persistence-recovery.test.js:-async function slowPhone2408(t,{saveMs}){",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{board,saveMs:0,worker:SilentWorker2427});",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{board,saveMs:0});",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{saveMs,signedIn:false,dropDatabase:true});",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{saveMs:0});",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{saveMs:0});",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{saveMs:0});",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{saveMs:1500});",
+      "tests/persistence-recovery.test.js:-const device=await slowPhone2408(t,{saveMs:3000});",
+      "tests/persistence-recovery.test.js:-const device=await slowPhone2408(t,{saveMs});",
+      "tests/persistence-recovery.test.js:-const run=await answerRunOnSlowPhone2408(t,{saveMs,gapMs});",
+      "tests/persistence-recovery.test.js:-const waiting=await answeringDevice2408(t,{saveMs:0});"
+    ],
+    "reason": "One entry covers this integration branch's test diff against main (#2419, #2436 and the #2419 final review); the #2419 implementation and review-fix entries it replaces repeated these lines or weakened none. (1) #2419 moves full copies off the answer path: while every change since the board was last clean went up as a change record the Sync session accepted, the full copy waits about 30 seconds without changes, at most about 2 minutes, or until the app is hidden, instead of following each 2-second pause and the 20-second longest wait, and a Yes that goes as a record asks for no immediate full copy. Six #2408 scheduling tests and two #2427 push-work tests asserted that full-copy schedule on boards whose answers now go as records, where the spec changes it; each now runs on rules without change records (answeringDevice2408 and the slow-phone helpers take changeRecords:false, which makes the fake cloud refuse records as such rules do), where the spec keeps that schedule exactly. (2) #2436 records a push's acknowledgement as a row beside the device head instead of a second whole-board device save (GLOSSARY: Saved board); the #2408 test that counted the answer's save and the acknowledgement's save as the only two device saves now counts one. (3) #2419 final review: the #2417 guidance assertion that Help says an app copy from before quick updates 'syncs as before' encoded wording that #2419 made wrong: such a copy reads only full copies, which now wait for a longer pause, so it shows this device's answers only once the full copy goes.",
+    "previousBehavior": "The #2408 and #2427 tests opened devices whose rules accepted change records and asserted the 2-second debounce, the 20-second longest wait and an immediate push for a single Yes for answers that also went up as records; every acknowledged push saved the whole board again on this device; and Help said an older app copy syncs as before.",
+    "intendedBehavior": "With rules that accept records, an answer shows Synced once its record is accepted and its full copy waits for the longer pause, at most about 2 minutes, or until the app is hidden; any change that does not go as a record, and every change on rules without records, keeps the schedule those tests check. An ordinary push whose own save holds exactly the board it uploaded records its acknowledgement beside that head with no whole-board save. Help says an app copy from before this update shows this device's answers only once the full copy of the board goes.",
+    "preservedCoverage": [
+      "Every assertion of the six #2408 scheduling tests and the two #2427 push-work tests still runs unchanged, on rules without change records, where the schedule they check applies; every other caller of answeringDevice2408, slowPhone2408 and answerRunOnSlowPhone2408 keeps changeRecords:true.",
+      "Where those guarantees still hold with change records on, records-path tests now cover them: the longest wait on a phone whose saves take 3 s, and an answer given while a full copy uploads staying unsynced until its record is accepted (#2419 final review). A single Yes's immediate push and the 20-second bound changed by design and have no records-path test.",
+      "Every other assertion of the #2436-changed test runs unchanged; the acknowledgement's durability is asserted by the counted push test's cold reopen and the #2427 cold-reopen test, both on the row.",
+      "The #2417 guidance test keeps every other assertion, and still requires that until the cloud accepts quick updates answers reach other devices as before; it now also requires that 'syncs as before' is gone."
+    ],
+    "replacementTests": [
+      "RISK full copies off the answer path: after a single No or Yes with nothing else pending, the sync status shows Synced once its change record is accepted, before any full copy is published",
+      "RISK full copies off the answer path: while every change since the last full copy went up as a record, the full copy waits about 30 seconds without changes, counted as scheduled sync work, or until the app is hidden",
+      "RISK full copies off the answer path: once a change since the last full copy did not go as a record, the full copy keeps the 2-second pause",
+      "RISK full copies off the answer path: during a run of answers 3 seconds apart on the large board, whole-board device saves and full-copy uploads per answer fall well below their counts when every pause brings a full copy",
+      "RISK full copies off the answer path: on a phone whose device saves take 3 s, while you answer every 2 s each answer reaches the cloud as its record at once, and the full copy within about 2 minutes of the first answer it carries",
+      "RISK full copies off the answer path: an answer given while a full copy uploads keeps the board unsynced, and not shown synced, until its own record is accepted, and then reaches the cloud",
+      "RISK push work: after its upload, a push records its acknowledgement with no whole-board device save and at most one whole-board serialization, the same on a 20-task board as on the large board, and a cold reopen opens on the acknowledged revision",
+      "RISK push work: another tab of this device that opened before a push’s acknowledgement was recorded saves onto the acknowledged board, keeping its revision and decision base with that tab’s edit",
+      "RISK full copies off the answer path guidance: mounted Help and the changelog say an answer shows synced within about a second and the full copy waits for a longer pause, one feature per bullet"
+    ],
+    "redEvidence": {
+      "command": "Each through scripts/agent-tools/record-run.mjs: #2419, node --max-old-space-size=8192 --test --test-name-pattern=\"full copies off the answer path\" tests/persistence-recovery.test.js (preimplementation-red 2026-11-21T11-49-08-997Z-d927198d on 8cb7a646 with the new tests only, then the #2408 cohort on the implementation); #2436, node --max-old-space-size=8192 --test tests/persistence-recovery.test.js (green attempt 2026-11-21T14-30-14-201Z-b07378b2 on 3513362d, before its tests changed); final review, node --test --test-name-pattern=\"RISK change records guidance\" tests/core.test.js (preimplementation-red 2026-11-21T21-48-23-914Z-00b4823c on f851eeb5)",
+      "failure": "#2419: 'no: the sync status shows Synced' (actual '☁ syncing') and 'with change records no full copy is uploaded during the run' before the implementation; after it, on records, the moved #2408 and #2427 tests failed on the full-copy timing the spec changes ('a single Yes with nothing else syncing still pushes at once', 'positive control: the No is pushed'). #2436: 'the answer’s save and the acknowledgement’s save are the only device saves' (1 !== 2). Final review: 'what an older app copy sees' (the answer still said it syncs as before)."
+    }
   }
 ]
