@@ -19088,6 +19088,58 @@ test('RISK push work: right after a push’s acknowledgement is recorded beside 
  assert.equal(saved.payload,JSON.stringify(ctx.state),'and its saved board is the board it holds');
 });
 
+// #2436 review B1: a tab forgets the last push it made when the person signs
+// out, hides the app or taps Retry sync, or when a push fails, and another tab
+// of this device has made none, so its next push uploads the board this device
+// already holds, acknowledgement row and all. That push's acknowledgement
+// names a saved board whose text is the head's with the row applied, not the
+// head's own, so it is recorded with a whole-board save, never as a second row
+// over the first: the saved board stays readable, and a cold reopen, with sync
+// on or off, opens on that push's acknowledged revision with no recovery hold.
+test('RISK push work: a second push of the unchanged board after its acknowledgement was recorded beside the head, from this tab after Retry sync or from another tab, keeps the saved board readable, and a cold reopen opens on that push’s acknowledged revision with no recovery hold',{timeout:300000},async t=>{
+ for(const variant of ['Retry sync','another tab'])await t.test(variant,async sub=>{
+  const {device,candidate,revision,uploads}=await answeredBeforePush2436(sub,'again-'+variant.replace(/ /g,'-'));
+  const {ctx,clock,counters}=device,commits=counters.commits.length;
+  await clock.settle();
+  assert.equal(counters.uploads.length-uploads,1,'positive control: the No is pushed');
+  assert.equal(ctx.state.syncRev,revision+1,'positive control: and acknowledged');
+  assert.equal(counters.commits.length,commits,'positive control: beside the head, with no whole-board save');
+  const first=counters.uploads.at(-1).payload;
+  let pusher=device;
+  if(variant==='Retry sync'){
+   await ctx.onAction('sync-retry',{});await clock.settle();
+   await ctx.sendPush();await clock.settle();
+  }else{
+   pusher=await answeringDevice2408(sub,{docs:device.docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,changeRecords:false});
+   assert.equal(pusher.ctx.state.syncRev,revision+1,'positive control: the other tab opens on the acknowledged revision');
+   await device.close();
+   await pusher.ctx.sendPush();await syncSettled(pusher.ctx,{within:20000});
+  }
+  assert.equal(pusher.counters.uploads.at(-1)?.payload,first,'positive control: the same board is uploaded again');
+  assert.equal(pusher.ctx.state.syncRev,revision+2,'positive control: and acknowledged at the next revision');
+  let saved=null,error=null;
+  try{saved=await pusher.ctx.window.ScannerDeviceStore.readHead();}catch(e){error=e?.message??String(e);}
+  assert.equal(error,null,'the saved board stays readable');
+  assert.equal(saved?.payload,JSON.stringify(pusher.ctx.state),'and is the board the tab holds, on the second push’s revision');
+  await pusher.close();await device.close();
+  for(const signedIn of [false,true]){
+   const label=signedIn?'sync on':'sync off';
+   const reopened=await answeringDevice2408(sub,{docs:device.docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,signedIn,changeRecords:false});
+   const opened=reopened.ctx.state;
+   assert.equal(opened.considered?.[candidate],'no',label+': the reopened board holds the answer');
+   assert.equal(opened.syncRev,revision+2,label+': on the second push’s acknowledged revision');
+   assert.equal(await reopened.ctx.window.ScannerDeviceStore.getRecoveryCloudHold(),null,label+': with no recovery hold stored');
+   assert.equal(vm.runInContext('!!deviceRecoveryCloudHold',reopened.ctx),false,label+': or held by the page');
+   if(signedIn){
+    const pulls=reopened.report().events.filter(event=>event.stage==='cloud-pull');
+    assert.equal(pulls.at(-1)?.status,'unchanged',label+': the first cloud read finds the copy it has: '+JSON.stringify(pulls.map(event=>event.status)));
+    assert.equal(reopened.shim.document.getElementById('syncBtn').textContent,'☁ synced',label+': and shows synced');
+   }
+   await reopened.close();
+  }
+ });
+});
+
 // #2436 (older versions): the supported floor and the release base read the
 // head alone. Each opens a device whose push acknowledgement is recorded
 // beside its head on the board one acknowledged revision behind, with every

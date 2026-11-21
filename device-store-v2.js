@@ -1396,7 +1396,11 @@
           const [head,row,holdKey]=await Promise.all([requestResult(store.get("head")),requestResult(store.get(ACKNOWLEDGEMENT_KEY)),
             requestResult(store.getKey("recoveryCloudHold"))]);
           const current=savedBoardIdentity(head,row);
-          if(!head||typeof head.hash!=="string"||current!==expectedHash||holdKey!==undefined){tx.abort();try{await done;}catch{}return {conflict:true,hash:current};}
+          // #2436 review B1: a row already names this head, so the caller's
+          // saved board is the head with that row, whose text is not the
+          // head's: a row made from it would not fit the head. The push that
+          // re-sent the unchanged board records it with a whole-board save.
+          if(!head||typeof head.hash!=="string"||current!==expectedHash||holdKey!==undefined||acknowledgementNames(row,head)){tx.abort();try{await done;}catch{}return {conflict:true,hash:current};}
           store.put({v:1,head:head.hash,id,headKeys:headKeys.map(span=>[...span]),keys:[...keys],values:{...values}},ACKNOWLEDGEMENT_KEY);
           await done;return {ok:true,hash:id};
         }catch(error){try{tx.abort();}catch{}try{await done;}catch{}throw error;}
