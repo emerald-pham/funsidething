@@ -4033,6 +4033,24 @@ test('RISK full copies off the answer path guidance: mounted Help and the change
  assert.doesNotMatch(lighter[0],/within about a second/,'showing synced is its own feature');
 });
 
+// #2435: the changelog says what a lighter answer means for the person, and
+// its limits, in one bullet of its own.
+test('RISK decision evidence guidance: the November 21 changelog has one bullet saying a Yes, No or Dislodge on a large board checks only its own decision, with the answers that still check them all',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const bullets=(markup.split('<h3>November 21, 2026</h3><ul>')[1]?.split('</ul>')[0]||'').split('<li>').slice(1).map(item=>item.replace(/<\/li>$/,''));
+ const found=bullets.filter(item=>/checks only its own decision/.test(item));
+ assert.equal(found.length,1,'one November 21 bullet says an answer checks only its own decision: '+JSON.stringify(bullets));
+ const bullet=found[0];
+ assert.match(bullet,/^On a large board, a Yes, No or Dislodge now checks only its own decision before it shows and, with sync on, before it is sent to your other devices, instead of every decision the board holds, so your next tap waits less\./);
+ assert.match(bullet,/Some answers still check them all once, such as the first after the app opens/,'the bullet says some answers still check every decision');
+ assert.match(bullet,/after an Undo of an answer each answer for the rest of that pass still checks them all before it shows/,'and the Undo limit');
+ assert.match(bullet,/What is saved and synced is unchanged\.$/);
+ assert.doesNotMatch(bullet,/projection|replay|gate|change record|evidence/i,'the bullet says what the person sees, not how it works');
+ assert.doesNotMatch(bullet,/within about a second|30 seconds/,'showing synced and the full copy\'s pause are their own features');
+});
+
 test('RISK sync responsiveness guidance: mounted Help explains large boards and bounded damaged-source recovery',async()=>{
  const {ctx,shim}=await loadApp();
  for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
