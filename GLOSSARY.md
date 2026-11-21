@@ -107,8 +107,10 @@ acknowledgement row recorded beside that head, when there is one. When a
 push's own device save holds exactly the board it uploads and nothing changes
 before the cloud's acknowledgement arrives, the acknowledgement's device-only
 bookkeeping (the revision, the decision base and the rest) is recorded as that
-row instead of in a second whole-board save. The row names the head it belongs
-to, applies to that head only, and goes with the next head this device writes.
+row instead of in a second whole-board save. A head has one row at most, so a
+push of a saved board that already has its row records its acknowledgement
+with a whole-board save. The row names the head it belongs to, applies to that
+head only, and goes with the next head this device writes.
 Every reader of the saved board, recovery included, reads the head and its row
 together through one read, and every write made on condition of the saved board
 checks the two together.

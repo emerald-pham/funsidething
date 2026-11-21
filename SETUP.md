@@ -206,9 +206,13 @@ board it uploaded records the cloud's acknowledgement as that row, provided
 nothing changed the board meanwhile, no device save is running or waiting, the
 account is the same, and no recovery hold, save issue or other step a save
 carries is outstanding. A push that publishes a recovery, and anything else,
-records it with a whole-board save, as before. The row counts toward the cloud
-save-loop guard as that save did. Each recovery guarantee holds against the
-head and its row together:
+records it with a whole-board save, as before. So does a push whose saved
+board already has its row, since a head has one row at most: a tab that forgot
+its last push (Retry sync, signing out, hiding the app), or another tab that
+has pushed nothing, uploads that unchanged board again. The row counts toward
+the cloud save-loop guard once, as that save did; a row that is refused leaves
+the count to the whole-board save it falls back to. Each recovery guarantee
+holds against the head and its row together:
 
 - **Durable before it counts.** A Cloud acknowledgement counts only once its
   row, or its whole-board save, is written. A row that is refused or fails
@@ -233,19 +237,27 @@ head and its row together:
   records the revision the cloud gave; nothing orders by a clock.
 - **Replaced, never stale.** The next head this device writes, a save's or a
   recovery's, removes the row in the same transaction, and a row that names
-  another head never applies. A row that names the head but does not fit it
-  makes the saved board unreadable, as a corrupt head does, and recovery keeps
-  every source.
+  another head never applies. The device store writes a row only when it fits
+  the head's own text, read in the same transaction (slicing only), so it never
+  writes one that would make the saved board unreadable. A row that names the
+  head but does not fit it, as damaged storage might leave, makes the saved
+  board unreadable, as a corrupt head does, and recovery keeps every source.
 - **Bookkeeping only.** The row holds only the board's device-only keys
   (revision, account, identity, decision base, change-record position, the
   unsynced flag, server time and protected recovery IDs), never a task,
   decision, History row or setting. It cannot add, drop or reorder a decision,
   and Undo, change records and conflict repair work on the same board as before.
+  The device store holds it to that: it refuses a row that sets any other key
+  or leaves out any other key of the head, and a stored row that does either
+  names no head and never applies.
 - **Recovery sources.** Raw captures of device storage (recovery originals,
-  recovery archives, the raw data export) hold the row as one more meta row and
-  so keep the saved board exactly. No automatic copy is written for the row:
-  the latest copy holds the same board with the bookkeeping from before the
-  acknowledgement.
+  recovery archives, the raw data export) hold the row as one more meta row, so
+  every byte of the saved board is kept. When the head is unreadable, the
+  recovery that opens a local working board from earlier captures reads each
+  captured head alone, as an older version does: the board one acknowledged
+  revision behind, with every decision. No automatic copy is written for the
+  row: the latest copy holds the same board with the bookkeeping from before
+  the acknowledgement.
 - **Older versions.** An app version from before #2436 reads the head alone,
   the board one acknowledged revision behind; its first cloud read reconciles
   that as a higher cloud revision and keeps every decision. The head it then
