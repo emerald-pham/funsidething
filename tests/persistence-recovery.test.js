@@ -16583,8 +16583,8 @@ test('one save per answer harness: a device opened without an explicit device-sa
 // report, 2026-11-16). These run on a phone whose every device save takes
 // saveMs from the moment the app opens: the fake clock runs from the start, so
 // sign-in and Start already save at that pace before the answers begin.
-async function slowPhone2408(t,{saveMs,changeRecords=true}){
- const device=await answeringDevice2408(t,{saveMs,signedIn:false,dropDatabase:true,changeRecords});
+async function slowPhone2408(t,{saveMs,changeRecords=true,board}){
+ const device=await answeringDevice2408(t,{board,saveMs,signedIn:false,dropDatabase:true,changeRecords});
  const {ctx,clock}=device;
  delete ctx.window.CLOUD_PUSH_DELAY_MS;clock.install();
  device.signIn();await clock.settle();
@@ -18260,6 +18260,36 @@ test('RISK full copies off the answer path: while you keep answering, the full c
  assert.equal(syncText2419(device),'☁ synced','and sync ends synced');
 });
 
+// #2419 final review: #2408's longest-wait guarantees (a push still goes out
+// within the longest wait while answers keep arriving, also on a phone whose
+// saves outlast the gap between answers) ran only on rules without change
+// records. On the records path each answer reaches the cloud as its record at
+// once, and the full copy's longest wait of about 2 minutes starts early by
+// the save lead as the 20-second one does, so on a phone whose device saves
+// take 3 s it still reaches the cloud within about 2 minutes of the first
+// answer it carries.
+test('RISK full copies off the answer path: on a phone whose device saves take 3 s, while you answer every 2 s each answer reaches the cloud as its record at once, and the full copy within about 2 minutes of the first answer it carries',{timeout:600000},async t=>{
+ const device=await slowPhone2408(t,{saveMs:3000,board:answeringBoard2408({tasks:100,padBytes:0})});
+ const {ctx,counters,clock,backend,docs}=device,session=vm.runInContext('syncSession',ctx),from=counters.uploads.length,uploads=()=>counters.uploads.slice(from);
+ const sent=[],append=backend.CS.appendChangeRecord;
+ backend.CS.appendChangeRecord=async record=>{const reply=await append(record);if(reply?.ok)sent.push({at:clock.now,seq:reply.seq});return reply;};
+ const answers=[],start=clock.now;
+ while(clock.now-start<150000){answers.push({id:device.tap('no'),at:clock.now});await clock.advance(2000);}
+ assert.equal(sent.length,answers.length,'every answer goes up as its record: '+sent.length+' of '+answers.length);
+ const late=answers.map((answer,i)=>sent[i].at-answer.at).filter(wait=>wait>1000);
+ assert.deepEqual(late,[],'each within a second of the answer');
+ assert.ok([...session.snapshot().work].some(item=>item.kind==='push-debounce'||item.kind==='push'),'positive control: the full copy is still to come or going: '+JSON.stringify(session.snapshot().work));
+ const first=uploads()[0];
+ assert.ok(first,'a full copy goes while the answers go on');
+ assert.ok(first.at-start<=120000,'within about 2 minutes of the first answer: at '+(first.at-start)+' ms');
+ assert.ok(first.at-start>=100000,'positive control: on its longest wait, not after a pause: at '+(first.at-start)+' ms');
+ const saved=answers.filter(answer=>answer.at<=first.at-2*3000).map(answer=>answer.id);
+ assert.deepEqual(decisionsAbout2417(JSON.parse(first.payload),saved),saved.map(id=>'no:'+id).sort(),'carrying every answer saved before it');
+ await clock.settle();
+ assert.deepEqual(decisionsAbout2417(await cloudCopy2408(docs),answers.map(answer=>answer.id)),answers.map(answer=>'no:'+answer.id).sort(),'once the run stops the full copy holds every answer');
+ assert.equal(syncText2419(device),'☁ synced','and sync ends synced');
+});
+
 test('RISK full copies off the answer path: once a change since the last full copy did not go as a record, the full copy keeps the 2-second pause',{timeout:120000},async t=>{
  const device=await answeringDevice2408(t,{saveMs:0,dropDatabase:true});
  await startAnswering2408(device);
@@ -18301,7 +18331,11 @@ test('RISK full copies off the answer path: during a run of answers 3 seconds ap
  // #2436: each full copy's acknowledgement is recorded beside the head, not by a second device save.
  assert.ok(fullCopies.uploads>=answers-1&&fullCopies.saves>=answers,'positive control: when every pause brings a full copy, each answer costs about one upload and one device save: '+JSON.stringify(fullCopies));
  assert.equal(records.uploads,0,'with change records no full copy is uploaded during the run');
- assert.ok(records.saves<=answers,'and at most one whole-board device save per answer: '+JSON.stringify(records));
+ // #2419 final review: at most one per answer was #2408's bound. The record
+ // path costs each answer's own save and nothing more, fewer than the run
+ // where every pause brings a full copy, whose full copies cost saves too.
+ assert.equal(records.saves,answers,'exactly one whole-board device save per answer, the answer’s own: '+JSON.stringify(records));
+ assert.ok(records.saves<fullCopies.saves,'fewer than when every pause brings a full copy: '+JSON.stringify({fullCopies,records}));
  assert.ok(2*(records.saves+records.uploads)<=fullCopies.saves+fullCopies.uploads,'well below the counts with a full copy after every pause: '+JSON.stringify({fullCopies,records}));
 });
 
