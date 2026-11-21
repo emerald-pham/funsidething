@@ -8821,8 +8821,9 @@ function decisionProjectionIssue(board,checkCoherence=true,effectiveNow=Date.now
     let projected=comparisonCopy(true);
     if(!Object.hasOwn(projected,"syncAccount"))projected.syncAccount=baseline.account;
     projectDecisionEvents(projected,null,{capture});
-    // #2435: the incremental projection keeps what this replay wrote.
-    if(capture?.replayed)capture.values=DecisionProjection.values(projected,capture);
+    // #2435: the incremental projection keeps what this replay wrote; one it
+    // cannot read is not kept, and the verdict is the same either way.
+    if(capture?.replayed){try{capture.values=DecisionProjection.values(projected,capture);}catch{capture.values=null;}}
     normalizeExpiredTimedHoldsForComparison(projected,effectiveNow);
     const byId=new Map(projected.tasks.map(task=>[task.id,[task.mu,task.sigma]]));
     // A read that throws still throws where the comparison reaches it.
@@ -13673,18 +13674,24 @@ const DecisionProjection=(()=>{
   const unrepresented=(row,represented,pending)=>validRatingHistoryRow(row)&&row.before&&["no","yes","dot","dislodge"].includes(row.kind)
     &&(row.before.mu!==row.after.mu||row.before.sigma!==row.after.sigma)&&!represented.has(row.id)&&!pending.has(row.id);
   // A projection verified for board. checked: the full check found nothing
-  // for that account; ready: decisionReplayReady said the board replays.
-  function anchor(board,capture,{account=null,ready=false}={}){
+  // for account (the gate's); ready: decisionReplayReady said the board
+  // replays. Making one never changes a verdict: one that cannot be made is
+  // simply not kept.
+  function anchor(board,capture,options={}){
     verified=null;
+    try{verified=made(board,capture,options);}catch{verified=null;}
+  }
+  function made(board,capture,{account=null,checked=false,ready=false}){
     const baseline=board?.decisionBaseline,events=board?.decisionEvents,v=capture?.values;
-    // The gate's check replays a copy that takes the baseline's account when
-    // the board names none, so it keeps a projection only for a board that
-    // names its account, as the replay of the board itself reads it.
-    if(!v||!capture.replayed||capture.conflicts||capture.inheritanceReplays||capture.inheritedCancellations||capture.cancelledInPass||!capture.passEvents
-      ||!plain(baseline)||!Array.isArray(events)||!Array.isArray(board.tasks)||board.decisionBaselineRecovery!==undefined
-      ||account!==null&&!Object.hasOwn(board,"syncAccount")||typeof WeakRef!=="function")return;
+    if(!v||!capture.replayed||capture.conflicts||capture.inheritanceReplays||capture.inheritedCancellations||!capture.passEvents
+      ||!plain(baseline)||!Array.isArray(events)||!Array.isArray(board.tasks)||board.decisionBaselineRecovery!==undefined||typeof WeakRef!=="function")return null;
+    // The full check replays a copy that takes the baseline's account when
+    // the board names none: what it checked holds for the board itself only
+    // where that leaves the same owner.
+    if(checked&&!Object.hasOwn(board,"syncAccount")&&baseline.account!==null)checked=false;
     const readyAccount=readyAccountOf(board);
-    if(account!==null)ready=supportedDecisionBaseline(baseline,readyAccount);
+    if(checked&&!ready)ready=supportedDecisionBaseline(baseline,readyAccount);
+    if(!checked&&!ready)return null;
     const ids=new Set(),undoActions=new Set(),undoEvents=new Set(),cancelledDispositions=new Set(),legacy=[],legacyTasks=new Set();
     const taskIndex=new Map(board.tasks.map((task,index)=>[task?.id,index]));
     for(const event of events){
@@ -13722,22 +13729,27 @@ const DecisionProjection=(()=>{
     // The check that made it found no History row it does not represent.
     const okLists=new WeakSet();
     for(const task of board.tasks)if(Array.isArray(task?.ratingHistory))okLists.add(task.ratingHistory);
-    verified={board:new WeakRef(board),account,ready,readyAccount,owner,baseline,baselineKey:baselineKey(baseline),events:events.slice(),ids,
+    return {board:new WeakRef(board),checked,account:checked?account:null,ready,readyAccount,owner,baseline,baselineKey:baselineKey(baseline),events:events.slice(),ids,
       frontier:new Set(decisionActionFrontier(events)),included:new Set([...baseline.includedActionIds,...inheritedDecisionFacts(baseline).map(fact=>fact.id)]),
       retired:new Set(receipts.flatMap(receipt=>receipt.facts.map(fact=>fact.id))),undoActions,undoEvents,cancelledDispositions,
       rated:new Set(decisionBaselineRatings(baseline).values.keys()),trained:new Set(capture.ratings.keys()),
       activePass:capture.activePass,passBase:capture.passBase?.winner||null,undoneRoots:new Set(capture.passBase?.undoneRoots||[]),
       passWinners:capture.passWinners||[],horizon:capture.passBase?.horizon??Infinity,anchorAt:Date.now(),
       syncAccount:fieldText(board,"syncAccount"),taskIds:board.tasks.map(task=>task?.id),taskDone:board.tasks.map(task=>task?.done),taskIndex,passRoots,legacy,legacyTasks,
-      values:v,disposition:new Map(capture.disposition),outstanding:new Map([...capture.outstanding].map(([id,set])=>[id,new Set(set)])),moves,settleFull:false,
-      represented,okRows:new WeakSet(),okLists,boundaries,completions,starts,nullTargets};
+      // An answer this pass's Undo cancelled has the replay write its task's
+      // pass-start marks first, which moves marks this projection does not
+      // follow, so the replay stays whole while one is there; the gate does
+      // not need the order of the marks.
+      values:v,disposition:new Map(capture.disposition),outstanding:new Map([...capture.outstanding].map(([id,set])=>[id,new Set(set)])),moves,
+      settleFull:!!capture.cancelledInPass,represented,okRows:new WeakSet(),okLists,boundaries,completions,starts,nullTargets};
   }
   // The projection, if it was made on this board and nothing it depends on
-  // has moved: its decisions are the board's first ones.
-  function current(board,{account=null,ready=false}={}){
+  // has moved: its decisions are the board's first ones. gate: the full check
+  // found nothing in it for this account; otherwise it replays.
+  function current(board,{gate=false,account=null}={}){
     const sigma=verified;
     if(!sigma||sigma.board.deref()!==board)return null;
-    if(account!==null?sigma.account!==account:!ready||!sigma.ready||sigma.readyAccount!==readyAccountOf(board))return null;
+    if(gate?!sigma.checked||sigma.account!==account:!sigma.ready||sigma.readyAccount!==readyAccountOf(board))return null;
     const now=Date.now(),events=board.decisionEvents,tasks=board.tasks;
     sigma.grown=board.decisionBaseline===sigma.baseline?grownBaseline(board.decisionBaseline,sigma.baselineKey,sigma.rated,sigma.legacyTasks):null;
     if(!(now>=sigma.anchorAt&&now<sigma.horizon)||!sigma.grown
@@ -13776,7 +13788,7 @@ const DecisionProjection=(()=>{
   function extend(sigma,next,board,event){
     if(!supportedDecisionEvent(event))return false;
     const baseline=board.decisionBaseline;
-    if(event.account!==baseline.account||event.account!==sigma.owner||sigma.account!==null&&event.account!==sigma.account
+    if(event.account!==baseline.account||event.account!==sigma.owner||sigma.checked&&event.account!==sigma.account
       ||sigma.ids.has(event.id)||next.ids.has(event.id)||sigma.retired.has(event.id)
       ||sigma.included.has(event.id)||event.passId!==sigma.activePass||sigma.undoActions.has(event.actionId||event.id)||sigma.undoEvents.has(event.id))return false;
     const observed=new Set(event.observedActionIds);
@@ -13885,7 +13897,7 @@ const DecisionProjection=(()=>{
   // The sender's gate: decisionEvidenceIssue(board,account), as the full
   // check gives it.
   function evidenceIssue(board,account){
-    const sigma=current(board,{account});
+    const sigma=current(board,{gate:true,account});
     if(sigma){
       try{
         const fresh=board.decisionEvents.slice(sigma.events.length),next=begin(sigma),now=Date.now();
@@ -13895,23 +13907,28 @@ const DecisionProjection=(()=>{
     }
     verified=null;
     const capture={},issue=decisionEvidenceIssue(board,account,true,capture);
-    if(issue===null)anchor(board,capture,{account});
+    if(issue===null)anchor(board,capture,{account,checked:true});
     return issue;
   }
   // BoardDecision's replay (settle): true once board holds exactly what
   // projectDecisionEvents makes of it, false where decisionReplayReady is.
   function replay(board){
-    const sigma=current(board,{ready:true});
-    let plan=null;
-    if(sigma&&!sigma.settleFull){
+    const sigma=current(board);
+    let plan=null,kept=null;
+    if(sigma){
       try{
         const fresh=board.decisionEvents.slice(sigma.events.length),answer=fresh.at(-1),next=begin(sigma),now=Date.now();
         // The decisions before this answer were drawn by their own rules
         // (a Can't or Worked on it); the board holds what they left.
-        if(answer&&(answer.kind==="no"||answer.kind==="comparison"&&(answer.action==="yes"||answer.action==="dislodge"))
-          &&fresh.slice(0,-1).every(event=>event.kind==="current-choice"&&extend(sigma,next,board,event))&&!next.settleFull
-          &&holds(board,sigma,next,now)&&historyHolds(board,sigma,next)&&extend(sigma,next,board,answer))plan={fresh,answer,next};
-      }catch{plan=null;}
+        const replays=!!answer&&(answer.kind==="no"||answer.kind==="comparison"&&(answer.action==="yes"||answer.action==="dislodge"));
+        const before=replays&&fresh.slice(0,-1).every(event=>event.kind==="current-choice"&&extend(sigma,next,board,event));
+        const fast=before&&!next.settleFull&&holds(board,sigma,next,now)&&historyHolds(board,sigma,next);
+        const extended=before&&extend(sigma,next,board,answer);
+        if(fast&&extended)plan={fresh,answer,next};
+        // The whole replay follows. Its board's decisions still extend the
+        // ones the full check found nothing in, so the gate keeps them.
+        else if(extended&&sigma.checked)kept=sigma.account;
+      }catch{plan=null;kept=null;}
     }
     // Writing is the replay's own work: a write that throws throws, as the
     // whole-board replay's would, and is never replayed a second time.
@@ -13920,7 +13937,10 @@ const DecisionProjection=(()=>{
     if(!decisionReplayReady(board))return false;
     const capture={};
     projectDecisionEvents(board,null,{refreshRanks:false,ready:true,capture});
-    if(capture.replayed){capture.values=values(board,capture);anchor(board,capture,{ready:true});}
+    if(capture.replayed){
+      try{capture.values=values(board,capture);}catch{capture.values=null;}
+      anchor(board,capture,{ready:true,checked:kept!==null,account:kept});
+    }
     return true;
   }
   // The replay's writes for its last decision, in its order; everything else

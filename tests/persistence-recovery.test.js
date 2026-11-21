@@ -18806,10 +18806,12 @@ test('RISK decision evidence gate: on the mixed decision fixture, answers pass t
 // them at random.
 function seededCrypto2435(){let n=0;return {getRandomValues:webcrypto.getRandomValues.bind(webcrypto),subtle:webcrypto.subtle,
  randomUUID:()=>'00000000-0000-4000-8000-'+(++n).toString(16).padStart(12,'0')};}
-async function twinApps2435(t,{tasks=14,seed=2435}={}){
- const board=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,syncAccount:ACCOUNT2408.email,
+// account: the board's own (null: a board that was never signed in, sync off).
+async function twinApps2435(t,{tasks=14,seed=2435,account=ACCOUNT2408.email}={}){
+ const board=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,...(account?{syncAccount:account}:{}),
   tasks:Array.from({length:tasks},(_,i)=>({...syncTask('twin-2435-'+i,'Twin task '+i),ctx:['home'],createdAt:1000+i})),
   settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8,theme:'system'}});
+ if(!account)delete board.syncAccount;
  const raw=JSON.stringify(board),apps=[];
  for(let i=0;i<2;i++){const app=await loadApp({seed,cryptoProvider:seededCrypto2435(),seedStorage:{[SYNC_STORE_KEY]:raw}});t.after(()=>app.dispose());apps.push(app);}
  // Each copy's own work (its device saves draw ids too) runs on one fake
@@ -18850,8 +18852,8 @@ async function twinApps2435(t,{tasks=14,seed=2435}={}){
   for(const app of apps)vm.runInContext('answerCatchUp.flush()',app.ctx);
   await at(0);
   const replayed=read.replay;read.gate=0;
-  const [gate,full]=[vm.runInContext(`DecisionProjection.evidenceIssue(state,${JSON.stringify(ACCOUNT2408.email)})`,apps[0].ctx),
-   vm.runInContext(`decisionEvidenceIssue(state,${JSON.stringify(ACCOUNT2408.email)})`,apps[1].ctx)];
+  const [gate,full]=[vm.runInContext(`DecisionProjection.evidenceIssue(state,${JSON.stringify(account)})`,apps[0].ctx),
+   vm.runInContext(`decisionEvidenceIssue(state,${JSON.stringify(account)})`,apps[1].ctx)];
   const [a,b]=apps.map(app=>JSON.stringify(app.ctx.state)),[ga,gb]=apps.map(app=>vm.runInContext('chanceGeneration',app.ctx));
   steps.push(act+(taken[0]?'':'(not offered)')+':'+(replayed<=1&&['yes','no','dislodge'].includes(act)&&taken[0]?'fast':'')+':'+gate);
   if(['yes','no','dislodge'].includes(act)&&taken[0]&&replayed===1)fast.settle++;
@@ -18883,4 +18885,32 @@ test('RISK decision evidence replay: the incremental replay leaves the board, dr
  const acts=['yes','no','no','yes','no','cant','bench-cant','worked','cand-worked','dislodge','undo','pause','resume','halving','rescan','cand-done','bench-done','postpone','start'];
  for(let i=0;i<80;i++){const act=acts[Math.floor(next()*acts.length)];await twin.step(act,60000+Math.floor(next()*3600000));}
  t.diagnostic(JSON.stringify({fast:twin.fast}));
+});
+// #2435: an Undo of an answer leaves it cancelled in its pass, and every
+// whole-board replay of that pass writes the task's pass-start marks again
+// first, so the answers after it replay the whole board, as they did before
+// #2435. Their gate still reads only their own decisions, and the board is
+// the one the whole-board replay leaves.
+test('RISK decision evidence gate: after an Undo of an answer in the pass, later answers pass the gate reading only their own decisions, and the replay leaves the whole-board replay’s board',{timeout:300000},async t=>{
+ const twin=await twinApps2435(t);
+ for(const [act,ms] of [['start',0],['no',60000],['yes',60000],['no',60000],['undo',60000]])await twin.step(act,ms);
+ const gates=twin.fast.gate,later=[['no',60000],['yes',60000],['no',60000],['no',60000],['yes',60000]];
+ for(const [act,ms] of later)await twin.step(act,ms);
+ t.diagnostic(JSON.stringify({fast:twin.fast,steps:twin.steps}));
+ assert.ok(twin.steps.slice(-later.length).every(step=>!step.includes('(not offered)')),'positive control: every answer after the Undo is taken: '+twin.steps.join(' '));
+ assert.ok(twin.apps[0].ctx.state.decisionEvents.some(event=>event.kind==='undo'),'positive control: the Undo is recorded');
+ assert.equal(twin.fast.gate-gates,later.length,'every answer after the Undo passes the gate reading only its own decision: '+twin.steps.join(' '));
+});
+// #2435: a board that was never signed in (sync off) names no account; its
+// answers replay their own decisions alone too, and the board is the one the
+// whole-board replay leaves. It sends no change records, so the gate only
+// has to give the full check's verdict.
+test('RISK decision evidence replay: on a board with no account the incremental replay leaves the board, draw count and mark order the whole-board replay leaves',{timeout:300000},async t=>{
+ const twin=await twinApps2435(t,{account:null});
+ assert.equal(Object.hasOwn(twin.apps[0].ctx.state,'syncAccount')?twin.apps[0].ctx.state.syncAccount:null,null,'positive control: the board names no account');
+ for(const [act,ms] of [['start',0],['yes',60000],['no',60000],['no',60000],['yes',60000],['cant',60000],['no',60000],['dislodge',60000],['no',60000],
+  ['yes',60000],['bench-cant',60000],['no',60000],['no',60000],['yes',40*60000],['no',60000]])await twin.step(act,ms);
+ t.diagnostic(JSON.stringify({fast:twin.fast,steps:twin.steps}));
+ assert.ok(twin.apps[0].ctx.state.decisionEvents.every(event=>event.account===null),'positive control: its decisions name no account');
+ assert.ok(twin.fast.settle>=8,'positive control: its answers replay their own decision alone: '+JSON.stringify(twin.fast));
 });
