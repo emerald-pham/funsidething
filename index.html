@@ -7963,15 +7963,26 @@ async function recordPushAcknowledgement(source,account){
   // The row is the bookkeeping write the whole-board save was, so it counts
   // toward the cloud save-loop guard as that save did, compared by the same
   // content, which the push's texts already hold (#2348).
+  // #2436 review N1: once. A row that is not written puts the guard back as
+  // it was, and the whole-board save it falls back to counts that write;
+  // counted by both, each refused row was two runs of the loop.
+  const guardBefore=cloudSaveLoopGuard,before=guardBefore&&{...guardBefore};
   const check=cloudSaveLoopCheck(()=>text,()=>saveLoopContentOf(saved.texts));
   if(!check.allowed)return "refused";
+  const guardCounted=cloudSaveLoopGuard,counted=guardCounted&&{...guardCounted};
+  const unwritten=()=>{
+    // Unless another check has counted since: its count stands.
+    if(cloudSaveLoopGuard!==guardCounted||guardCounted&&Object.keys(counted).some(key=>guardCounted[key]!==counted[key]))return false;
+    if(guardBefore)Object.assign(guardBefore,before);
+    cloudSaveLoopGuard=guardBefore;return false;
+  };
   const startedAt=supportDiagnosticsNow();
   let result=null;
   // The saved board's identity is the hash of its text, as a head's is; the
   // digest runs in the browser's crypto, not in this page's JavaScript.
   try{result=await deviceWriteBeforeDiagnostics("recordAcknowledgement",{expectedHash:saved.hash,hash:await ChainStorageV2.hashPayload(text),...row},store);}
-  catch{return false;}
-  if(result?.ok!==true||typeof result.hash!=="string")return false;
+  catch{return unwritten();}
+  if(result?.ok!==true||typeof result.hash!=="string")return unwritten();
   cloudSaveLoopLastSaveFailed=false;
   if(check.cloudStep)supportDiagnosticsObserveCloudStep("cloud-save","durable",startedAt,state?.syncRev,"unknown",{cloudStep:check.cloudStep});
   // A save of this tab that began after the bookkeeping above and committed

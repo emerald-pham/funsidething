@@ -19140,6 +19140,42 @@ test('RISK push work: a second push of the unchanged board after its acknowledge
  });
 });
 
+// #2436 review N1: an acknowledgement row is the bookkeeping write the
+// whole-board save was, so the cloud save-loop guard counts it as that save,
+// once; a row the device store refuses, which the whole-board save then
+// writes, counts once too. Pushes of the unchanged board, each acknowledged
+// with nothing else changing, are the loop the guard stops: here the app is
+// hidden and shown, which forgets its last push, and pushes again. Recorded as
+// rows, the acknowledgements alternate between a row and a refused row (one
+// already names the head) and its whole-board save; on a page whose cached
+// device store records no rows, each is a whole-board save. The guard stops
+// both runs after as many pushes.
+test('RISK push work: the cloud save-loop guard stops a run of pushes of the unchanged board after as many pushes when their acknowledgements are recorded beside the head, refused rows included, as when each is a whole-board save',{timeout:300000},async t=>{
+ const stoppedAt=async(label,rows)=>{
+  const {device,revision}=await answeredBeforePush2436(t,'loop-'+label.replace(/ /g,'-'));
+  const {ctx,clock,shim,counters}=device;
+  if(!rows)delete ctx.window.ScannerDeviceStore.recordAcknowledgement;
+  await clock.settle();
+  assert.equal(ctx.state.syncRev,revision+1,label+': positive control: the No is acknowledged');
+  for(let push=1;push<=12;push++){
+   shim.document.hidden=true;shim.document.dispatchEvent({type:'visibilitychange'});await clock.advance(100);
+   shim.document.hidden=false;shim.document.dispatchEvent({type:'visibilitychange'});await clock.settle();
+   const uploads=counters.uploads.length;
+   await ctx.sendPush();await clock.settle();
+   assert.equal(counters.uploads.length-uploads,1,label+': positive control: push '+push+' uploads the board again');
+   if(ctx.window.CloudSync.errorCode==='save-loop'){
+    assert.match(shim.document.getElementById('syncBtn').title,/failed \(save loop\)/,label+': the stop shows as a save loop');
+    await device.close();return push;
+   }
+  }
+  assert.fail(label+': the guard never stops the run');
+ };
+ const rows=await stoppedAt('rows',true),saves=await stoppedAt('whole-board saves',false);
+ t.diagnostic(JSON.stringify({rows,saves}));
+ assert.ok(saves>2,'positive control: with whole-board saves the guard lets a few pushes through before it stops: '+saves);
+ assert.equal(rows,saves,'recorded beside the head, refused rows included, the run stops after as many pushes');
+});
+
 // #2436 review S1: the device store records an acknowledgement row only when,
 // in the same transaction as its check of the saved board, the row fits the
 // head's own text and holds only the board's device-only bookkeeping: it sets
