@@ -4050,6 +4050,10 @@ test('RISK decision evidence guidance: the November 21 changelog has one bullet 
  assert.match(bullet,/^On a large board, a Yes, No or Dislodge now checks only its own decision before it shows and, with sync on, before it is sent to your other devices, instead of every decision the board holds, so your next tap waits less\./);
  assert.match(bullet,/Some answers still check them all once, such as the first after the app opens/,'the bullet says some answers still check every decision');
  assert.match(bullet,/after an Undo of an answer each answer for the rest of that pass still checks them all before it shows/,'and the Undo limit');
+ // #2435 review: a board whose earlier decisions came over from signed-out
+ // use or another account keeps checking them all after an Undo of one of
+ // them, on every answer from then on, not once.
+ assert.match(bullet,/answers that came over from signed-out use or another account, by signing in, an import or a restore, once one of them is undone, every answer checks them all from then on/,'and the boards that check them all on every answer');
  assert.match(bullet,/What is saved and synced is unchanged\.$/);
  assert.doesNotMatch(bullet,/projection|replay|gate|change record|evidence/i,'the bullet says what the person sees, not how it works');
  assert.doesNotMatch(bullet,/within about a second|30 seconds/,'showing synced and the full copy\'s pause are their own features');
