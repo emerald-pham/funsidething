@@ -18584,12 +18584,301 @@ test('RISK push work: with sync on, one push validates the board at most once, h
   assert.equal(atUpload.deviceSaves,0,label+': and proves the answer’s device save holds it without saving again: '+JSON.stringify(atUpload));
   assert.ok(counted.validations<=1,label+': the push validates the board’s decision evidence at most once: '+JSON.stringify(counted));
   assert.equal(counted.hashes,0,label+': no whole board is hashed in JavaScript: '+JSON.stringify(counted));
-  // The acknowledgement is still recorded by one whole-board device save:
-  // the saved head holds the acknowledged board, as recovery reads it.
+  // #2436: the acknowledgement is recorded beside the head the push's own
+  // save wrote (the next test counts it), or else by one whole-board save.
   assert.ok(counted.deviceSaves<=1,label+': the acknowledgement costs at most its one device save: '+JSON.stringify(counted));
  }
  assert.deepEqual(large.atUpload,small.atUpload,'up to its upload, one push costs the same whole-board work on the large board as on a 20-task board');
  assert.deepEqual(large.counted,small.counted,'one push costs the same whole-board work on the large board as on a 20-task board');
+});
+
+// #2436: the work a push's acknowledgement costs this device's main thread
+// once the push has uploaded, counted as #2427 counts a push (pushWork2427),
+// from the upload until sync is settled. The acknowledgement is recorded with
+// no whole-board device save: the saved board (GLOSSARY) is the head the
+// push's own save wrote plus the acknowledgement row beside it. The board is
+// serialized once at most: the new decision base, whose text the saved
+// board's exact text holds. The work is the same on a 20-task board as on the
+// large board. The device store's head read then holds exactly the board the
+// app has, and a cold reopen of the large board, with sync on or off, opens
+// on the acknowledged revision and decision base.
+async function acknowledgedPush2436(t,label,board,{before=[]}={}){
+ const device=await answeringDevice2408(t,{board,saveMs:0});
+ await startAnswering2408(device);
+ const {ctx,clock,counters}=device;
+ for(const act of before){device.tap(act);await clock.advance(1500);}
+ await clock.settle();
+ const seeded=Buffer.byteLength(JSON.stringify(board),'utf8');
+ const work=pushWork2427(device,Math.min(seeded,Buffer.byteLength(ctx.cloudPayload(),'utf8')));
+ const candidate=device.tap('no');
+ assert.equal(ctx.state.considered?.[candidate],'no',label+': positive control: the No is taken');
+ await clock.advance(1500);
+ const uploads=counters.uploads.length,revision=ctx.state.syncRev;
+ work.reset();
+ let atUpload=null;const push=device.backend.CS.push;
+ device.backend.CS.push=(...args)=>{atUpload??=work.now();return push(...args);};
+ await clock.settle();
+ const counted=work.now();
+ device.backend.CS.push=push;
+ assert.ok(atUpload,label+': positive control: the upload was seen');
+ assert.equal(counters.uploads.length-uploads,1,label+': positive control: one push uploads');
+ assert.equal(ctx.state.syncRev,revision+1,label+': positive control: the push is acknowledged');
+ assert.equal(ctx.state.syncDirty,false,label+': positive control: and nothing is left to push');
+ const afterUpload=Object.fromEntries(Object.keys(counted).map(key=>[key,counted[key]-atUpload[key]]));
+ return {afterUpload,counted,sites:work.sites(),device,candidate,revision:revision+1};
+}
+test('RISK push work: after its upload, a push records its acknowledgement with no whole-board device save and at most one whole-board serialization, the same on a 20-task board as on the large board, and a cold reopen opens on the acknowledged revision',{timeout:300000},async t=>{
+ const twenty=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
+  tasks:Array.from({length:20},(_,i)=>({...syncTask('twenty-2436-'+i,'Twenty task '+i),ctx:['home'],createdAt:1000+i,futureNote:'x'.repeat(15000)}))});
+ const small=await acknowledgedPush2436(t,'20 tasks',twenty,{before:['yes']});
+ await small.device.close();
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const large=await acknowledgedPush2436(t,'large board',JSON.parse(fixture.payload));
+ t.diagnostic(JSON.stringify({small:small.afterUpload,large:large.afterUpload,smallWhole:small.counted,largeWhole:large.counted}));
+ t.diagnostic(JSON.stringify({smallSites:small.sites,largeSites:large.sites}));
+ for(const [label,{afterUpload}] of [['20 tasks',small],['large board',large]]){
+  assert.equal(afterUpload.deviceSaves,0,label+': after the upload, the acknowledgement costs no whole-board device save: '+JSON.stringify(afterUpload));
+  assert.ok(afterUpload.serializations<=1,label+': and serializes the board once at most: '+JSON.stringify(afterUpload));
+ }
+ assert.deepEqual(large.afterUpload,small.afterUpload,'after the upload, a push costs the same whole-board work on the large board as on a 20-task board');
+ // The saved board, read as every recovery reader reads it, is the board the
+ // app holds: the acknowledged revision with its decision base.
+ const {device}=large,state=device.ctx.state;
+ const saved=await device.ctx.window.ScannerDeviceStore.readHead();
+ assert.equal(saved.payload,JSON.stringify(state),'the device store’s head read holds exactly the acknowledged board');
+ assert.equal(vm.runInContext('deviceHeadHash',device.ctx),saved.hash,'and the app’s saved-board identity is that read’s');
+ const acknowledged={rev:state.syncRev,base:state.decisionBase.id,payload:state.decisionBase.payload};
+ assert.equal((await device.cloud()).rev,acknowledged.rev,'positive control: the cloud holds the acknowledged revision');
+ await device.close();
+ for(const signedIn of [false,true]){
+  const label=signedIn?'sync on':'sync off';
+  const reopened=await answeringDevice2408(t,{docs:device.docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,signedIn});
+  const opened=reopened.ctx.state;
+  assert.equal(opened.considered?.[large.candidate],'no',label+': the reopened large board holds the answer');
+  assert.equal(opened.syncRev,acknowledged.rev,label+': and opens on the acknowledged revision');
+  assert.equal(opened.decisionBase?.id,acknowledged.base,label+': with that revision’s decision base');
+  assert.equal(opened.decisionBase?.payload,acknowledged.payload,label+': holding the acknowledged copy');
+  assert.equal(reopened.ctx.validDecisionBase(opened.decisionBase,opened.syncAccount,opened.syncRev),true,label+': which still verifies');
+  if(signedIn){
+   const pulls=reopened.report().events.filter(event=>event.stage==='cloud-pull');
+   assert.equal(pulls.at(-1)?.status,'unchanged',label+': the first cloud read finds the copy it has: '+JSON.stringify(pulls.map(event=>event.status)));
+   assert.equal(opened.syncDirty,false,label+': and nothing left to push');
+  }
+  await reopened.close();
+ }
+});
+
+// #2436: the saved board names the account its board belongs to, as the head
+// read returns it: a conflict repair onto it compares that account with the
+// board's before it merges. An acknowledgement row never changes the head's
+// account (the first read after signing in binds the board to its account
+// before the first push), so after the first push from a board saved signed
+// out, recorded beside its head, the two still agree.
+test('RISK push work: after the first push from a board saved signed out, the saved board names the account its board belongs to',{timeout:120000},async t=>{
+ const device=await answeringDevice2408(t,{board:answeringBoard2408({tasks:20,padBytes:0}),saveMs:0});
+ const {ctx}=device;
+ assert.equal(ctx.state.syncAccount,ACCOUNT2408.email,'positive control: the first push is acknowledged for the account');
+ const head=await ctx.window.ScannerDeviceStore.readHead(),board=JSON.parse(head.payload);
+ assert.equal(board.syncAccount,ACCOUNT2408.email,'the saved board is the acknowledged one');
+ assert.equal(head.account,board.syncAccount,'and names the account its board belongs to');
+});
+
+// #2436: a 20-task board answered once with sync on, on rules without change
+// records so the No's full copy follows its 2-second pause; the No is saved
+// on the device and its push has not gone yet.
+async function answeredBeforePush2436(t,label){
+ const board=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
+  tasks:Array.from({length:20},(_,i)=>({...syncTask(label+'-2436-'+i,'Board task '+i),ctx:['home'],createdAt:1000+i}))});
+ const device=await answeringDevice2408(t,{board,saveMs:0,changeRecords:false});
+ await startAnswering2408(device);
+ const {ctx,clock,counters}=device;
+ await clock.settle();
+ const revision=ctx.state.syncRev,uploads=counters.uploads.length,candidate=device.tap('no');
+ await clock.advance(500);
+ assert.equal(JSON.parse((await ctx.window.ScannerDeviceStore.readHead()).payload).considered?.[candidate],'no','positive control: the answer is saved on this device');
+ assert.equal(counters.uploads.length,uploads,'positive control: and not pushed yet');
+ return {device,candidate,revision,uploads};
+}
+// #2436: a second copy of the app on this device (another tab) that opened
+// before a push's acknowledgement was recorded still names the saved board as
+// it was then. The acknowledgement row changes the saved board's identity, so
+// that tab's next save repairs onto the saved board instead of writing over
+// it: the device keeps the acknowledged revision and decision base with the
+// answer and the other tab's edit, as after a whole-board acknowledgement save.
+test('RISK push work: another tab of this device that opened before a push’s acknowledgement was recorded saves onto the acknowledged board, keeping its revision and decision base with that tab’s edit',{timeout:180000},async t=>{
+ const {device,candidate,revision,uploads}=await answeredBeforePush2436(t,'tab');
+ const {ctx,clock,counters}=device;
+ // The other tab opens now, signed out, on this device's storage.
+ const other=await answeringDevice2408(t,{docs:device.docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,signedIn:false});
+ assert.equal(other.ctx.state.considered?.[candidate],'no','positive control: the other tab opened on the saved answer');
+ await clock.settle();
+ assert.equal(counters.uploads.length-uploads,1,'positive control: the No is pushed');
+ assert.equal(ctx.state.syncRev,revision+1,'positive control: and acknowledged');
+ const acknowledged={rev:ctx.state.syncRev,base:ctx.state.decisionBase.id};
+ other.ctx.addTask('Added in the other tab');
+ await syncSettled(other.ctx,{within:20000});
+ const saved=JSON.parse((await other.ctx.window.ScannerDeviceStore.readHead()).payload);
+ assert.ok(saved.tasks.some(task=>task.title==='Added in the other tab'),'the other tab’s task is saved');
+ assert.equal(saved.considered?.[candidate],'no','with the answer');
+ assert.equal(saved.syncRev,acknowledged.rev,'on the acknowledged revision');
+ assert.equal(saved.decisionBase?.id,acknowledged.base,'with that revision’s decision base');
+});
+
+// #2436: the head and its acknowledgement row are the acknowledged board, so
+// when the cloud copy that acknowledgement names loses its chunks, this device
+// rebuilds it from its saved board exactly as after a whole-board
+// acknowledgement save: a later revision holds the board, the device shows
+// synced, and its saved board is the board it holds.
+test('RISK push work: when the cloud copy a push’s acknowledgement names loses its chunks, the device rebuilds it from its head and acknowledgement row and shows synced',{timeout:180000},async t=>{
+ const {device,candidate,revision,uploads}=await answeredBeforePush2436(t,'rebuild');
+ const {ctx,clock,counters}=device,commits=counters.commits.length;
+ await clock.settle();
+ assert.equal(counters.uploads.length-uploads,1,'positive control: the No is pushed');
+ assert.equal(ctx.state.syncRev,revision+1,'positive control: and acknowledged');
+ assert.equal(counters.commits.length,commits,'positive control: beside the head, with no whole-board save');
+ const acknowledged=device.docs.get('users/owner');
+ assert.equal(acknowledged.rev,revision+1,'positive control: the cloud holds the acknowledged revision');
+ for(const key of [...device.docs.keys()])if(key.startsWith('users/owner/generations/'+acknowledged.activeGeneration+'/chunks/'))device.docs.delete(key);
+ // Retry sync reads the whole copy, so it finds the chunks gone.
+ ctx.onAction('sync',{});await ctx.onAction('sync-retry',{});await clock.settle();
+ const root=device.docs.get('users/owner');
+ assert.ok(root.rev>acknowledged.rev,'a later revision replaces the copy that lost its chunks');
+ const cloud=await device.cloud();
+ assert.equal(cloud.board.considered?.[candidate],'no','and holds the answer');
+ assert.equal(ctx.state.syncRev,root.rev,'this device confirmed it');
+ assert.equal(ctx.state.syncDirty,false,'with nothing left to push');
+ assert.equal(device.shim.document.getElementById('syncBtn').textContent,'☁ synced','the device shows synced');
+ const saved=await ctx.window.ScannerDeviceStore.readHead();
+ assert.equal(saved.payload,JSON.stringify(ctx.state),'and its saved board is the board it holds');
+});
+
+// #2436: the same when another device's later copy is the one that loses its
+// chunks: the copy before it is the one this device's acknowledgement row
+// names, so this device publishes its board over the unreadable revision by
+// itself (the automatic recovery default), as after a whole-board
+// acknowledgement save, and shows synced.
+test('RISK push work: when another device’s later copy loses its chunks, the device whose acknowledgement row names the copy before it publishes its board over it and shows synced',{timeout:180000},async t=>{
+ const {device,candidate,revision,uploads}=await answeredBeforePush2436(t,'contained');
+ const {ctx,clock,counters}=device,commits=counters.commits.length;
+ await clock.settle();
+ assert.equal(counters.uploads.length-uploads,1,'positive control: the No is pushed');
+ assert.equal(ctx.state.syncRev,revision+1,'positive control: and acknowledged');
+ assert.equal(counters.commits.length,commits,'positive control: beside the head, with no whole-board save');
+ // Another device, signed in to the same account, adds a task and syncs it.
+ const laptop=await answeringDevice2408(t,{docs:device.docs,storage:sharedScannerStorage(),saveMs:0,changeRecords:false,dropDatabase:true});
+ laptop.ctx.addTask('Added on the laptop');await syncSettled(laptop.ctx,{within:20000});
+ const later=device.docs.get('users/owner');
+ assert.equal(later.rev,revision+2,'positive control: the laptop published the next revision');
+ await laptop.close();
+ for(const key of [...device.docs.keys()])if(key.startsWith('users/owner/generations/'+later.activeGeneration+'/chunks/'))device.docs.delete(key);
+ await ctx.cloudPull();await clock.settle();
+ const root=device.docs.get('users/owner');
+ assert.ok(root.rev>later.rev,'a later revision replaces the one that lost its chunks');
+ const cloud=await device.cloud();
+ assert.equal(cloud.board.considered?.[candidate],'no','and holds this device’s answer');
+ assert.equal(ctx.state.syncRev,root.rev,'this device confirmed it');
+ assert.equal(device.shim.document.getElementById('syncBtn').textContent,'☁ synced','the device shows synced');
+ const saved=await ctx.window.ScannerDeviceStore.readHead();
+ assert.equal(saved.payload,JSON.stringify(ctx.state),'and its saved board is the board it holds');
+});
+
+// #2436: Review cloud recovery compares this device's stored rows with the
+// saved board it read, and Apply publishes a chosen source over it. With the
+// acknowledgement recorded beside the head, the person can still review the
+// sources and apply this device's board: it is published as the next
+// revision, the device shows synced, and its saved board is the board it holds.
+test('RISK push work: right after a push’s acknowledgement is recorded beside the head, Review cloud recovery applies this device’s board and the device shows synced',{timeout:180000},async t=>{
+ const {device,candidate,revision,uploads}=await answeredBeforePush2436(t,'review');
+ const {ctx,clock,counters,shim}=device,commits=counters.commits.length;
+ await clock.settle();
+ assert.equal(counters.uploads.length-uploads,1,'positive control: the No is pushed');
+ assert.equal(ctx.state.syncRev,revision+1,'positive control: and acknowledged');
+ assert.equal(counters.commits.length,commits,'positive control: beside the head, with no whole-board save');
+ const acknowledged=device.docs.get('users/owner');
+ // The copy before the acknowledged one is damaged, so there is a source to review.
+ const previous='users/owner/generations/'+acknowledged.previousGeneration;
+ assert.ok(device.docs.get(previous),'positive control: the cloud keeps the copy before the acknowledged one');
+ device.docs.set(previous,{...device.docs.get(previous),hash:'f'.repeat(64)});
+ const reviewing=ctx.onAction('review-cloud-source-recovery',{});await clock.settle();
+ assert.equal(await reviewing,true,'the review reads the sources');
+ const chose=ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}});await clock.settle();
+ assert.equal(await chose,true,'and this device’s board can be chosen');
+ const applying=ctx.onAction('apply-cloud-source-recovery',{});await clock.settle();
+ const applied=await applying;
+ assert.equal(applied,true,'Apply publishes the chosen source');
+ const root=device.docs.get('users/owner');
+ assert.ok(root.rev>acknowledged.rev,'as the next revision');
+ assert.equal((await device.cloud()).board.considered?.[candidate],'no','holding this device’s answer');
+ assert.equal(ctx.state.syncRev,root.rev,'this device confirmed it');
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','the device shows synced');
+ const saved=await ctx.window.ScannerDeviceStore.readHead();
+ assert.equal(saved.payload,JSON.stringify(ctx.state),'and its saved board is the board it holds');
+});
+
+// #2436 (older versions): the supported floor and the release base read the
+// head alone. Each opens a device whose push acknowledgement is recorded
+// beside its head on the board one acknowledged revision behind, with every
+// answer; its first cloud read reconciles that with no error or recovery
+// hold, and it saves and syncs an edit. This version then opens the head that
+// release wrote, which the earlier row does not name, and syncs on from it. A
+// board the floor wrote holds choices the floor recorded without this
+// version's decision evidence, which this version keeps exactly and holds, as
+// after any board the floor writes; only the release base's is synced here.
+test('RISK BACKWARD COMPATIBILITY: the supported floor and the release base open a device whose push acknowledgement is recorded beside its head, keep every answer and sync, and the candidate then opens the board they saved',{timeout:300000},async t=>{
+ const {readReleasedClient,SUPPORTED_RELEASE}=await import('../scripts/backward-compatibility.mjs');
+ const base=process.env.COMPATIBILITY_BASE_SHA||spawnSync('git',['rev-parse','origin/main'],{cwd:__dirname,encoding:'utf8'}).stdout.trim();
+ assert.match(base,/^[0-9a-f]{40}$/,'positive control: the release base is a commit');
+ for(const sha of [...new Set([SUPPORTED_RELEASE,base])])await t.test(sha.slice(0,7),async sub=>{
+  const {device,candidate,revision,uploads}=await answeredBeforePush2436(sub,'compat-'+sha.slice(0,7));
+  const {ctx,clock,counters}=device,commits=counters.commits.length;
+  await clock.settle();
+  assert.equal(counters.uploads.length-uploads,1,'positive control: the No is pushed');
+  assert.equal(ctx.state.syncRev,revision+1,'positive control: and acknowledged');
+  assert.equal(counters.commits.length,commits,'positive control: beside the head, with no whole-board save');
+  const acknowledged=ctx.state.syncRev;
+  await device.close();
+  const released=readReleasedClient(__dirname,sha);
+  const old=await loadApp({artifacts:released,appSource:extractAppScript(released.html),sharedStorage:device.storage,
+   indexedDBProvider:device.indexedDB,deviceDbName:device.dbName});
+  const backend=await loadCloudBackendV2({artifacts:released,runtimeWindow:old.ctx.window,sharedDocs:device.docs,failures:{authPending:true},
+   timeoutMs:5000,recordSyncError:old.ctx.recordSyncError,serverClock:Date.now});
+  let closed=false;
+  const close=async()=>{if(closed)return;closed=true;backend.CS.suspend?.();
+   try{vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer)',old.ctx);}catch{}await old.dispose?.();};
+  sub.after(close);
+  old.ctx.window.cloudPull=old.ctx.cloudPull;old.ctx.window.CLOUD_PUSH_DELAY_MS=0;
+  assert.equal(old.ctx.state.considered?.[candidate],'no','the release opens the board with the answer');
+  assert.equal(old.ctx.state.syncRev,revision,'one acknowledged revision behind: it reads the head alone');
+  backend.emitAuth(ACCOUNT2408);
+  await old.ctx.cloudPull();await settleRecoveryOperations188(old.ctx);
+  assert.notEqual(old.ctx.window.CloudSync.status,'error','its first cloud read reconciles with no error ('+old.ctx.window.CloudSync.errorCode+')');
+  assert.equal(vm.runInContext('cloudAdoptionHeld',old.ctx),false,'and holds nothing for recovery');
+  assert.equal(old.ctx.state.considered?.[candidate],'no','and keeps the answer');
+  assert.ok(old.ctx.state.syncRev>=acknowledged,'on the cloud’s revision');
+  old.ctx.addTask('Added on the release');
+  assert.equal(await old.ctx.persist(),true,'the release saves an edit on this device');
+  await old.ctx.cloudPull();await old.ctx.sendPush();
+  let cloud=null;
+  for(const end=Date.now()+15000;Date.now()<end;await new Promise(resolve=>setTimeout(resolve,20))){
+   await settleRecoveryOperations188(old.ctx);
+   cloud=JSON.parse((await backend.CS.pull()).payload);
+   if(cloud.tasks.some(task=>task.title==='Added on the release')&&!vm.runInContext('pulling||cloudPushInFlight',old.ctx))break;
+  }
+  assert.ok(cloud.tasks.some(task=>task.title==='Added on the release'),'and syncs it');
+  const releaseRevision=old.ctx.state.syncRev;
+  await close();
+  const reopened=await answeringDevice2408(sub,{docs:device.docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,changeRecords:false,signedIn:false});
+  const opened=reopened.ctx.state;
+  assert.ok(opened.tasks.some(task=>task.title==='Added on the release'),'the candidate opens the board the release saved');
+  assert.equal(opened.considered?.[candidate],'no','with the answer');
+  assert.equal(opened.syncRev,releaseRevision,'on the revision the release saved, not the earlier row’s');
+  if(sha===base){
+   reopened.signIn();await syncSettled(reopened.ctx,{within:20000});
+   assert.notEqual(reopened.ctx.window.CloudSync.status,'error','and syncs on from it with no error ('+reopened.ctx.window.CloudSync.errorCode+')');
+   assert.equal(reopened.ctx.state.syncDirty,false,'with nothing left to push');
+  }
+  await reopened.close();
+ });
 });
 
 // #2427: the acknowledgement a push records stays as durable as the
