@@ -4057,6 +4057,23 @@ test('RISK decision evidence guidance: the November 21 changelog has one bullet 
  assert.doesNotMatch(bullet,/within about a second|30 seconds/,'showing synced and the full copy\'s pause are their own features');
 });
 
+// #2436: the changelog says, in one bullet of its own, that once the cloud
+// confirms a full copy the app no longer saves the whole board again on this
+// device to note it, so it pauses less after a large board syncs, and that an
+// app closed right after still opens on the confirmed copy.
+test('RISK push acknowledgement guidance: the November 21 changelog says the app pauses less after the cloud confirms a full copy because it no longer saves the whole board again to note it, in one bullet with its limit',async()=>{
+ const {shim}=await loadApp();
+ shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ const current=shim.document.getElementById('appChangelogCurrent').innerHTML.split('<h3>November 21, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.ok(current,'the changelog has a November 21, 2026 section');
+ const items=current.split('<li>').slice(1),noted=items.filter(item=>/no longer saves the whole board again on this device/.test(item));
+ assert.equal(noted.length,1,'one bullet says the app no longer saves the whole board again to note a confirmed full copy');
+ assert.match(noted[0],/once the cloud confirms a full copy of your board/);
+ assert.match(noted[0],/pauses less right after a large board syncs/);
+ assert.match(noted[0],/still opens on the copy the cloud confirmed/,'the bullet keeps the limit that belongs to it');
+ assert.doesNotMatch(noted[0],/within about a second|30 seconds/,'showing synced and the full copy’s pause are their own features');
+});
+
 test('RISK sync responsiveness guidance: mounted Help explains large boards and bounded damaged-source recovery',async()=>{
  const {ctx,shim}=await loadApp();
  for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
