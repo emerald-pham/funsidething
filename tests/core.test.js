@@ -23865,6 +23865,8 @@ test('RISK steady scanner browser: the finish row sits on its own line under the
 // Postpone included, share one width; on a phone Postpone keeps its longer
 // label's width so the row stays on one line.
 const buttonMinEm=viewportWidth=>viewportWidth<=420?5:6;
+// 200% button text, the issue's largest size (STEADY_ENLARGED_TEXT is 150%).
+const STEADY_DOUBLE_TEXT=STEADY_ENLARGED_TEXT.replace('.btn{font-size:21px','.btn{font-size:28px');
 test('RISK steady scanner browser: Yes No and Cant share one width and no scanner or side-rail button is narrower than the shared minimum, including a newly added choice, across phone enlarged short-landscape tablet and desktop views in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[];
  const measureWithAddedChoice=page=>page.evaluate(()=>{
@@ -23886,6 +23888,8 @@ test('RISK steady scanner browser: Yes No and Cant share one width and no scanne
     {name:'iPhone portrait',width:390,height:844},
     {name:'iPhone portrait with Postpone',width:390,height:844,showPostpone:true},
     {name:'short landscape with Postpone',width:844,height:390,showPostpone:true},
+    {name:'large phone at 200% text with Postpone',width:430,height:932,enlarged:true,doubleText:true,showPostpone:true},
+    {name:'just above phone width at 200% text',width:421,height:900,enlarged:true,doubleText:true},
     {name:'tablet portrait with Postpone',width:768,height:1024,showPostpone:true},
     {name:'desktop with Postpone',width:1000,height:900,touch:false,showPostpone:true},
    ])for(const webFonts of [true,false]){
@@ -23899,7 +23903,7 @@ test('RISK steady scanner browser: Yes No and Cant share one width and no scanne
       await page.reload({waitUntil:'domcontentloaded'});
       await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]'),null,{timeout:60000});
      }
-     if(spec.enlarged)await page.addStyleTag({content:STEADY_ENLARGED_TEXT});
+     if(spec.enlarged)await page.addStyleTag({content:spec.doubleText?STEADY_DOUBLE_TEXT:STEADY_ENLARGED_TEXT});
      await page.waitForFunction(()=>!!document.querySelector('.decide [data-act="cant"]')&&!!document.querySelector('.siderail [data-act="cand-worked"]'),null,{timeout:15000});
      await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(80);
      const loadedFonts=await page.evaluate(()=>[...document.fonts].filter(face=>face.status==='loaded').length);
