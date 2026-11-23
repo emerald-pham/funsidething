@@ -23487,10 +23487,12 @@ async function steadyScannerEngines(){
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT||process.env.PLAYWRIGHT_MODULE||'playwright');
  return [['chromium',chromium],['webkit',webkit]];
 }
-async function steadyScannerPage(browser,board,{width=390,height=844,touch=true}={}){
- const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+// webFonts lets the Google Fonts hosts through, for checks whose widths depend
+// on the fonts a person actually sees (#2449); every other request stays local.
+async function steadyScannerPage(browser,board,{width=390,height=844,touch=true,webFonts=false}={}){
+ const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin,fontHosts=webFonts?['fonts.googleapis.com','fonts.gstatic.com']:[];
  const context=await browser.newContext({viewport:{width,height},deviceScaleFactor:3,hasTouch:touch,isMobile:touch,serviceWorkers:'block',reducedMotion:'reduce'});
- await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+ await context.route('**/*',route=>{const url=new URL(route.request().url());return url.origin===origin||fontHosts.includes(url.hostname)?route.continue():route.abort();});
  await context.addInitScript(board=>{
   Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
   localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
@@ -23732,6 +23734,65 @@ test('RISK steady scanner browser: the finish row sits on its own line under the
      assert.ok(seen.finish.top>=lowest-0.5,`${label}: the finish row starts on its own line under the choices: it starts at ${Math.round(seen.finish.top)}, the choices end at ${Math.round(lowest)}`);
      assert.ok(seen.finish.left>=seen.scan.left&&seen.finish.right<=seen.scan.right&&seen.finish.bottom<=seen.scan.bottom,`${label}: the finish row sits inside the scanner box`);
      assert.ok(seen.overflow<=0,`${label}: no sideways page overflow: ${seen.overflow}`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(error.message.split('\n')[0]);}finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+// #2449: Yes, No and Can't shrank to their labels (47 to 64 px on a phone) right
+// under side-rail actions of the same colours that were far wider. Every button
+// now shares one minimum width that scales with its own font size (6 em, or
+// 5.25 em at 420 px and under, where three choices must share a 320 px line and
+// Postpone must still join them at 390 px, as it did before), so
+// short labels match their neighbours, and a button added later with the
+// standard classes gets it without CSS of its own.
+const buttonMinEm=viewportWidth=>viewportWidth<=420?5.25:6;
+test('RISK steady scanner browser: Yes No and Cant share one width and no scanner or side-rail button is narrower than the shared minimum, including a newly added choice, across phone enlarged tablet and desktop views in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ const read=page=>page.evaluate(()=>{
+  const future=document.createElement('button');future.className='btn yes';future.dataset.act='future-choice';future.textContent='Ok';
+  document.querySelector('.decide').insertBefore(future,document.querySelector('.decide-finish'));
+  const seen=[...document.querySelectorAll('#scan .btn')].filter(el=>el.offsetParent).map(el=>{const r=el.getBoundingClientRect();return {act:el.dataset.act,className:el.className,width:r.width,right:r.right,top:r.top,fontSize:parseFloat(getComputedStyle(el).fontSize),clipped:el.scrollWidth>el.clientWidth+1};});
+  future.remove();
+  return {buttons:seen,scanRight:document.getElementById('scan').getBoundingClientRect().right,overflow:document.documentElement.scrollWidth-innerWidth,viewportWidth:innerWidth};
+ });
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const spec of [
+    {name:'small phone',width:320,height:568},
+    {name:'small phone with enlarged text and Postpone',width:320,height:568,enlarged:true,showPostpone:true},
+    {name:'iPhone portrait',width:390,height:844},
+    {name:'iPhone portrait with Postpone',width:390,height:844,showPostpone:true},
+    {name:'tablet portrait with Postpone',width:768,height:1024,showPostpone:true},
+    {name:'desktop with Postpone',width:1000,height:900,touch:false,showPostpone:true},
+   ])for(const webFonts of [true,false]){
+    const label=`${engineName} ${spec.name} ${webFonts?'with web fonts':'fonts blocked'}`;
+    const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard(spec),{...spec,webFonts});
+    try{
+     if(spec.enlarged)await page.addStyleTag({content:STEADY_ENLARGED_TEXT});
+     await page.waitForFunction(()=>!!document.querySelector('.decide [data-act="cant"]')&&!!document.querySelector('.siderail [data-act="cand-worked"]'),null,{timeout:15000});
+     await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(80);
+     const loadedFonts=await page.evaluate(()=>[...document.fonts].filter(face=>face.status==='loaded').length);
+     if(webFonts)assert.ok(loadedFonts>0,`${label}: positive control: the web fonts loaded, which needs the network`);
+     else assert.equal(loadedFonts,0,`${label}: positive control: no web font loaded`);
+     const shot=await read(page);
+     const by=act=>shot.buttons.find(b=>b.act===act);
+     assert.ok(by('future-choice'),`${label}: the added choice renders`);
+     if(spec.showPostpone)assert.ok(by('postpone'),`${label}: Postpone is shown`);
+     for(const b of shot.buttons){
+      const min=buttonMinEm(shot.viewportWidth)*b.fontSize;
+      assert.ok(b.width>=min-0.5,`${label}: ${b.act} (${b.className}) is ${b.width.toFixed(1)} px wide, under the shared ${min.toFixed(1)} px minimum`);
+      assert.equal(b.clipped,false,`${label}: ${b.act} shows its whole label`);
+      assert.ok(b.right<=shot.scanRight+0.5,`${label}: ${b.act} stays inside the scanner box`);
+     }
+     const choices=['yes','no','cant','future-choice'].map(by);
+     assert.ok(Math.max(...choices.map(c=>c.width))-Math.min(...choices.map(c=>c.width))<=0.5,`${label}: Yes, No, Can't and an added choice share one width: ${choices.map(c=>c.act+' '+c.width.toFixed(1)).join(', ')}`);
+     if(!spec.enlarged){const acts=['yes','no','cant',...(spec.showPostpone?['postpone']:[])],tops=new Set(acts.map(act=>Math.round(by(act).top)));assert.equal(tops.size,1,`${label}: ${acts.join(', ')} share one line`);}
+     assert.ok(shot.overflow<=0,`${label}: no sideways page overflow: ${shot.overflow}`);
      assert.deepEqual(errors,[],`${label}: no page errors`);
     }catch(error){failures.push(error.message.split('\n')[0]);}finally{await context.close();}
    }
