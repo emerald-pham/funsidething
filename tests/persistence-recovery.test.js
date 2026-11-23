@@ -19764,17 +19764,34 @@ test('RISK push work: a full copy whose acknowledgement is recorded beside the h
  assert.equal(JSON.stringify(reopened.ctx.state.syncRecords),position,'and on that position, before any cloud read');
 });
 
-// #2436 (older versions): the supported floor and the release base read the
-// head alone. Each opens a device whose push acknowledgement is recorded
-// beside its head on the board one acknowledged revision behind, with every
-// answer; its first cloud read reconciles that with no error or recovery
-// hold, and it saves and syncs an edit. This version then opens the head that
-// release wrote, which the earlier row does not name, and syncs on from it. A
-// board the floor wrote holds choices the floor recorded without this
-// version's decision evidence, which this version keeps exactly and holds, as
-// after any board the floor writes; only the release base's is synced here.
-test('RISK BACKWARD COMPATIBILITY: the supported floor and the release base open a device whose push acknowledgement is recorded beside its head, keep every answer and sync, and the candidate then opens the board they saved',{timeout:300000},async t=>{
+// #2436 (older versions): the supported floor and the release base each open
+// a device whose push acknowledgement is recorded beside its head, with every
+// answer. A release whose device store has no acknowledgement row reads the
+// head alone, one acknowledged revision behind; one that reads the row opens
+// on the acknowledged revision. Either way its first cloud read reconciles
+// with no error or recovery hold, and it saves and syncs an edit. This version
+// then opens the head that release wrote, which the earlier row does not name,
+// and syncs on from it. A board the floor wrote holds choices the floor
+// recorded without this version's decision evidence, which this version keeps
+// exactly and holds, as after any board the floor writes; only the release
+// base's is synced here.
+// #2453: which of the two a release does follows from its own device store,
+// not from its commit: the base became a release that reads the row with the
+// #2445 merge, and every base after it does too. A release reads the row when
+// its device store reads the meta key this version records the row under.
+// The two expectations differ, so a release this misjudges fails here rather
+// than passing on the other expectation.
+const ACKNOWLEDGEMENT_ROW_KEY2453='acknowledgement';
+function readsAcknowledgementRow2453(storage){
+ const key=ACKNOWLEDGEMENT_ROW_KEY2453,literal=new RegExp('(["\'])'+key+'\\1','g');
+ const names=[...storage.matchAll(new RegExp('\\b(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*(["\'])'+key+'\\2','g'))].map(match=>match[1]);
+ const refs=[...new Set([...(storage.match(literal)||[]),...names])].map(ref=>ref.replace(/[$]/g,'\\$&'));
+ return refs.some(ref=>new RegExp('\\.get\\(\\s*'+ref+'\\s*\\)').test(storage));
+}
+test('RISK BACKWARD COMPATIBILITY: the supported floor and the release base open a device whose push acknowledgement is recorded beside its head, each on the revision its own device store can read, keep every answer and sync, and the candidate then opens the board they saved',{timeout:300000},async t=>{
  const {readReleasedClient,SUPPORTED_RELEASE}=await import('../scripts/backward-compatibility.mjs');
+ assert.equal(readsAcknowledgementRow2453(fs.readFileSync(path.join(__dirname,'device-store-v2.js'),'utf8')),true,'positive control: this version’s device store reads the acknowledgement row');
+ assert.equal(readsAcknowledgementRow2453(readReleasedClient(__dirname,SUPPORTED_RELEASE).storage),false,'positive control: the supported floor’s, which predates the row, does not');
  const base=process.env.COMPATIBILITY_BASE_SHA||spawnSync('git',['rev-parse','origin/main'],{cwd:__dirname,encoding:'utf8'}).stdout.trim();
  assert.match(base,/^[0-9a-f]{40}$/,'positive control: the release base is a commit');
  for(const sha of [...new Set([SUPPORTED_RELEASE,base])])await t.test(sha.slice(0,7),async sub=>{
@@ -19785,8 +19802,10 @@ test('RISK BACKWARD COMPATIBILITY: the supported floor and the release base open
   assert.equal(ctx.state.syncRev,revision+1,'positive control: and acknowledged');
   assert.equal(counters.commits.length,commits,'positive control: beside the head, with no whole-board save');
   const acknowledged=ctx.state.syncRev;
+  const meta=(await ctx.window.ScannerDeviceStore.readRawExportSnapshot()).stores.meta,row=meta.values[meta.keys.indexOf(ACKNOWLEDGEMENT_ROW_KEY2453)];
+  assert.ok(row&&row.head===meta.values[meta.keys.indexOf('head')]?.hash,'positive control: the acknowledgement is recorded beside the head, under the key the release is judged by');
   await device.close();
-  const released=readReleasedClient(__dirname,sha);
+  const released=readReleasedClient(__dirname,sha),readsRow=readsAcknowledgementRow2453(released.storage);
   const old=await loadApp({artifacts:released,appSource:extractAppScript(released.html),sharedStorage:device.storage,
    indexedDBProvider:device.indexedDB,deviceDbName:device.dbName});
   const backend=await loadCloudBackendV2({artifacts:released,runtimeWindow:old.ctx.window,sharedDocs:device.docs,failures:{authPending:true},
@@ -19797,7 +19816,8 @@ test('RISK BACKWARD COMPATIBILITY: the supported floor and the release base open
   sub.after(close);
   old.ctx.window.cloudPull=old.ctx.cloudPull;old.ctx.window.CLOUD_PUSH_DELAY_MS=0;
   assert.equal(old.ctx.state.considered?.[candidate],'no','the release opens the board with the answer');
-  assert.equal(old.ctx.state.syncRev,revision,'one acknowledged revision behind: it reads the head alone');
+  if(readsRow)assert.equal(old.ctx.state.syncRev,acknowledged,'a release that reads the acknowledgement row opens on the acknowledged revision');
+  else assert.equal(old.ctx.state.syncRev,revision,'one acknowledged revision behind: a release with no acknowledgement row reads the head alone');
   backend.emitAuth(ACCOUNT2408);
   await old.ctx.cloudPull();await settleRecoveryOperations188(old.ctx);
   assert.notEqual(old.ctx.window.CloudSync.status,'error','its first cloud read reconciles with no error ('+old.ctx.window.CloudSync.errorCode+')');
