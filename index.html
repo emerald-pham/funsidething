@@ -180,8 +180,8 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
    enlarged text scale with it: short labels such as Yes, No and Can't no longer
    shrink below their neighbours, and a new button gets it without CSS (#2449).
    6em fits Can't with its key hint, so the three choices match on wide screens;
-   phones take 5.25em (below), where the choices' tighter padding needs less,
-   all three share one line at 320px and Postpone still joins them at 390px.
+   phones take 5em (below), where the choices' tighter padding needs less,
+   all three share one line at 320px and Postpone still joins them at 375px.
    Layouts that must share a narrow row still override it with min-width:0. */
 .btn{border-radius:8px;border:1px solid transparent;padding:8px 16px;font-weight:700;font-size:14px;color:#fff;box-shadow:0 1px 2px rgba(20,24,48,.15);min-inline-size:6em;text-align:center}
 .btn:active{transform:translateY(1px)}
@@ -456,7 +456,7 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
 /* Keep constrained scanner cards and the finish group readable when enlarged.
    Wrapping preserves every action; clipping would hide a choice. */
 @media (max-width:420px){
-  .btn{min-inline-size:5.25em}   /* #2449: the phone minimum; see .btn */
+  .btn{min-inline-size:5em}   /* #2449: the phone minimum; see .btn */
   .decide>.btn{padding-left:8px;padding-right:8px}
   .crumb{max-width:min(190px,100%)}
   .card{flex-wrap:wrap}
