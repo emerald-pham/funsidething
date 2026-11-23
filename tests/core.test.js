@@ -23487,12 +23487,10 @@ async function steadyScannerEngines(){
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT||process.env.PLAYWRIGHT_MODULE||'playwright');
  return [['chromium',chromium],['webkit',webkit]];
 }
-// webFonts lets the Google Fonts hosts through, for checks whose widths depend
-// on the fonts a person actually sees (#2449); every other request stays local.
-async function steadyScannerPage(browser,board,{width=390,height=844,touch=true,webFonts=false}={}){
- const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin,fontHosts=webFonts?['fonts.googleapis.com','fonts.gstatic.com']:[];
+async function steadyScannerPage(browser,board,{width=390,height=844,touch=true}={}){
+ const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
  const context=await browser.newContext({viewport:{width,height},deviceScaleFactor:3,hasTouch:touch,isMobile:touch,serviceWorkers:'block',reducedMotion:'reduce'});
- await context.route('**/*',route=>{const url=new URL(route.request().url());return url.origin===origin||fontHosts.includes(url.hostname)?route.continue():route.abort();});
+ await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
  await context.addInitScript(board=>{
   Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
   localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
@@ -23775,8 +23773,15 @@ test('RISK steady scanner browser: Yes No and Cant share one width and no scanne
     {name:'desktop with Postpone',width:1000,height:900,touch:false,showPostpone:true},
    ])for(const webFonts of [true,false]){
     const label=`${engineName} ${spec.name} ${webFonts?'with web fonts':'fonts blocked'}`;
-    const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard(spec),{...spec,webFonts});
+    const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard(spec),spec);
     try{
+     // The helper blocks every outside host. Widths depend on the fonts a person
+     // sees, so let the Google Fonts hosts through (the newest route wins) and reload.
+     if(webFonts){
+      await context.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//,route=>route.continue());
+      await page.reload({waitUntil:'domcontentloaded'});
+      await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]'),null,{timeout:60000});
+     }
      if(spec.enlarged)await page.addStyleTag({content:STEADY_ENLARGED_TEXT});
      await page.waitForFunction(()=>!!document.querySelector('.decide [data-act="cant"]')&&!!document.querySelector('.siderail [data-act="cand-worked"]'),null,{timeout:15000});
      await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(80);
