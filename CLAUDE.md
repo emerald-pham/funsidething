@@ -49,8 +49,8 @@ alone is not shipment.
 Verify the applied theme attribute, computed color scheme and paint before
 accepting each theme capture; theme labels alone do not establish coverage.
 
-For new or changed controls or layout, follow
-[UI consistency](docs/agents/ui-consistency.md) before styling, and read
+For new or changed controls or layout, style them per
+[UI consistency](docs/agents/ui-consistency.md), and read
 [visual test requirements](docs/agents/rendered-evidence.md#visual-test-requirements)
 before capturing or reviewing evidence.
 

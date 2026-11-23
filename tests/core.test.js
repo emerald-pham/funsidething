@@ -23748,14 +23748,16 @@ test('RISK steady scanner browser: the finish row sits on its own line under the
 // 5.25 em at 420 px and under, where three choices must share a 320 px line and
 // Postpone must still join them at 390 px, as it did before), so
 // short labels match their neighbours, and a button added later with the
-// standard classes gets it without CSS of its own.
+// standard classes gets it without CSS of its own. Above 420 px the choices,
+// Postpone included, share one width; on a phone Postpone keeps its longer
+// label's width so the row stays on one line.
 const buttonMinEm=viewportWidth=>viewportWidth<=420?5.25:6;
-test('RISK steady scanner browser: Yes No and Cant share one width and no scanner or side-rail button is narrower than the shared minimum, including a newly added choice, across phone enlarged tablet and desktop views in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+test('RISK steady scanner browser: Yes No and Cant share one width and no scanner or side-rail button is narrower than the shared minimum, including a newly added choice, across phone enlarged short-landscape tablet and desktop views in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[];
- const read=page=>page.evaluate(()=>{
+ const measureWithAddedChoice=page=>page.evaluate(()=>{
   const future=document.createElement('button');future.className='btn yes';future.dataset.act='future-choice';future.textContent='Ok';
   document.querySelector('.decide').insertBefore(future,document.querySelector('.decide-finish'));
-  const seen=[...document.querySelectorAll('#scan .btn')].filter(el=>el.offsetParent).map(el=>{const r=el.getBoundingClientRect();return {act:el.dataset.act,className:el.className,width:r.width,right:r.right,top:r.top,fontSize:parseFloat(getComputedStyle(el).fontSize),clipped:el.scrollWidth>el.clientWidth+1};});
+  const seen=[...document.querySelectorAll('#scan .btn')].filter(el=>el.offsetParent).map(el=>{const r=el.getBoundingClientRect();return {act:el.dataset.act,className:el.className,width:r.width,height:r.height,right:r.right,top:r.top,fontSize:parseFloat(getComputedStyle(el).fontSize),clipped:el.scrollWidth>el.clientWidth+1};});
   future.remove();
   return {buttons:seen,scanRight:document.getElementById('scan').getBoundingClientRect().right,overflow:document.documentElement.scrollWidth-innerWidth,viewportWidth:innerWidth};
  });
@@ -23763,10 +23765,12 @@ test('RISK steady scanner browser: Yes No and Cant share one width and no scanne
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
   try{
    for(const spec of [
+    {name:'narrowest phone with enlarged text and Postpone',width:260,height:568,enlarged:true,showPostpone:true},
     {name:'small phone',width:320,height:568},
     {name:'small phone with enlarged text and Postpone',width:320,height:568,enlarged:true,showPostpone:true},
     {name:'iPhone portrait',width:390,height:844},
     {name:'iPhone portrait with Postpone',width:390,height:844,showPostpone:true},
+    {name:'short landscape with Postpone',width:844,height:390,showPostpone:true},
     {name:'tablet portrait with Postpone',width:768,height:1024,showPostpone:true},
     {name:'desktop with Postpone',width:1000,height:900,touch:false,showPostpone:true},
    ])for(const webFonts of [true,false]){
@@ -23779,7 +23783,7 @@ test('RISK steady scanner browser: Yes No and Cant share one width and no scanne
      const loadedFonts=await page.evaluate(()=>[...document.fonts].filter(face=>face.status==='loaded').length);
      if(webFonts)assert.ok(loadedFonts>0,`${label}: positive control: the web fonts loaded, which needs the network`);
      else assert.equal(loadedFonts,0,`${label}: positive control: no web font loaded`);
-     const shot=await read(page);
+     const shot=await measureWithAddedChoice(page);
      const by=act=>shot.buttons.find(b=>b.act===act);
      assert.ok(by('future-choice'),`${label}: the added choice renders`);
      if(spec.showPostpone)assert.ok(by('postpone'),`${label}: Postpone is shown`);
@@ -23789,8 +23793,9 @@ test('RISK steady scanner browser: Yes No and Cant share one width and no scanne
       assert.equal(b.clipped,false,`${label}: ${b.act} shows its whole label`);
       assert.ok(b.right<=shot.scanRight+0.5,`${label}: ${b.act} stays inside the scanner box`);
      }
-     const choices=['yes','no','cant','future-choice'].map(by);
-     assert.ok(Math.max(...choices.map(c=>c.width))-Math.min(...choices.map(c=>c.width))<=0.5,`${label}: Yes, No, Can't and an added choice share one width: ${choices.map(c=>c.act+' '+c.width.toFixed(1)).join(', ')}`);
+     const choices=['yes','no','cant','future-choice',...(spec.showPostpone&&shot.viewportWidth>420?['postpone']:[])].map(by);
+     for(const c of [...choices,...(spec.showPostpone?[by('postpone')]:[])])assert.ok(c.height>=44,`${label}: ${c.act} keeps the 44 px tap height: ${c.height.toFixed(1)} px`);
+     assert.ok(Math.max(...choices.map(c=>c.width))-Math.min(...choices.map(c=>c.width))<=0.5,`${label}: the choices share one width: ${choices.map(c=>c.act+' '+c.width.toFixed(1)).join(', ')}`);
      if(!spec.enlarged){const acts=['yes','no','cant',...(spec.showPostpone?['postpone']:[])],tops=new Set(acts.map(act=>Math.round(by(act).top)));assert.equal(tops.size,1,`${label}: ${acts.join(', ')} share one line`);}
      assert.ok(shot.overflow<=0,`${label}: no sideways page overflow: ${shot.overflow}`);
      assert.deepEqual(errors,[],`${label}: no page errors`);
