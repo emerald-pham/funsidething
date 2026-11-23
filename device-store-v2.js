@@ -12,6 +12,14 @@
   // #2254: the acknowledged recovery trim's plan (a meta row) and the rows it
   // can never delete (see beginRecoveryTrim).
   const RECOVERY_TRIM_KEY="recoveryTrim",RECOVERY_TRIM_MAX_KEYS=4096;
+  // #2436: a push's acknowledgement recorded as one meta row beside the head
+  // (GLOSSARY: Saved board). No new store, so older app versions still open
+  // this database; they read the head alone.
+  const ACKNOWLEDGEMENT_KEY="acknowledgement";
+  // #2436 review S1: the board's device-only keys (the app's
+  // DEVICE_LOCAL_KEYS), the only values an acknowledgement row may set: an
+  // acknowledgement changes the board's bookkeeping and nothing else of it.
+  const ACKNOWLEDGEMENT_VALUE_KEYS=new Set(["syncRev","syncAccount","syncIdentity","lastCloudServerAt","syncDirty","protectedBackupIds","decisionBase","syncRecords"]);
   const RECOVERY_TRIM_KEPT_PREFIXES=Object.freeze(["unreadable-generation-record:","device-recovery-original:","device-recovery-file:","cloud-generation-recovery:","cloud-generation-recovery-summary:"]);
   // #2281 review: a recovery archive's summary. Archives are kept forever and
   // never replaced, and the previous release copied every earlier prepared
@@ -64,6 +72,79 @@
   const hex=array=>Array.from(new Uint8Array(array),value=>value.toString(16).padStart(2,"0")).join("");
   const digest=async value=>hex(await root.crypto.subtle.digest("SHA-256",value instanceof Uint8Array?value:bytes(value)));
   const hashPayload=async payload=>digest(bytes(payload));
+  /* #2436: the acknowledgement row (GLOSSARY: Saved board),
+     {v:1, head, id, headKeys, keys, values}: the head (its hash) it was
+     recorded for; the saved board's own identity while it names that head,
+     the hash of the saved board's text;
+     where each top-level value lies in the head's text, [key, start, end],
+     in order; the saved board's top-level keys in order; and the text of each
+     value the row sets. Every other key of the saved board takes its value's
+     text from the head's, so the saved board's text is made by slicing the
+     head's text, with no parse or serialization of the board. The row's shape
+     is checked here without reading the head. #2436 review S1: so is that it
+     is only bookkeeping: it sets no value but a device-only key's, and keeps
+     every other key the head's text holds. A row that is not, as stored,
+     names no head and never applies. */
+  const HASH_PATTERN=/^[0-9a-f]{64}$/;
+  const own=(object,key)=>Object.prototype.hasOwnProperty.call(object,key);
+  function acknowledgementParts(row){
+    if(!row||typeof row!=="object"||Array.isArray(row)||!Array.isArray(row.headKeys)||!Array.isArray(row.keys)||
+      !row.values||typeof row.values!=="object"||Array.isArray(row.values))return false;
+    const named=new Set();
+    for(const span of row.headKeys){
+      if(!Array.isArray(span)||span.length!==3||typeof span[0]!=="string"||named.has(span[0])||!Number.isSafeInteger(span[1])||
+        !Number.isSafeInteger(span[2])||span[1]<1||span[2]<=span[1])return false;
+      named.add(span[0]);
+    }
+    const keys=new Set(row.keys);
+    if(row.keys.some(key=>typeof key!=="string")||keys.size!==row.keys.length)return false;
+    return Object.keys(row.values).every(key=>ACKNOWLEDGEMENT_VALUE_KEYS.has(key)&&keys.has(key)&&typeof row.values[key]==="string"&&!!row.values[key])&&
+      row.keys.every(key=>own(row.values,key)||named.has(key))&&[...named].every(key=>ACKNOWLEDGEMENT_VALUE_KEYS.has(key)||keys.has(key));
+  }
+  function acknowledgementRow(row){
+    return !!row&&typeof row==="object"&&row.v===1&&typeof row.head==="string"&&HASH_PATTERN.test(row.head)&&
+      typeof row.id==="string"&&HASH_PATTERN.test(row.id)&&acknowledgementParts(row)?row:null;
+  }
+  // The saved board's text: the head's text with the row's values in place,
+  // in the row's key order, made by slicing. null when the row does not fit
+  // the head: its spans must tile the head's text exactly, "{", each key and
+  // its value, the commas between them, and "}".
+  function acknowledgedBoardText(payload,row){
+    if(typeof payload!=="string"||!acknowledgementParts(row)||payload[0]!=="{"||payload[payload.length-1]!=="}")return null;
+    if(!row.headKeys.length&&payload!=="{}")return null;
+    const spans=new Map();let at=1;
+    for(const [index,[key,start,end]] of row.headKeys.entries()){
+      const label=JSON.stringify(key)+":";
+      if(!payload.startsWith(label,at)||start!==at+label.length||end>payload.length-1)return null;
+      if(index===row.headKeys.length-1?end!==payload.length-1:payload[end]!==",")return null;
+      spans.set(key,[start,end]);at=end+1;
+    }
+    const parts=[];
+    for(const key of row.keys){
+      const text=own(row.values,key)?row.values[key]:payload.slice(spans.get(key)[0],spans.get(key)[1]);
+      parts.push(JSON.stringify(key)+":"+text);
+    }
+    return "{"+parts.join(",")+"}";
+  }
+  // Whether the row applies to this head: it names that head's hash.
+  const acknowledgementNames=(row,head)=>typeof head?.hash==="string"&&!!acknowledgementRow(row)&&row.head===head.hash;
+  // The saved board's identity: the head's hash, or the row's id while the row
+  // names that head. Every write made on condition of the saved board compares it.
+  const savedBoardIdentity=(head,row)=>!head?null:acknowledgementNames(row,head)?row.id:head.hash??null;
+  // The head's metadata as the head read returns it (its payload aside): the
+  // stored row, with the saved board's identity as its hash. A reviewed head
+  // a recovery compares in full is this record.
+  const savedHeadRecord=(head,row)=>head?(acknowledgementNames(row,head)?{...head,hash:row.id}:head):null;
+  // The saved board as the head read returns it. A row that names the head but
+  // does not fit it makes the saved board unreadable, as a corrupt head does.
+  // A saved board made with a row says so (acknowledged), in a property that is
+  // not enumerated, so a copy or comparison of the head sees only its record.
+  function savedBoardOf(head,row){
+    if(!head||!acknowledgementNames(row,head))return head;
+    const payload=acknowledgedBoardText(head.payload,row);
+    if(typeof payload!=="string")throw new Error("Durable device head is corrupt");
+    return Object.defineProperty({...head,hash:row.id,payload},"acknowledged",{value:true});
+  }
   // #2254 release review (B1): the rejections decodeSnapshot raises because the
   // chunks it was given do not match the header that describes them (a chunk
   // missing, out of place or altered, or a length or hash that differs). Only
@@ -380,7 +461,9 @@
       return count;
     }
 
-    async function readHead(){
+    // The head as stored, {...meta, payload}, and the acknowledgement row
+    // beside it (or null), read in one transaction.
+    async function readStoredHead(){
       ensureOpen();
       const tx=await beginTransaction(["meta","snapshots"],"readonly");
       // #2239 round 2: the head's snapshot is read by its key, which is the
@@ -392,19 +475,31 @@
       // rejects that promise and readonlyResults records the failure once;
       // readonlyRequest would record it a second time.
       const metaRequest=readonlyRequest(tx,"head",()=>tx.objectStore("meta").get("head"));
+      // #2436: the acknowledgement row is read in the same transaction.
+      const rowRequest=readonlyRequest(tx,"head",()=>tx.objectStore("meta").get(ACKNOWLEDGEMENT_KEY));
       const snapshotRequest=metaRequest.then(meta=>{
         if(typeof meta?.hash!=="string")return undefined;
         return requestResult(tx.objectStore("snapshots").get(meta.hash)).then(row=>row?.hash===meta.hash?row:
           requestResult(tx.objectStore("snapshots").getAll()).then(rows=>rows.find(item=>item?.hash===meta.hash)));
       });
-      const [meta,found]=await readonlyResults(tx,[metaRequest,snapshotRequest],"head");
+      const [meta,found,row]=await readonlyResults(tx,[metaRequest,snapshotRequest,rowRequest],"head");
       if(!meta) return null;
       if(typeof meta!=="object"||meta.schemaVersion!==SCHEMA_VERSION||typeof meta.hash!=="string"||!/^[0-9a-f]{64}$/.test(meta.hash))
         throw new Error("Durable device head format is unsupported");
       const snapshot=found;
       if(!snapshot||typeof snapshot.payload!=="string"||await sha(snapshot.payload)!==meta.hash)
         throw new Error("Durable device head is corrupt");
-      return {...meta,payload:snapshot.payload};
+      return {head:{...meta,payload:snapshot.payload},row:row??null};
+    }
+    /* #2436: the saved board (GLOSSARY): the head, with the acknowledgement
+       row applied when it names that head. Its hash is the saved board's
+       identity, which every write made on condition of the saved board
+       compares, and its payload the exact text a whole-board save would have
+       written. This is the one read of the saved board: the opening, the
+       app's saves and repairs and every recovery reader take it from here. */
+    async function readHead(){
+      const stored=await readStoredHead();
+      return stored&&savedBoardOf(stored.head,stored.row);
     }
 
     async function withCurrentHead(expectedHash,visit){
@@ -415,13 +510,18 @@
       // synchronous decision finishes; this operation never changes IDB data.
       const tx=await beginTransaction(["meta","snapshots","backups"],"readwrite"),done=transactionDone(tx);
       try{
-        const [head,snapshot,backups]=await Promise.all([
+        const [head,row,backups]=await Promise.all([
           requestResult(tx.objectStore("meta").get("head")),
-          requestResult(tx.objectStore("snapshots").get(expectedHash)),
+          requestResult(tx.objectStore("meta").get(ACKNOWLEDGEMENT_KEY)),
           requestResult(tx.objectStore("backups").getAll()),
         ]);
-        if(head?.hash!==expectedHash||snapshot?.hash!==expectedHash||typeof snapshot?.payload!=="string"||
-           visit({...head,payload:snapshot.payload},backups.map(row=>({...row})))!==true){
+        // #2436: expectedHash names the saved board, the head with its row;
+        // the head's own snapshot is under the head's hash.
+        const snapshot=typeof head?.hash==="string"?await requestResult(tx.objectStore("snapshots").get(head.hash)):undefined;
+        let saved=null;
+        try{if(savedBoardIdentity(head,row)===expectedHash&&snapshot?.hash===head.hash&&typeof snapshot?.payload==="string")saved=savedBoardOf({...head,payload:snapshot.payload},row);}
+        catch{saved=null;}
+        if(!saved||visit(saved,backups.map(row=>({...row})))!==true){
           tx.abort();try{await done;}catch(e){}return false;
         }
         await done;return true;
@@ -708,8 +808,8 @@
       if(typeof expectedHeadHash!=="string"||!Array.isArray(summaries)||summaries.some(row=>!validCloudRecoverySummary(row,row?.archiveKey)))return {error:true,code:"invalid-recovery-summary"};
       const tx=await beginTransaction(["meta","opaque"],"readwrite"),done=transactionDone(tx),meta=tx.objectStore("meta"),opaque=tx.objectStore("opaque");
       try{
-        const [head,holdKey]=await Promise.all([requestResult(meta.get("head")),requestResult(meta.getKey("recoveryCloudHold"))]);
-        if(head?.hash!==expectedHeadHash||holdKey!==undefined){tx.abort();try{await done;}catch{}return {conflict:true};}
+        const [head,holdKey,row]=await Promise.all([requestResult(meta.get("head")),requestResult(meta.getKey("recoveryCloudHold")),requestResult(meta.get(ACKNOWLEDGEMENT_KEY))]);
+        if(!head||savedBoardIdentity(head,row)!==expectedHeadHash||holdKey!==undefined){tx.abort();try{await done;}catch{}return {conflict:true};}
         const present=await Promise.all(summaries.map(row=>Promise.all([requestResult(opaque.getKey(row.archiveKey)),requestResult(opaque.getKey(cloudRecoverySummaryKey(row.archiveKey)))])));
         let written=0;
         summaries.forEach((row,index)=>{const [archive,summary]=present[index];
@@ -724,12 +824,13 @@
       if(typeof expectedHash!=="string"||typeof key!=="string"||!key||typeof raw!=="string")return false;
       if(summary!==null&&!validCloudRecoverySummary(summary,key))return false;
       const tx=await beginTransaction(["meta","opaque"],"readwrite"),done=transactionDone(tx);
-      const head=await requestResult(tx.objectStore("meta").get("head"));
+      const [head,row]=await Promise.all([requestResult(tx.objectStore("meta").get("head")),requestResult(tx.objectStore("meta").get(ACKNOWLEDGEMENT_KEY))]);
       const store=tx.objectStore("opaque"),summaryKey=cloudRecoverySummaryKey(key);
       const [existingKey,existing,existingSummary]=await Promise.all([requestResult(store.getKey(key)),requestResult(store.get(key)),summary?requestResult(store.getKey(summaryKey)):undefined]);
       // A peer edit or different evidence at this identity invalidates the
       // capture. Recovery never replaces an earlier protected original.
-      if(head?.hash!==expectedHash||existingKey!==undefined&&(existing?.key!==key||existing?.raw!==raw)){tx.abort();try{await done;}catch{}return false;}
+      // #2436: expectedHash names the saved board, the head with its row.
+      if(!head||savedBoardIdentity(head,row)!==expectedHash||existingKey!==undefined&&(existing?.key!==key||existing?.raw!==raw)){tx.abort();try{await done;}catch{}return false;}
       // #2281 review: the archive's summary is saved with it. A write that
       // aborts the transaction is waited for, so its failure is reported once.
       try{
@@ -776,9 +877,13 @@
         if(existingKey===undefined)opaque.put({...archive,order:Date.now()},archive.key);
         snapshots.put({...((previous&&Object.prototype.toString.call(previous)==="[object Object]")?previous:{}),hash,payload},hash);
         await done;
-        const [verified,archives]=await Promise.all([readHead(),listOpaqueArchives()]);
-        if(verified?.hash!==hash||verified.payload!==payload||!archives.some(row=>row.key===archive.key&&row.raw===archive.raw))
+        // #2436: the repaired snapshot is the head's own; an acknowledgement
+        // row beside the head still applies to it, so the saved board the
+        // repair hands back is the head with its row.
+        const [stored,archives]=await Promise.all([readStoredHead(),listOpaqueArchives()]);
+        if(stored?.head.hash!==hash||stored.head.payload!==payload||!archives.some(row=>row.key===archive.key&&row.raw===archive.raw))
           return {conflict:true};
+        let verified;try{verified=savedBoardOf(stored.head,stored.row);}catch{return {conflict:true};}
         return {ok:true,head:verified};
       }catch(error){try{tx.abort();}catch{}try{await done;}catch{}throw error;}
     }
@@ -808,6 +913,9 @@
         if(payload!==undefined){
           tx.objectStore("snapshots").put({hash:nextHash,payload},nextHash);
           tx.objectStore("meta").put({hash:nextHash,account,sourceFingerprint,schemaVersion:SCHEMA_VERSION,committedAt:Date.now()},"head");
+          // #2436: a recovered head carries its own bookkeeping; the exact
+          // acknowledgement row it replaces is in the raw source just compared.
+          tx.objectStore("meta").delete(ACKNOWLEDGEMENT_KEY);
           // #2254: a recovery that commits supersedes an unfinished trim; the
           // trim after its own acknowledgement plans again from what is left.
           if(hold){tx.objectStore("meta").put({...hold,headHash:nextHash},"recoveryCloudHold");tx.objectStore("meta").delete(RECOVERY_TRIM_KEY);}
@@ -831,14 +939,15 @@
     async function clearRecoveryCloudHold({expectedHeadHash,expectedHead,encodeHead=pendingJSON,expectedHold,encodeHold=pendingJSON}={}){
       ensureOpen();if(typeof expectedHeadHash!=="string"||!expectedHold)return false;
       const tx=await beginTransaction("meta","readwrite"),done=transactionDone(tx),store=tx.objectStore("meta");
-      const [head,hold]=await Promise.all([requestResult(store.get("head")),requestResult(store.get("recoveryCloudHold"))]);
+      const [head,hold,row]=await Promise.all([requestResult(store.get("head")),requestResult(store.get("recoveryCloudHold")),requestResult(store.get(ACKNOWLEDGEMENT_KEY))]);
       // Recovery supplies its existing lossless source encoder. Legacy callers
       // stay strict: JSON-lossy unknown facts cannot authorize deleting a hold.
       let same=false;
       try{const expected=encodeHold(expectedHold),current=encodeHold(hold);same=typeof expected==="string"&&typeof current==="string"&&expected===current;}catch{}
       let sameHead=expectedHead===undefined;
-      if(!sameHead)try{const expected=encodeHead(expectedHead),current=encodeHead(head??null);sameHead=typeof expected==="string"&&typeof current==="string"&&expected===current;}catch{}
-      if(head?.hash!==expectedHeadHash||!same||!sameHead){
+      if(!sameHead)try{const expected=encodeHead(expectedHead),current=encodeHead(savedHeadRecord(head,row));sameHead=typeof expected==="string"&&typeof current==="string"&&expected===current;}catch{}
+      // #2436: expectedHeadHash names the saved board, the head with its row.
+      if(!head||savedBoardIdentity(head,row)!==expectedHeadHash||!same||!sameHead){
         tx.abort();try{await done;}catch{}return false;
       }
       store.delete("recoveryCloudHold");await done;return true;
@@ -873,9 +982,10 @@
     async function recoveryTrimTransaction(expectedHeadHash,visit){
       const tx=await beginTransaction(["meta","opaque"],"readwrite"),done=transactionDone(tx),meta=tx.objectStore("meta");
       try{
-        const [head,holdKey,plan]=await Promise.all([requestResult(meta.get("head")),requestResult(meta.getKey("recoveryCloudHold")),
-          requestResult(meta.get(RECOVERY_TRIM_KEY))]);
-        const result=holdKey!==undefined?{held:true}:head?.hash!==expectedHeadHash?{conflict:true}:
+        const [head,holdKey,plan,row]=await Promise.all([requestResult(meta.get("head")),requestResult(meta.getKey("recoveryCloudHold")),
+          requestResult(meta.get(RECOVERY_TRIM_KEY)),requestResult(meta.get(ACKNOWLEDGEMENT_KEY))]);
+        // #2436: expectedHeadHash names the saved board, the head with its row.
+        const result=holdKey!==undefined?{held:true}:!head||savedBoardIdentity(head,row)!==expectedHeadHash?{conflict:true}:
           await visit({head,plan,meta,opaque:tx.objectStore("opaque")});
         if(!result?.ok){tx.abort();try{await done;}catch{}return result;}
         await done;return result;
@@ -921,12 +1031,13 @@
         prepared.push({row:{...row,payloadHash:await sha(row.payload)},payload:row.payload});
       }
       const tx=await beginTransaction(storeNames,"readwrite"),metaStore=tx.objectStore("meta"),snapshotStore=tx.objectStore("snapshots"),backupStore=tx.objectStore("backups"),opaqueStore=tx.objectStore("opaque");
-      const existing=await requestResult(metaStore.get("head"));
+      const [existing,existingRow]=await Promise.all([requestResult(metaStore.get("head")),requestResult(metaStore.get(ACKNOWLEDGEMENT_KEY))]);
       if(existing){
         tx.abort();
         try{await transactionDone(tx);}catch(e){}
         const head=await readHead();
-        return {ok:true,verified:head?.hash===existing.hash,existing:true,hash:head?.hash};
+        // #2436: the saved board read is the head with its acknowledgement row.
+        return {ok:true,verified:head?.hash===savedBoardIdentity(existing,existingRow),existing:true,hash:head?.hash};
       }
       snapshotStore.put({hash:headHash,payload:legacy.headPayload},headHash);
       for(const item of prepared){
@@ -937,6 +1048,8 @@
         opaqueStore.put({...row,order},`${order}:${String(row?.key||"")}`);
       metaStore.put({hash:headHash,account:legacy.account??null,sourceFingerprint:legacy.sourceFingerprint??null,
         schemaVersion:SCHEMA_VERSION,committedAt:Date.now()},"head");
+      // #2436: a first head carries its own bookkeeping.
+      metaStore.delete(ACKNOWLEDGEMENT_KEY);
       await transactionDone(tx);
       const [head,backups,opaque]=await Promise.all([readHead(),listBackups(),listOpaqueArchives()]);
       const exactBackups=(legacy.backups||[]).every(row=>backups.some(saved=>saved.id===row.id&&saved.payload===row.payload&&saved.kind===row.kind));
@@ -962,20 +1075,23 @@
         ids.add(candidate.id);preparedBackups.push({...candidate,payloadHash:known??await sha(candidate.payload)});
       }
       const tx=await beginTransaction(["meta","snapshots","backups"],"readwrite"),metaStore=tx.objectStore("meta"),snapshotStore=tx.objectStore("snapshots"),backupStore=tx.objectStore("backups");
-      const [current,backupRows,snapshotKeys,recoveryHold,backupKeys]=await Promise.all([
+      const [current,backupRows,snapshotKeys,recoveryHold,backupKeys,acknowledgement]=await Promise.all([
         requestResult(metaStore.get("head")),requestResult(backupStore.getAll()),requestResult(snapshotStore.getAllKeys()),requestResult(metaStore.get("recoveryCloudHold")),
-        requestResult(backupStore.getAllKeys()),
+        requestResult(backupStore.getAllKeys()),requestResult(metaStore.get(ACKNOWLEDGEMENT_KEY)),
       ]);
+      // #2436: expectedHash names the saved board, the head with its
+      // acknowledgement row; a row recorded since makes this commit conflict.
+      const currentIdentity=savedBoardIdentity(current,acknowledgement);
       // A reviewed recovery head grants more authority than its payload hash.
       // Compare all original metadata inside the same transaction as the write.
       let sameHead=expectedHead===undefined;
-      if(!sameHead)try{const expected=encodeHead(expectedHead),actual=encodeHead(current??null);sameHead=typeof expected==="string"&&typeof actual==="string"&&expected===actual;}catch{}
+      if(!sameHead)try{const expected=encodeHead(expectedHead),actual=encodeHead(savedHeadRecord(current,acknowledgement));sameHead=typeof expected==="string"&&typeof actual==="string"&&expected===actual;}catch{}
       let sameHold=!releaseRecoveryHold;
       if(!sameHold)try{const encode=releaseRecoveryHold.encodeHold||pendingJSON,expected=encode(releaseRecoveryHold.expectedHold),actual=encode(recoveryHold??null);
         sameHold=!!recoveryHold&&typeof expected==="string"&&typeof actual==="string"&&expected===actual;}catch{}
-      if((current?.hash??null)!==(expectedHash??null)||!sameHead||!sameHold){
+      if(currentIdentity!==(expectedHash??null)||!sameHead||!sameHold){
         tx.abort();try{await transactionDone(tx);}catch(e){}
-        return {conflict:true,hash:current?.hash??null};
+        return {conflict:true,hash:currentIdentity};
       }
       for(const prepared of preparedBackups){
         const at=backupKeys.indexOf(prepared.id),existing=backupRows[at];
@@ -1018,6 +1134,9 @@
         snapshotStore.put({hash:nextHash,payload},nextHash);
         committedHead={...current,hash:nextHash,account,schemaVersion:SCHEMA_VERSION,committedAt:Date.now()};
         metaStore.put(committedHead,"head");
+        // #2436: the board this commit writes carries its own bookkeeping, so
+        // the acknowledgement row recorded beside the previous head goes with it.
+        if(acknowledgement!==undefined)metaStore.delete(ACKNOWLEDGEMENT_KEY);
         if(releaseRecoveryHold)metaStore.delete("recoveryCloudHold");
         // Snapshot payloads are immutable and shared by the live head and any
         // number of recovery references. Retire only blobs that will have no
@@ -1065,10 +1184,13 @@
       const payloadHash=await sha(backup.payload);
       const tx=await beginTransaction(["meta","snapshots","backups"],"readwrite"),done=transactionDone(tx);
       const metaStore=tx.objectStore("meta"),snapshotStore=tx.objectStore("snapshots"),backupStore=tx.objectStore("backups");
-      const [current,existing,existingKey]=await Promise.all([requestResult(metaStore.get("head")),requestResult(backupStore.get(backup.id)),requestResult(backupStore.getKey(backup.id))]);
-      if((current?.hash??null)!==(expectedHash??null)){
+      const [current,existing,existingKey,row]=await Promise.all([requestResult(metaStore.get("head")),requestResult(backupStore.get(backup.id)),requestResult(backupStore.getKey(backup.id)),
+        requestResult(metaStore.get(ACKNOWLEDGEMENT_KEY))]);
+      // #2436: expectedHash names the saved board, the head with its row.
+      const currentIdentity=savedBoardIdentity(current,row);
+      if(currentIdentity!==(expectedHash??null)){
         tx.abort();try{await done;}catch(e){}
-        return {conflict:true,hash:current?.hash??null};
+        return {conflict:true,hash:currentIdentity};
       }
       if(existingKey!==undefined&&(!existing||existing.id!==backup.id||existing.payloadHash!==payloadHash)){
         tx.abort();try{await done;}catch(e){}
@@ -1202,8 +1324,11 @@
       try{
         const tx=await beginTransaction("meta","readwrite"),done=transactionDone(tx),store=tx.objectStore("meta");
         try{
-          const head=await requestResult(store.get("head"));
-          if((head?.hash??null)!==(expectedHash??null)&&!ownHeads.has(head?.hash)){tx.abort();try{await done;}catch{}return {conflict:true,hash:head?.hash??null};}
+          const [head,row]=await Promise.all([requestResult(store.get("head")),requestResult(store.get(ACKNOWLEDGEMENT_KEY))]);
+          // #2436: the saved board's identity, the head with its row; a row
+          // this copy recorded is one of its own saves.
+          const current=savedBoardIdentity(head,row);
+          if(current!==(expectedHash??null)&&!ownHeads.has(current)){tx.abort();try{await done;}catch{}return {conflict:true,hash:current};}
           store.put({account,id,parts,order,sentSeq:null},changeRecordPrefix(account)+id);
           await done;return {ok:true};
         }catch(error){try{tx.abort();}catch{}try{await done;}catch{}throw error;}
@@ -1248,9 +1373,71 @@
     }
     async function setLegacyFingerprint(expectedHash,fingerprint){
       ensureOpen();if(typeof fingerprint!=="string"||!fingerprint)return false;
-      const tx=await beginTransaction("meta","readwrite"),done=transactionDone(tx),store=tx.objectStore("meta"),current=await requestResult(store.get("head"));
-      if(!current||current.hash!==expectedHash){tx.abort();try{await done;}catch(e){}return false;}
+      const tx=await beginTransaction("meta","readwrite"),done=transactionDone(tx),store=tx.objectStore("meta");
+      const [current,row]=await Promise.all([requestResult(store.get("head")),requestResult(store.get(ACKNOWLEDGEMENT_KEY))]);
+      // #2436: expectedHash names the saved board; the head keeps its hash, so
+      // its acknowledgement row still applies.
+      if(!current||savedBoardIdentity(current,row)!==expectedHash){tx.abort();try{await done;}catch(e){}return false;}
       store.put({...current,sourceFingerprint:fingerprint},"head");await done;return true;
+    }
+    /* #2436: records a push's acknowledgement as the row beside the head
+       (GLOSSARY: Saved board) instead of a whole-board save. Written only
+       while the saved board is still the caller's (expectedHash, the head with
+       any row it has), in one transaction with that check, and never while a
+       recovery hold is stored. headKeys: where each top-level value lies in
+       the head's text; keys: the saved board's top-level keys in order;
+       values: the text of each value the row sets, the board's device-only
+       bookkeeping; hash: the hash of the saved board's text that the head and
+       these make (acknowledgedBoardText), its identity, as a head's identity
+       is the hash of its text, so a later save of the same text keeps it. A
+       row that does not fit the head makes the saved board unreadable. */
+    async function recordAcknowledgement({expectedHash,hash,headKeys,keys,values}={}){
+      ensureOpen();
+      if(typeof expectedHash!=="string"||!HASH_PATTERN.test(expectedHash)||typeof hash!=="string"||!HASH_PATTERN.test(hash)||
+        !acknowledgementParts({headKeys,keys,values}))return {error:true,code:"invalid-acknowledgement"};
+      const id=hash;
+      noteOwnHead(id);
+      try{
+        const tx=await beginTransaction(["meta","snapshots"],"readwrite"),done=transactionDone(tx),store=tx.objectStore("meta");
+        try{
+          const [head,row,holdKey]=await Promise.all([requestResult(store.get("head")),requestResult(store.get(ACKNOWLEDGEMENT_KEY)),
+            requestResult(store.getKey("recoveryCloudHold"))]);
+          const current=savedBoardIdentity(head,row);
+          // #2436 review B1: a row already names this head, so the caller's
+          // saved board is the head with that row, whose text is not the
+          // head's: a row made from it would not fit the head. The push that
+          // re-sent the unchanged board records it with a whole-board save.
+          const stale=!head||typeof head.hash!=="string"||current!==expectedHash||holdKey!==undefined||acknowledgementNames(row,head);
+          // #2436 review S1: and the row must fit the head's own text, read
+          // here under the head's hash, so a row is never written that would
+          // make the saved board unreadable. Checking it only slices that
+          // text. Otherwise the push falls back to the whole-board save.
+          const snapshot=stale?null:await requestResult(tx.objectStore("snapshots").get(head.hash));
+          const next=stale?null:{v:1,head:head.hash,id,headKeys:headKeys.map(span=>[...span]),keys:[...keys],values:{...values}};
+          if(stale||snapshot?.hash!==head.hash||typeof snapshot.payload!=="string"||acknowledgedBoardText(snapshot.payload,next)===null){
+            tx.abort();try{await done;}catch{}return {conflict:true,hash:current};
+          }
+          store.put(next,ACKNOWLEDGEMENT_KEY);
+          await done;return {ok:true,hash:id};
+        }catch(error){try{tx.abort();}catch{}try{await done;}catch{}throw error;}
+      }catch(error){
+        return {error:true,code:error?.name==="QuotaExceededError"?"quota-exhausted":"acknowledgement-write-failed"};
+      }
+    }
+
+    /* #2436: writes the saved board as a head of its own, its exact text under
+       its own hash, so the head alone is the saved board. A recovery that
+       compares this device's stored rows with the saved board asks for it
+       first. A whole-board commit made on condition of the saved board's
+       identity (expectedHash); with no acknowledgement row it writes nothing. */
+    async function foldAcknowledgement({expectedHash}={}){
+      ensureOpen();
+      const stored=await readStoredHead();
+      if(!stored||!acknowledgementNames(stored.row,stored.head))return {ok:true,folded:false,hash:stored?stored.head.hash:null};
+      const saved=savedBoardOf(stored.head,stored.row);
+      if(saved.hash!==expectedHash)return {conflict:true,hash:saved.hash};
+      const result=await commitHead({expectedHash:saved.hash,payload:saved.payload,account:saved.account??null});
+      return result?.ok?{...result,folded:true}:result;
     }
 
     async function close(){
@@ -1261,10 +1448,10 @@
     }
     const api={open,close,readRawExportSnapshot,readRawExportRows,readRawFingerprint,readRawRows,readHead,withCurrentHead,countBackups,listBackups,listBackupFacts,readBackups,listOpaqueArchives,listOpaqueArchiveKeys,readOpaqueArchive,readCloudRecoverySummary,saveCloudRecoverySummaries,protectRecoverySource,repairHeadSnapshot,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,commitHeadIfCurrent:commitHead,putBackup,
       updateBackupKind,deleteBackup,getPendingUpload,setPendingUpload,setPendingUploadIfCurrent,clearPendingUpload,clearPendingUploadIfCurrent,setLegacyFingerprint,
-      getRecoveryTrim,beginRecoveryTrim,continueRecoveryTrim,putChangeRecord,listChangeRecords,markChangeRecordSent,removeChangeRecords};
+      getRecoveryTrim,beginRecoveryTrim,continueRecoveryTrim,putChangeRecord,listChangeRecords,markChangeRecordSent,removeChangeRecords,recordAcknowledgement,foldAcknowledgement};
     return api;
   }
 
-  root.ChainStorageV2={SCHEMA_VERSION,DEFAULT_TARGET_BYTES,KEPT_BY_SAVED_BOARD,hashPayload,encodeSnapshot,decodeSnapshot,isCorruptSnapshotError,createDeviceStore,
+  root.ChainStorageV2={SCHEMA_VERSION,DEFAULT_TARGET_BYTES,KEPT_BY_SAVED_BOARD,hashPayload,encodeSnapshot,decodeSnapshot,isCorruptSnapshotError,createDeviceStore,acknowledgedBoardText,
     canonicalRecoveryJson,cloudRecoverySummary,cloudRecoverySummaryKey,provedUnusableGeneration};
 })(globalThis);

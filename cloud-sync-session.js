@@ -329,11 +329,21 @@
         return now===ticket.backend&&now.user===ticket.account&&rawIdentity()===ticket.identity&&!!now.ready&&
           owner===ticket.owner&&authority===ticket.account;
       };
+      // #2419: a reply from an obsolete connection is treated as a push
+      // reply's is: the change stays pending, and while this ticket's owner
+      // binding is still the page's, read authority ends, so a fresh read of
+      // the current connection must come before the record counts.
+      const obsolete=()=>{
+        let readRequired=false;
+        if(owner===ticket.owner&&account()===ticket.account&&rawIdentity()===ticket.identity&&authority===ticket.account){authority=null;readRequired=true;}
+        if(owner===ticket.owner)owner=null;
+        changed();return readRequired;
+      };
       const send={...ticket,current,
         async accept(reply,{install=()=>true}={}){
           if(!open)return {accepted:false,reason:"ended"};
           open=false;
-          if(!current())return {accepted:false,reason:"obsolete"};
+          if(!current())return {accepted:false,reason:"obsolete",readRequired:obsolete()};
           if(!reply)return {accepted:false,reason:"unavailable"};
           if(reply.cancelled)return {accepted:false,reason:"cancelled"};
           if(reply.unsupported)return {accepted:false,reason:"unsupported"};

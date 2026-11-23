@@ -49,6 +49,19 @@ reconnect also trigger reconciliation. An open editor or active scanner gesture
 defers adoption, and scanner controls remain bound to the tasks they displayed.
 
 - Writes are debounced 2 seconds, so a fast scanning run costs one write, not thirty
+- While every change since the board was last clean went up as a change record
+  (below) whose reply the Sync session accepted, the board shows Synced and the
+  full copy is only a checkpoint: it waits for 30 seconds without changes, and
+  at most 2 minutes after the oldest push request it carries, or for the app to
+  be hidden, instead of each 2-second pause and the 20-second longest wait. As
+  the app is hidden it goes at once, with every check a push makes, and sync
+  suspends for the hidden app once it ends. Showing the app, or 10 seconds
+  (half a cloud step's 20-second limit, so a page frozen meanwhile reports no
+  timeout for it), stops one still running, and what it did not get into the
+  cloud goes after the read that showing the app starts. Any
+  other change, or a record that does not go, puts it back on that schedule.
+  A record's reply from an obsolete connection leaves the change pending and
+  starts a fresh read, after which the record is sent again under its own id
 - Each scanner answer (Yes, No, Can't, Done, Worked on it, Postpone,
   Dislodge) is also saved on the device as a small row and sent at once as a
   change record, numbered by the cloud. Other open devices hear it on a live
@@ -63,7 +76,11 @@ defers adoption, and scanner controls remain bound to the tasks they displayed.
   shows no error; a refusal that a plain read of the counter does not repeat
   (contention) leaves records on. No record goes that a push would refuse, and
   a received record after which the board could not be pushed is skipped
-  whole, reported, and left to its sender's full copy. Undo of an answer
+  whole, reported, and left to its sender's full copy. A full copy names the
+  records its board holds, in number order, only up to the first one that
+  device skipped or could not read, so the cloud keeps that record until a
+  full copy that holds it names it; the skip is the page's own, so a reopened
+  app reads the record again. Undo of an answer
   saves its own device row, never sent, so a reopened app keeps the Undo
 - A pull that finds nothing new produces zero writes
 - Firestore revisions order copies and prevent concurrent writes from silently
@@ -184,6 +201,74 @@ recovery references. Supported fallback storage and retained legacy browser
 bytes keep their recovery roles. Automatic history rotates before and at the
 quota boundary. If mandatory recovery or the primary device save cannot finish,
 replacement and cloud publication remain held, and unsaved work is reported.
+
+### The saved board: the head and its acknowledgement row (#2436)
+
+The board this device has saved is its device head plus, when the cloud
+acknowledged exactly that head, an acknowledgement row beside it in the same
+meta store (GLOSSARY: Saved board). A push whose own save holds exactly the
+board it uploaded records the cloud's acknowledgement as that row, provided
+nothing changed the board meanwhile, no device save is running or waiting, the
+account is the same, and no recovery hold, save issue or other step a save
+carries is outstanding. A push that publishes a recovery, and anything else,
+records it with a whole-board save, as before. So does a push whose saved
+board already has its row, since a head has one row at most: a tab that forgot
+its last push (Retry sync, signing out, hiding the app), or another tab that
+has pushed nothing, uploads that unchanged board again. The row counts toward
+the cloud save-loop guard once, as that save did; a row that is refused leaves
+the count to the whole-board save it falls back to. Each recovery guarantee
+holds against the head and its row together:
+
+- **Durable before it counts.** A Cloud acknowledgement counts only once its
+  row, or its whole-board save, is written. A row that is refused or fails
+  falls back to the whole-board save. A cold reopen opens on the acknowledged
+  revision and decision base.
+- **One read.** The device store's head read returns the head with its row
+  applied: the exact text a whole-board save would have written, made by
+  slicing the head's text, so reading it costs no parse or serialization of
+  the board. The opening, a save's own checks, a conflict repair, recovery and
+  every other reader of the saved board use that read; none applies the row
+  by itself. A cloud recovery, which also compares this device's stored rows
+  with that board, first writes a saved board with a row as a head of its
+  own, the same text in one whole-board save, so the head alone is the saved
+  board for each of its comparisons.
+- **Compared as one, ordered by revision.** The row is written only while the
+  saved board is still the one the push uploaded, in the same transaction as
+  that check. The saved board's identity is then the hash of its own text, as
+  a head's is, so a later save of the same text keeps it. A write made on
+  condition of the saved board (another tab's save, a backup, a change record,
+  a recovery step) is refused on the head's old identity and repairs onto the
+  saved board, exactly as after a whole-board acknowledgement save. The row
+  records the revision the cloud gave; nothing orders by a clock.
+- **Replaced, never stale.** The next head this device writes, a save's or a
+  recovery's, removes the row in the same transaction, and a row that names
+  another head never applies. The device store writes a row only when it fits
+  the head's own text, read in the same transaction (slicing only), so it never
+  writes one that would make the saved board unreadable. A row that names the
+  head but does not fit it, as damaged storage might leave, makes the saved
+  board unreadable, as a corrupt head does, and recovery keeps every source.
+- **Bookkeeping only.** The row holds only the board's device-only keys
+  (revision, account, identity, decision base, change-record position, the
+  unsynced flag, server time and protected recovery IDs), never a task,
+  decision, History row or setting. It cannot add, drop or reorder a decision,
+  and Undo, change records and conflict repair work on the same board as before.
+  The device store holds it to that: it refuses a row that sets any other key
+  or leaves out any other key of the head, and a stored row that does either
+  names no head and never applies.
+- **Recovery sources.** Raw captures of device storage (recovery originals,
+  recovery archives, the raw data export) hold the row as one more meta row, so
+  every byte of the saved board is kept. When the head is unreadable, the
+  recovery that opens a local working board from earlier captures reads each
+  captured head alone, as an older version does: the board one acknowledged
+  revision behind, with every decision. No automatic copy is written for the
+  row: the latest copy holds the same board with the bookkeeping from before
+  the acknowledgement.
+- **Older versions.** An app version from before #2436 reads the head alone,
+  the board one acknowledged revision behind; its first cloud read reconciles
+  that as a higher cloud revision and keeps every decision. The head it then
+  writes stands on its own, since the row names an earlier head. A page whose
+  cached device store has no rows records the acknowledgement with a
+  whole-board save. No row is recorded while a recovery hold is stored.
 
 Decision capability rules must deploy before the new application shell. Against
 old rules the new writer safely holds and preserves its local board until the

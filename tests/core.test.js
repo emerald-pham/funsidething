@@ -3990,7 +3990,12 @@ test('RISK change records guidance: mounted Help and the changelog say a scanner
  assert.match(answer,/saved on this device first; if it can’t be saved, it isn’t sent/);
  assert.match(answer,/Offline answers go up when you reconnect, and a long run of them goes as one copy of the board/);
  assert.match(answer,/while you tap the scanner or edit waits until you finish/);
- assert.match(answer,/An app copy from before this update syncs as before/);assert.match(answer,/until the cloud accepts these quick updates, answers reach other devices as before/);
+ // #2419 final review: an app copy from before this update reads only full
+ // copies, which now wait for a longer pause, so it does not sync as before:
+ // it shows this device's answers once the full copy of the board goes.
+ assert.match(answer,/An app copy from before this update shows answers from this device only once the full copy of the board goes/,'what an older app copy sees: '+answer);
+ assert.doesNotMatch(answer,/syncs as before/,'not that it syncs as before');
+ assert.match(answer,/until the cloud accepts these quick updates, answers reach other devices as before/);
  assert.doesNotMatch(answer,/change record|sequence|includedSeq|listener/i,'the answer says what the person sees, not how it works');
  assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
  const current=shim.document.getElementById('appChangelogCurrent').innerHTML.split('<h3>November 17, 2026</h3>')[1]?.split('</ul>')[0]||'';
@@ -4001,6 +4006,116 @@ test('RISK change records guidance: mounted Help and the changelog say a scanner
  assert.doesNotMatch(quick[0],/saved on this device before it is sent/,'saving on the device first is its own feature');
  // #2417 review N3: the feature's limit stays in its bullet: it applies with sync on.
  assert.ok(items.some(item=>/^With sync on, an answer is now saved on this device before it is sent, so an app closed right after an answer opens with it/.test(item)),'saving an answer on the device first has its own bullet, which says it applies with sync on');
+});
+
+// #2419: Help and the changelog replace #2408's "the cloud confirms after a
+// short pause, or at least every 20 seconds" with Synced within about a
+// second, keep #2408's timing only for a cloud that does not take the quick
+// updates yet, and say the full copy waits for a longer pause; one feature
+// per bullet. #2419 second review: the wait has a longest wait, so both say
+// the full copy also goes about every 2 minutes while you keep answering.
+// #2419 final review: leaving the app now sends the full copy (review N2 said
+// it went only once the app was shown again), so both say it goes as you
+// leave the app, and when you next come back if it cannot finish then.
+test('RISK full copies off the answer path guidance: mounted Help and the changelog say an answer shows synced within about a second and the full copy waits for a longer pause, one feature per bullet',async()=>{
+ const {ctx,shim}=await loadApp();
+ for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const rapid=help.split('<dt>Does answering slow down with sync on?</dt><dd>')[1]?.split('</dd>')[0];assert.ok(rapid,'Data and backups answers whether answering slows down with sync on');
+ assert.match(rapid,/the cloud button shows synced within about a second, however large the board is/,'an answer shows synced within about a second: '+rapid);
+ assert.match(rapid,/A full copy of the board follows once you stop answering for about 30 seconds, or about every 2 minutes while you keep answering, or as you leave the app; if it can’t finish then, when you next come back\./,'the full copy goes about every 2 minutes while you keep answering, and as you leave the app: '+rapid);
+ assert.doesNotMatch(rapid,/if you leave the app, when you next come back/,'not only once you come back');
+ const fallback=rapid.indexOf('If the cloud doesn’t take these quick updates yet');
+ assert.ok(fallback>0,'the answer names the cloud that does not take the quick updates yet');
+ assert.ok(rapid.indexOf('after a short pause, or at least every 20 seconds or so')>fallback,'the short pause and the 20 seconds apply only to that cloud');
+ assert.doesNotMatch(rapid,/change record|checkpoint|debounce/i,'the answer says what the person sees, not how it works');
+ assert.ok(rapid.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
+ const current=shim.document.getElementById('appChangelogCurrent').innerHTML.split('<h3>November 21, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.ok(current,'the changelog has a November 21, 2026 section');
+ const items=current.split('<li>').slice(1);
+ const synced=items.filter(item=>/shows synced within about a second/.test(item));
+ assert.equal(synced.length,1,'one bullet says an answer shows synced within about a second');
+ assert.match(synced[0],/instead of after a short pause, or up to 20 seconds while you keep answering/);assert.match(synced[0],/answers sync as before/);
+ assert.doesNotMatch(synced[0],/30 seconds/,'the full copy\'s longer pause is its own feature');
+ const lighter=items.filter(item=>/stop answering for about 30 seconds, or at most about 2 minutes while you keep answering, or until you leave the app, instead of following each pause between answers/.test(item));
+ assert.equal(lighter.length,1,'one bullet says the full copy waits for a longer pause, at most about 2 minutes while you keep answering, or until you leave the app: '+JSON.stringify(items));
+ assert.match(lighter[0],/If it can’t finish as you leave, it goes when you next come back to the app/,'with its limit');
+ assert.ok(!items.some(item=>/if you leave the app, until you next come back/.test(item)),'no bullet says the full copy waits until you come back');
+ // #2419 final review: an app copy that reads only full copies sees this
+ // device's answers once the full copy goes, a limit of this feature.
+ assert.match(lighter[0],/An app copy from before November 17 shows your answers only once this full copy goes/,'and what an older app copy sees');
+ assert.match(lighter[0],/does less work on your phone/);assert.match(lighter[0],/Any other change still sends the full copy after a short pause/);
+ assert.doesNotMatch(lighter[0],/within about a second/,'showing synced is its own feature');
+});
+
+// #2435: the changelog says what a lighter answer means for the person, and
+// its limits, in one bullet of its own.
+test('RISK decision evidence guidance: the November 21 changelog has one bullet saying a Yes, No or Dislodge on a large board checks only its own decision, with the answers that still check them all',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const bullets=(markup.split('<h3>November 21, 2026</h3><ul>')[1]?.split('</ul>')[0]||'').split('<li>').slice(1).map(item=>item.replace(/<\/li>$/,''));
+ const found=bullets.filter(item=>/checks only its own decision/.test(item));
+ assert.equal(found.length,1,'one November 21 bullet says an answer checks only its own decision: '+JSON.stringify(bullets));
+ const bullet=found[0];
+ assert.match(bullet,/^On a large board, a Yes, No or Dislodge now checks only its own decision before it shows and, with sync on, before it is sent to your other devices, instead of every decision the board holds, so your next tap waits less\./);
+ assert.match(bullet,/Some answers still check them all once, such as the first after the app opens/,'the bullet says some answers still check every decision');
+ assert.match(bullet,/after an Undo of an answer each answer for the rest of that pass still checks them all before it shows/,'and the Undo limit');
+ // #2435 review: a board whose earlier decisions came over from signed-out
+ // use or another account keeps checking them all after an Undo of one of
+ // them, on every answer from then on, not once.
+ assert.match(bullet,/answers that came over from signed-out use or another account, by signing in, an import or a restore, once one of them is undone, every answer checks them all from then on/,'and the boards that check them all on every answer');
+ assert.match(bullet,/What is saved and synced is unchanged\.$/);
+ assert.doesNotMatch(bullet,/projection|replay|gate|change record|evidence/i,'the bullet says what the person sees, not how it works');
+ assert.doesNotMatch(bullet,/within about a second|30 seconds/,'showing synced and the full copy\'s pause are their own features');
+});
+
+// #2436: the changelog says, in one bullet of its own, that once the cloud
+// confirms a full copy the app no longer saves the whole board again on this
+// device to note it, so it pauses less after a large board syncs, and that an
+// app closed right after still opens on the confirmed copy.
+test('RISK push acknowledgement guidance: the November 21 changelog says the app pauses less after the cloud confirms a full copy because it no longer saves the whole board again to note it, in one bullet with its limit',async()=>{
+ const {shim}=await loadApp();
+ shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ const current=shim.document.getElementById('appChangelogCurrent').innerHTML.split('<h3>November 21, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.ok(current,'the changelog has a November 21, 2026 section');
+ const items=current.split('<li>').slice(1),noted=items.filter(item=>/no longer saves the whole board again on this device/.test(item));
+ assert.equal(noted.length,1,'one bullet says the app no longer saves the whole board again to note a confirmed full copy');
+ assert.match(noted[0],/once the cloud confirms a full copy of your board/);
+ assert.match(noted[0],/pauses less right after a large board syncs/);
+ assert.match(noted[0],/still opens on the copy the cloud confirmed/,'the bullet keeps the limit that belongs to it');
+ assert.doesNotMatch(noted[0],/within about a second|30 seconds/,'showing synced and the full copy’s pause are their own features');
+});
+
+// #2419 final review (AGENTS.md FAQ duty): the #2435 and #2436 changelog
+// bullets state outcomes and limits people notice, so the extended FAQ answers
+// them too, each with its own group, in what the person sees.
+const helpAnswer2435=(help,question)=>help.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0];
+const helpWords2435=text=>text.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
+test('RISK decision evidence guidance: mounted Help says a Yes, No or Dislodge on a large board checks only its own decision, and which answers still check them all',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ await app.ctx.onAction('help',{});const help=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answer=helpAnswer2435(help,'Why do some answers take longer on a large board?');
+ assert.ok(answer,'Scanning answers why some answers take longer on a large board');
+ assert.ok(help.indexOf('<dt>Why do some answers take longer on a large board?</dt>')<help.indexOf('<summary><h3>Contexts</h3>'),'with the scanning answers');
+ assert.match(answer,/^A Yes, No or Dislodge checks only its own decision before it shows and, with sync on, before it goes to your other devices\./);
+ assert.match(answer,/Some answers still check every decision the board holds before they show: the first after the app opens, and, after you undo an answer, each one for the rest of that pass\./,'the answers that still check them all');
+ assert.match(answer,/answers that came over from signed-out use or another account, by signing in, an import or a restore, once one of them is undone, every answer checks them all from then on/,'and the boards where every answer does');
+ assert.match(answer,/What is saved and synced is the same either way\.$/);
+ assert.doesNotMatch(answer,/projection|replay|gate|change record|evidence/i,'the answer says what the person sees, not how it works');
+ assert.ok(helpWords2435(answer)<=130,'the answer stays within the 130-word limit');
+});
+test('RISK push acknowledgement guidance: mounted Help says the app no longer saves the whole board again to note a full copy the cloud confirmed, and that an app closed right after opens on that copy',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ await app.ctx.onAction('help',{});const help=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answer=helpAnswer2435(help,'Does syncing a large board pause the app?');
+ assert.ok(answer,'Data and backups answers whether syncing a large board pauses the app');
+ assert.ok(help.indexOf('<dt>Does syncing a large board pause the app?</dt>')>help.indexOf('<summary><h3>Data and backups</h3>'),'with the data and backups answers');
+ assert.match(answer,/once the cloud confirms a full copy of your board, the app notes it on this device without saving the whole board again/);
+ assert.match(answer,/so it pauses less right after a large board syncs/);
+ assert.match(answer,/An app closed right after still opens on the copy the cloud confirmed/,'with its limit');
+ assert.doesNotMatch(answer,/acknowledg|\brow\b|\bhead\b|serializ/i,'the answer says what the person sees, not how it works');
+ assert.ok(helpWords2435(answer)<=130,'the answer stays within the 130-word limit');
 });
 
 test('RISK sync responsiveness guidance: mounted Help explains large boards and bounded damaged-source recovery',async()=>{

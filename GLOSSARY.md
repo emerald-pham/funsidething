@@ -95,9 +95,29 @@ _Avoid_: Loading any readable backup
 
 **Cloud acknowledgement**:
 Confirmation that the current saved board reached the person's cloud account,
-separate from device-local saving or reading a cloud copy. It does not establish
-that unavailable historical changes have been recovered.
+separate from device-local saving or reading a cloud copy. The board has reached
+it when the active full copy plus this device's accepted change records hold
+it. It does not establish that unavailable historical changes have been
+recovered.
 _Avoid_: Synced badge
+
+**Saved board**:
+What this device holds as the board: its device head together with the
+acknowledgement row recorded beside that head, when there is one. When a
+push's own device save holds exactly the board it uploads and nothing changes
+before the cloud's acknowledgement arrives, the acknowledgement's device-only
+bookkeeping (the revision, the decision base and the rest) is recorded as that
+row instead of in a second whole-board save. A head has one row at most, so a
+push of a saved board that already has its row records its acknowledgement
+with a whole-board save. The row names the head it belongs to, applies to that
+head only, and goes with the next head this device writes.
+Every reader of the saved board, recovery included, reads the head and its row
+together through one read, except the recovery that opens a local working board
+from earlier captures when the head is unreadable: it reads each captured head
+alone, so that board is one acknowledged revision behind in its device-only
+bookkeeping only, with every decision. Every write made on condition of the
+saved board checks the two together.
+_Avoid_: Device head alone, last whole-board save
 
 **Sync session**:
 The one owner, while the app is open, of what this device knows about its cloud
@@ -111,8 +131,10 @@ holds the page's read authority, the exact cloud copy last read or acknowledged
 and the Confirmed device cloud owner, and it is the one place a cloud reply is
 accepted as a Cloud acknowledgement: only while the reply still belongs to the
 connection its push started under, is not older than this device's revision,
-and this device has saved the acknowledged board. It starts empty each time the
-app opens.
+and this device has saved the acknowledged board. A change record's reply is
+accepted there with the same checks (this device has saved the record); one from
+an obsolete connection leaves the change pending and asks for a fresh read. It
+starts empty each time the app opens.
 _Avoid_: Sync manager, cloud cache
 
 **Change record**:
@@ -122,14 +144,22 @@ took them. Other open devices apply it through the same merge as a full copy
 holding only that change, without downloading the board. Full copies stay the
 checkpoints: each names the records it includes, a device opening from one
 applies the records it does not name, and a record is removed only once the
-active full copy includes it.
+active full copy includes it. A device's full copy never names a record that
+device skipped or could not read, or any record after it. While every change
+since the board was last clean went up as a record the Sync session accepted,
+the board shows Synced and its next full copy waits for about 30 seconds
+without changes, and at most about 2 minutes after the oldest push request it
+carries, instead of each 2-second pause. It goes as the app is hidden, before
+sync suspends for the hidden app; one that cannot finish then goes once the
+app is shown again.
 _Avoid_: Delta, patch, sync event
 
 **Settled (sync)**:
 The Sync session's report that no sync step is running (a cloud read or
 write, sending or applying a change record, a device save or a recovery flow)
 and none is scheduled (an answer's catch-up still queued, a save debounce, a
-push waiting on its debounce or its longest wait, a live, backup or change
+push waiting on its debounce, its longest wait or a full copy's longer pause
+after change records, a live, backup or change
 record read, or a retry), so the app will do no more sync work on its own. Work that waits on something outside the app, such as
 an open editor, a hidden page or a read still owed, is listed as waiting and
 does not count. Only tests read it; nothing in the app or on screen does.
@@ -146,6 +176,17 @@ inputs each time. Retention is at most 2,048 keys and 256 Ki UTF-16 input units;
 changed calculators, Math or string methods, accessors, nonprimitive and
 oversized inputs use the ordinary calculation. It retains no saved object or
 source-validation result.
+
+**Verified decision projection**:
+What the last whole check or whole replay of a board's decision evidence found
+its decisions write on that board (ratings, chain, marks, pass and current
+choices), kept by the open app and extended by each new answer that observed
+every earlier decision. An answer's replay and the check before its change
+record use it only while the board still holds those exact values and
+decisions; any other change sends them back to the whole check, which makes a
+new one. It is never saved or sent, and it never names an issue itself: every
+issue is the whole check's.
+_Avoid_: Cached verdict, evidence cache
 
 - **Confirmed device cloud owner**: one process-local backend, account, identity and revision binding established by an accepted cloud read or acknowledgement. An acknowledgement binds it while its board saves on this device, and a refused save withdraws that binding. Device CAS repair may retain a higher confirmed revision only with current reconciliation authority, the same exact decision-base payload and unchanged owner. Sign-out or suspension invalidates the binding; a replacement backend needs a fresh accepted read. The binding retains no board graph or extra payload. Shared edits still require their own cloud confirmation.
 
