@@ -23855,6 +23855,83 @@ test('RISK steady scanner browser: the finish row sits on its own line under the
  assert.deepEqual(failures,[]);
 });
 
+// #2449: Yes, No and Can't shrank to their labels (47 to 64 px on a phone) right
+// under side-rail actions of the same colours that were far wider. Every button
+// now shares one minimum width that scales with its own font size (6 em, or
+// 5 em at 420 px and under, where three choices must share a 320 px line and
+// Postpone must still join them at 375 px, as it did before), so
+// short labels match their neighbours, and a button added later with the
+// standard classes gets it without CSS of its own. Above 420 px the choices,
+// Postpone included, share one width; on a phone Postpone keeps its longer
+// label's width so the row stays on one line.
+const buttonMinEm=viewportWidth=>viewportWidth<=420?5:6;
+// 200% button text, the issue's largest size (STEADY_ENLARGED_TEXT is 150%).
+const STEADY_DOUBLE_TEXT=STEADY_ENLARGED_TEXT.replace('.btn{font-size:21px','.btn{font-size:28px');
+test('RISK steady scanner browser: Yes No and Cant share one width and no scanner or side-rail button is narrower than the shared minimum, including a newly added choice, across phone enlarged short-landscape tablet and desktop views in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ const measureWithAddedChoice=page=>page.evaluate(()=>{
+  const future=document.createElement('button');future.className='btn yes';future.dataset.act='future-choice';future.textContent='Ok';
+  document.querySelector('.decide').insertBefore(future,document.querySelector('.decide-finish'));
+  const seen=[...document.querySelectorAll('#scan .btn')].filter(el=>el.offsetParent).map(el=>{const r=el.getBoundingClientRect();return {act:el.dataset.act,className:el.className,width:r.width,height:r.height,right:r.right,top:r.top,fontSize:parseFloat(getComputedStyle(el).fontSize),clipped:el.scrollWidth>el.clientWidth+1};});
+  future.remove();
+  const decide=document.querySelector('.decide'),ds=getComputedStyle(decide);
+  return {row:{width:decide.clientWidth-parseFloat(ds.paddingLeft)-parseFloat(ds.paddingRight),gap:ds.columnGap},buttons:seen,scanRight:document.getElementById('scan').getBoundingClientRect().right,overflow:document.documentElement.scrollWidth-innerWidth,viewportWidth:innerWidth};
+ });
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const spec of [
+    {name:'narrowest phone with enlarged text and Postpone',width:260,height:568,enlarged:true,showPostpone:true},
+    {name:'small phone',width:320,height:568},
+    {name:'small phone with enlarged text and Postpone',width:320,height:568,enlarged:true,showPostpone:true},
+    {name:'common phone with Postpone',width:375,height:812,showPostpone:true},
+    {name:'iPhone portrait',width:390,height:844},
+    {name:'iPhone portrait with Postpone',width:390,height:844,showPostpone:true},
+    {name:'short landscape with Postpone',width:844,height:390,showPostpone:true},
+    {name:'large phone at 200% text with Postpone',width:430,height:932,enlarged:true,doubleText:true,showPostpone:true},
+    {name:'just above phone width at 200% text',width:421,height:900,enlarged:true,doubleText:true},
+    {name:'tablet portrait with Postpone',width:768,height:1024,showPostpone:true},
+    {name:'desktop with Postpone',width:1000,height:900,touch:false,showPostpone:true},
+   ])for(const webFonts of [true,false]){
+    const label=`${engineName} ${spec.name} ${webFonts?'with web fonts':'fonts blocked'}`;
+    const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard(spec),spec);
+    try{
+     // The helper blocks every outside host. Widths depend on the fonts a person
+     // sees, so let the Google Fonts hosts through (the newest route wins) and reload.
+     if(webFonts){
+      await context.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//,route=>route.continue());
+      await page.reload({waitUntil:'domcontentloaded'});
+      await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]'),null,{timeout:60000});
+     }
+     if(spec.enlarged)await page.addStyleTag({content:spec.doubleText?STEADY_DOUBLE_TEXT:STEADY_ENLARGED_TEXT});
+     await page.waitForFunction(()=>!!document.querySelector('.decide [data-act="cant"]')&&!!document.querySelector('.siderail [data-act="cand-worked"]'),null,{timeout:15000});
+     await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(80);
+     const loadedFonts=await page.evaluate(()=>[...document.fonts].filter(face=>face.status==='loaded').length);
+     if(webFonts)assert.ok(loadedFonts>0,`${label}: positive control: the web fonts loaded, which needs the network`);
+     else assert.equal(loadedFonts,0,`${label}: positive control: no web font loaded`);
+     const shot=await measureWithAddedChoice(page);
+     const by=act=>shot.buttons.find(b=>b.act===act);
+     assert.ok(by('future-choice'),`${label}: the added choice renders`);
+     if(spec.showPostpone)assert.ok(by('postpone'),`${label}: Postpone is shown`);
+     for(const b of shot.buttons){
+      const min=buttonMinEm(shot.viewportWidth)*b.fontSize;
+      assert.ok(b.width>=min-0.5,`${label}: ${b.act} (${b.className}) is ${b.width.toFixed(1)} px wide, under the shared ${min.toFixed(1)} px minimum`);
+      assert.equal(b.clipped,false,`${label}: ${b.act} shows its whole label`);
+      assert.ok(b.right<=shot.scanRight+0.5,`${label}: ${b.act} stays inside the scanner box`);
+     }
+     const choices=['yes','no','cant','future-choice',...(spec.showPostpone&&shot.viewportWidth>420?['postpone']:[])].map(by);
+     for(const c of [...choices,...(spec.showPostpone?[by('postpone')]:[])])assert.ok(c.height>=44,`${label}: ${c.act} keeps the 44 px tap height: ${c.height.toFixed(1)} px`);
+     assert.ok(Math.max(...choices.map(c=>c.width))-Math.min(...choices.map(c=>c.width))<=0.5,`${label}: the choices share one width: ${choices.map(c=>c.act+' '+c.width.toFixed(1)).join(', ')}`);
+     if(!spec.enlarged){const acts=['yes','no','cant',...(spec.showPostpone?['postpone']:[])],tops=new Set(acts.map(act=>Math.round(by(act).top)));assert.equal(tops.size,1,`${label}: ${acts.join(', ')} share one line: ${acts.map(act=>act+' '+by(act).width.toFixed(1)+'@'+Math.round(by(act).top)).join(', ')}, row ${shot.row.width.toFixed(1)} px with gap ${shot.row.gap}`);}
+     assert.ok(shot.overflow<=0,`${label}: no sideways page overflow: ${shot.overflow}`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(error.message.split('\n')[0]);}finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
 // When the next title is as long as the last, a second tap lands on the button
 // of the next candidate before anyone could have read it, so a physical press
 // inside 200 ms of the new task appearing is dropped.
