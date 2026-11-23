@@ -24849,5 +24849,28 @@
       "command": "Each through scripts/agent-tools/record-run.mjs: #2419, node --max-old-space-size=8192 --test --test-name-pattern=\"full copies off the answer path\" tests/persistence-recovery.test.js (preimplementation-red 2026-11-21T11-49-08-997Z-d927198d on 8cb7a646 with the new tests only, then the #2408 cohort on the implementation); #2436, node --max-old-space-size=8192 --test tests/persistence-recovery.test.js (green attempt 2026-11-21T14-30-14-201Z-b07378b2 on 3513362d, before its tests changed); final review, node --test --test-name-pattern=\"RISK change records guidance\" tests/core.test.js (preimplementation-red 2026-11-21T21-48-23-914Z-00b4823c on f851eeb5)",
       "failure": "#2419: 'no: the sync status shows Synced' (actual '☁ syncing') and 'with change records no full copy is uploaded during the run' before the implementation; after it, on records, the moved #2408 and #2427 tests failed on the full-copy timing the spec changes ('a single Yes with nothing else syncing still pushes at once', 'positive control: the No is pushed'). #2436: 'the answer’s save and the acknowledgement’s save are the only device saves' (1 !== 2). Final review: 'what an older app copy sees' (the answer still said it syncs as before)."
     }
+  },
+  {
+    "baseCommit": "6fd49455e19aa979def1ab105a0068fb1936c1dc",
+    "weakenedTestLines": [
+      "tests/persistence-recovery.test.js:-assert.equal(old.ctx.state.syncRev,revision,'one acknowledged revision behind: it reads the head alone');",
+      "tests/persistence-recovery.test.js:-const released=readReleasedClient(__dirname,sha);",
+      "tests/persistence-recovery.test.js:-test('RISK BACKWARD COMPATIBILITY: the supported floor and the release base open a device whose push acknowledgement is recorded beside its head, keep every answer and sync, and the candidate then opens the board they saved',{timeout:300000},async t=>{"
+    ],
+    "reason": "#2453: the #2436 compatibility case assumed every release it opens predates the acknowledgement row, so it expected the floor and the release base alike to read the head alone, one acknowledged revision behind. Release base 6fd49455 (the #2445 merge) ships the row in device-store-v2.js and correctly opens on the acknowledged revision, so the case failed 3 !== 2 for every PR on current main and for main itself; main's own push run passed only because it compared against 8cb7a646. The expectation was wrong, not the app. The test now judges each release by its own device store: one that reads the meta key this version records the row under opens on the acknowledged revision, one that does not reads the head alone. The rename spells that out; the declaration and the readReleasedClient line change only to name and record that capability.",
+    "previousBehavior": "Both the supported floor 7b9c92a4 and whatever release base the gate compared against were asserted to open on syncRev equal to the revision before the acknowledged push, which holds only for a base without the acknowledgement row (7b9c92a4, 8cb7a646) and fails for 6fd49455 and every later base.",
+    "intendedBehavior": "A release whose device store has no acknowledgement row still must open exactly one acknowledged revision behind; a release whose device store reads the row must open exactly on the acknowledged revision. Which applies is derived from the release's checked-out device-store-v2.js, never from a SHA list, and the two expectations are disjoint, so a misjudged release fails instead of passing on the other expectation.",
+    "replacementTests": [
+      "RISK BACKWARD COMPATIBILITY: the supported floor and the release base open a device whose push acknowledgement is recorded beside its head, each on the revision its own device store can read, keep every answer and sync, and the candidate then opens the board they saved"
+    ],
+    "preservedCoverage": [
+      "Every other assertion of the case runs unchanged for both releases: the No pushed and acknowledged beside the head with no whole-board save, the release opening with the answer, its first cloud read reconciling with no error and no recovery hold, keeping the answer on the cloud's revision, saving and syncing an edit, and the candidate opening the release's board with the answer on the release's revision and, for the base, syncing on with nothing left to push.",
+      "The release with no row keeps the exact original expectation (syncRev equals the pre-push revision); the floor 7b9c92a4 is immutable and always takes that branch, which a new positive control asserts.",
+      "New positive controls make the detector fail closed: it must find the row read in this version's device store and not in the floor's, and the device under test must hold the row beside its head under the exact key the detector looks for."
+    ],
+    "redEvidence": {
+      "command": "COMPATIBILITY_BASE_SHA=6fd49455e19aa979def1ab105a0068fb1936c1dc node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <git-common-dir>/agent-test-runs/issue-2453 --purpose preimplementation-red -- npm run test:compatibility",
+      "failure": "Record 5d43c6c7 on 6fd49455 before the test change: # tests 30, # pass 28, # fail 2, # skipped 0. Subtest 6fd4945 of the #2436 case failed 'one acknowledged revision behind: it reads the head alone' with expected 2, actual 3; the floor subtest 7b9c92a passed."
+    }
   }
 ]
