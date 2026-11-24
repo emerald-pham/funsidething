@@ -19292,7 +19292,13 @@ function readWork2458(){
 async function openSigned2458(t,{indexedDB,dbName,storage,docs,work=null,user={uid:'owner',email:'e@example.com'}}){
  const copies=new WeakMap();
  assert.ok(appSrc.includes('(async function init(){'),'the app boots from its init function');
- const app=driveApp(await loadApp({appSource:work?appSrc.replace('(async function init(){',readObserver2458+'(async function init(){'):appSrc,
+ // A counted run waits far longer for the worker before naming the base on the
+ // main thread: the 1.5 s fallback is the app's guard against a stuck worker,
+ // and a loaded CI runner can pass it (run 45379303255), which counts runner
+ // speed, not the app's work.
+ const waitLine='const ACKNOWLEDGED_BASE_WORKER_WAIT_MS=1500;';
+ assert.ok(appSrc.includes(waitLine),'the app names its acknowledged-base worker wait');
+ const app=driveApp(await loadApp({appSource:work?appSrc.replace(waitLine,'const ACKNOWLEDGED_BASE_WORKER_WAIT_MS=60000;').replace('(async function init(){',readObserver2458+'(async function init(){'):appSrc,
   indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage,cryptoProvider:webcrypto,
   beforeAppScript(sandbox){
    if(!work)return;
