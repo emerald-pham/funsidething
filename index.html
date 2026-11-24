@@ -11695,6 +11695,8 @@ function recomputeRanks(items=null,samples=state.settings.samples,parts=null){
   }
   rankCache = rankStats(items||openTasks().map(t=>({id:t.id, mu:t.mu, sigma:t.sigma})), samples, rankCache);
   sparkCache.clear();
+  // #2455 review: ranks an earlier action left to catch up are older than these.
+  answerCatchUp.dropRanks();
   return true;
 }
 function chainStart(){ return state.chain.length === 0; }
@@ -12221,10 +12223,13 @@ const answerCatchUp=(()=>{
   const CHAINED=Object.freeze({});
   // ids: the tasks whose History the answer records; none (benchmark Can't,
   // which moves no rating) means it records none and samples no ranks.
-  function begin(kind,ids){
-    const before=ids.length?captureRatingInputs(ids):null;
+  // ranking: History's observation an action outside the scanner captured
+  // itself (an editor Done or Dot), with the weight cache it found; its ranks
+  // and History's after values then catch up as an answer's do.
+  function begin(kind,ids,ranking=null){
+    const before=ids.length&&!ranking?captureRatingInputs(ids):null;
     if(before&&queue.length)before.weights=CHAINED;
-    return {kind,at:Date.now(),ids:[...new Set(ids)],id:null,before,after:null,frame:null,steps:null};
+    return {kind,at:Date.now(),ids:[...new Set(ids)],id:null,before,after:null,frame:null,steps:null,ranking};
   }
   /* #2459: the rank sampling runs in parts (recomputeRanks with parts), one
      part a task, instead of whole in one task: about 112,000 draws on the
@@ -12262,10 +12267,11 @@ const answerCatchUp=(()=>{
   // unsaved, pick the next candidate and draw, then queue the rest. These are
   // commit()'s steps, with the save and the push moved into the queue.
   function show(answer,{save:doSave=true,immediate=false,deferRanks=false}={}){
-    answer.after=answer.before?captureRatingInputs(answer.ids):null;
+    const ranked=!!(answer.before||answer.ranking);
+    answer.after=ranked?captureRatingInputs(answer.ids):null;
     answer.frame=undoStack.at(-1)||null;
     Object.assign(answer,{save:doSave,immediate:!!immediate,deferRanks,steps:[seal,store,draw]});
-    if(answer.before)answer.steps.unshift(ratings);
+    if(ranked){answer.steps.unshift(ratings);dropRanks();}
     queue.push(answer);
     if(!work)work=trackSyncWork("answer-catch-up");
     settleCommit();
@@ -12276,32 +12282,65 @@ const answerCatchUp=(()=>{
     try{render();}finally{listRanksDeferred=false;listRowsReuse=null;}
     schedule();
   }
-  function runStep(){
-    const answer=queue[0],next=answer.steps.shift();
-    try{next(answer);}finally{if(!answer.steps.length&&queue[0]===answer)queue.shift();}
+  /* #2455 review: an Add, an import or a Delete changes which tasks are open
+     but moves no rating and records no History, so only its ranks catch up:
+     in parts, as an answer's, from the open tasks as the action left them,
+     once the frame that shows the action has painted. Until then the board
+     keeps its earlier ranks; a new task shows no rank yet. Nothing saved or
+     synced reads ranks, so a save or push does not wait for them (flush
+     leaves them queued), and any later sampling of the ranks (another
+     action's, or a whole recomputeRanks()) replaces them, since its inputs
+     are newer. Their random draws are only ever ranks. */
+  function ranks(){
+    dropRanks();
+    const entry={kind:"ranks",ranksOnly:true,painted:false,ranking:{},
+      after:{open:openTasks().map(t=>({id:t.id,mu:t.mu,sigma:t.sigma})),samples:state.settings.samples},steps:null};
+    entry.steps=[rankParts,drawRanks];
+    queue.push(entry);
+    if(!work)work=trackSyncWork("answer-catch-up");
+    afterNextPaint(()=>{entry.painted=true;schedule();});
+  }
+  function rankParts(entry){if(recomputeRanks(entry.after.open,entry.after.samples,entry.ranking)===false)entry.steps.unshift(rankParts);}
+  // The rank column and the scanner's rank chips, with each row's markup kept.
+  function drawRanks(){
+    if(queue.length>1)return;
+    listRowsReuse=LIST_ROWS_RANKS;
+    try{render();}finally{listRowsReuse=null;}
+  }
+  function dropRanks(){
+    for(let index=queue.length-1;index>=0;index--)if(queue[index].ranksOnly)queue.splice(index,1);
+    if(!queue.length)finish();
+  }
+  // The entry a step runs next: ranks wait for their frame.
+  const runnable=entry=>!entry.ranksOnly||entry.painted;
+  function runStep(answer){
+    const next=answer.steps.shift();
+    try{next(answer);}finally{if(!answer.steps.length){const index=queue.indexOf(answer);if(index>=0)queue.splice(index,1);}}
   }
   function finish(){
     if(queue.length){schedule();return;}
     if(work){const done=work;work=null;done.end();}
   }
-  function schedule(){if(timer===null&&queue.length)timer=setTimeout(step,0);}
+  function schedule(){if(timer===null&&queue.some(runnable))timer=setTimeout(step,0);}
   function step(){
     timer=null;
-    if(running||!queue.length)return finish();
+    const next=queue.find(runnable);
+    if(running||!next)return finish();
     running=true;
-    try{runStep();}finally{running=false;finish();}
+    try{runStep(next);}finally{running=false;finish();}
   }
-  // Runs everything queued now. Inside a step (a save the step asks for) it
-  // does nothing: the queue goes on after that step.
+  // Runs every answer queued now, in order; ranks alone stay queued (ranks()).
+  // Inside a step (a save the step asks for) it does nothing: the queue goes
+  // on after that step.
   function flush(){
-    if(running||!queue.length)return;
+    if(running||!queue.some(entry=>!entry.ranksOnly))return;
     if(timer!==null){clearTimeout(timer);timer=null;}
     running=true;
-    try{while(queue.length)runStep();}finally{running=false;finish();}
+    try{for(let next;(next=queue.find(entry=>!entry.ranksOnly));)runStep(next);}finally{running=false;finish();}
   }
   // #2419: whether an answer shown is still waiting for its save and record
   // to be asked for (its store step).
-  return Object.freeze({begin,show,flush,pending:()=>queue.some(answer=>answer.steps?.includes(store))});
+  return Object.freeze({begin,show,ranks,dropRanks,flush,pending:()=>queue.some(answer=>answer.steps?.includes(store))});
 })();
 window.addEventListener("pagehide",()=>answerCatchUp.flush());
 document.addEventListener("visibilitychange",()=>{if(document.hidden)answerCatchUp.flush();});
@@ -12361,9 +12400,16 @@ const taskActionOwnerBundle=(()=>{
       contextIds:Array.isArray(observedCtx)?observedCtx.slice():[],resting});
     if(!result){commit();return false;}
     if(action==="dot")observation.id=result.rows[0].id;
-    if(action==="done"||action==="dot")recomputeRanks();
+    // #2455 review: a Done or Dot from the task editor shows first, as a
+    // scanner answer does (#2407): its ranks, History's after values (a Dot's
+    // Top x reads the new ranks), the Undo seal, the save and the push catch
+    // up after the paint (answerCatchUp), from what the action left.
+    if(action==="done"||action==="dot"){
+      answerCatchUp.show(answerCatchUp.begin(action,observation.ids,{observation,weights:chanceDisplayWeightCache}),{immediate:true});
+      return true;
+    }
     finishRatingObservation(action==="return"?{...observation,membershipChanged:result.moved}:observation);
-    commit(action==="done"||action==="dot"?true:undefined,action==="done"||action==="dot"?true:undefined);
+    commit();
     return true;
   }
   function executeEditorGesture(command){
@@ -12976,8 +13022,8 @@ function deleteTask(id){ // removes a task entirely — from the list, the chain
   delete state.cantAt[id];
   delete state.workedAt[id];
   if(state.candidateId===id) state.candidateId=null;
-  recomputeRanks();
   commit(true, true);           // deletions sync to the cloud right away
+  answerCatchUp.ranks();        // #2455 review: after the frame that shows it gone
 }
 /* newDay is true only when the caller crossed the 02:00 date marker — see
    ensureCandidate(). It is what separates "a new pass" from "a new day". */
@@ -13106,7 +13152,8 @@ function importList(text, ctx, dates = {}, taskOptions = {}){
     normalizeTaskPrerequisites(task);writeTaskDependencyModes(task,taskOptions.dependencyModes);state.tasks.push(task);
     added++;
   }
-  if(added){ recomputeRanks(); commit(); } else { undoStack.pop(); }
+  // #2455 review: the ranks catch up after the frame that shows the tasks.
+  if(added){ commit(); answerCatchUp.ranks(); } else { undoStack.pop(); }
   return {added, skipped, completed};
 }
 function importSummary(added, skipped, completed){
@@ -13331,8 +13378,8 @@ function addTask(title, dot, ctx, dates = {}, taskOptions = {}){
     if(chainStart()){ state.passStartedAt = Date.now(); state.passId = uid(); applyScanPreference(); }
     state.chain.push(t.id); state.interventionActive=false;
   }
-  recomputeRanks();
   commit(true, !!dot);          // "Add & dot" syncs to the cloud right away
+  answerCatchUp.ranks();        // #2455 review: after the frame that shows the task
   return t;
 }
 function createContextChoice(name){

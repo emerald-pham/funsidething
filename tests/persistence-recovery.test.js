@@ -21236,3 +21236,81 @@ test('RISK add box clears at once: on the large board an Add empties the add box
  for(const title of ['Cleared at once 2457','Typed right after 2457'])
   assert.equal(ctx.state.tasks.filter(task=>task.title===title).length,1,'the board holds '+title+' once');
 });
+
+// #2455 review: an Add, an import, a Done or Dot from the task editor and a
+// delete each sampled every open task's ranks inside the tap, one whole
+// sampling of about 112,000 draws on the large board. Their ranks now catch up
+// after the frame that shows the action, in tasks of a bounded number of draws,
+// as an answer's do (#2459). Counted with the #2459 draw counter, never timed,
+// on #2408's answering device. Each action goes through its own control: the
+// add box and Add, a pasted list, the editor's Done and Dot, and Delete.
+function rankActions2455(device){
+ const {ctx,shim}=device,run=source=>vm.runInContext(source,ctx);
+ const press=(act,dataset={})=>{const target={dataset:{act,...dataset},classList:{contains:()=>false}};target.closest=()=>target;shim.document.dispatchEvent({type:'click',detail:1,target});};
+ const typed=title=>()=>{shim.document.getElementById('addInput').value=title;press('add');};
+ // A pool task the editor can Dot, Done or Delete: not the candidate, not dotted.
+ const free=()=>run('pool().find(t=>canDotTask(t)&&t.id!==state.candidateId&&!t.evergreen)?.id');
+ const editor=action=>()=>{const id=free();hydrateUnchangedEditorDraft(device,id);return ()=>{ctx.onAction(action,{dataset:{id}});return id;};};
+ return [
+  ['Add',()=>typed('Ranked after its tap 2455')],
+  ['import',()=>typed('Imported first 2455\nImported second 2455')],
+  ['editor Done',editor('done-task')],
+  ['editor Dot',editor('dot-task')],
+  ['Delete',()=>{const id=free();return ()=>{ctx.onAction('delete-task',{dataset:{id}});return id;};}],
+ ];
+}
+test('RISK rank work per action: an Add, an import, an editor Done or Dot and a Delete on the large board sample no ranks in the tap, then rank every open task in tasks of a bounded number of draws',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,signedIn:false,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,samples=ctx.state.settings.samples,counted=drawsPerTask2459(device),ranks=()=>vm.runInContext('rankCache',ctx);
+ const open=()=>ctx.state.tasks.filter(task=>!task.done).length;
+ for(const [name,prepare] of rankActions2455(device)){
+  const act=prepare(),before=ranks(),tasksBefore=ctx.state.tasks.length,doneBefore=ctx.state.tasks.filter(task=>task.done).length;
+  counted.tasks.length=0;const from=counted.draws();
+  act();
+  const inTap=counted.draws()-from;
+  await clock.advance(1500);
+  const total=counted.draws()-from,largest=Math.max(0,...counted.tasks);
+  t.diagnostic(JSON.stringify({name,open:open(),inTap,total,largest}));
+  assert.ok(ctx.state.tasks.length!==tasksBefore||ctx.state.tasks.filter(task=>task.done).length!==doneBefore||ctx.state.chain.length>1,'positive control: the '+name+' changed the board');
+  assert.ok(total>=open()*samples,'positive control: the '+name+'’s ranks sample every open task '+samples+' times: '+total+' draws');
+  assert.notEqual(ranks(),before,'positive control: and replace the ranks it found');
+  assert.equal(ranks().size,open(),'the '+name+' leaves a rank for every open task');
+  assert.ok(inTap<=RANK_TASK_DRAWS2459,'the '+name+'’s tap samples no ranks: '+inTap+' draws');
+  assert.ok(largest<=RANK_TASK_DRAWS2459,'no task after the '+name+' draws more than '+RANK_TASK_DRAWS2459+': the largest drew '+largest);
+ }
+});
+// Ranks caught up after an Add, and after a Dot from the editor whose History
+// records the dotted task's Top x, are exactly one whole sampling of the same
+// open tasks from the same draws, as #2459 checks after a Yes: right after the
+// tap one whole sampling is taken from a seeded stream, the stream is put
+// back, and the catch-up then samples on the clock.
+test('RISK rank work per action: ranks caught up after an Add or an editor Dot on the large board equal one whole sampling of the same tasks from the same draws, and the Dot’s History records their Top x',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,signedIn:false,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,run=source=>vm.runInContext(source,ctx);
+ const ranksOf=source=>JSON.parse(run(`JSON.stringify([...(${source})].map(([id,rank])=>[id,rank.topK,rank.n,Array.from(rank.hist),Array.from(rank.cdf)]))`));
+ run(`globalThis.__stream2455={a:2455};Math.random=function(){let t=(__stream2455.a=(__stream2455.a+0x6D2B79F5)>>>0);
+  t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};_spare=null`);
+ const actions=new Map(rankActions2455(device));
+ for(const name of ['Add','editor Dot']){
+  const act=actions.get(name)();
+  const acted=act();
+  const at=run('JSON.stringify([__stream2455.a,_spare])');
+  const expected=ranksOf('rankStats(openTasks().map(t=>({id:t.id,mu:t.mu,sigma:t.sigma})),state.settings.samples)');
+  run(`(()=>{const [a,spare]=${at};__stream2455.a=a;_spare=spare;})()`);
+  await clock.advance(1500);
+  const actual=ranksOf('rankCache');
+  assert.equal(actual.length,ctx.state.tasks.filter(task=>!task.done).length,'positive control: after the '+name+' every open task has a rank');
+  assert.ok(new Set(actual.map(([,topK])=>topK)).size>1,'positive control: the ranks tell tasks apart');
+  const differing=actual.filter((rank,index)=>JSON.stringify(rank)!==JSON.stringify(expected[index])).map(([id])=>id);
+  assert.equal(actual.length,expected.length,'the catch-up after the '+name+' ranks as many tasks as the whole sampling');
+  assert.deepEqual(differing.slice(0,5),[],'it gives exactly the whole sampling’s ranks: '+differing.length+' tasks differ');
+  if(name==='editor Dot'){
+   const after=ctx.state.tasks.find(task=>task.id===acted).ratingHistory.at(-1).after;
+   assert.equal(after.topK,expected.find(([id])=>id===acted)[1],'the Dot’s History records the Top x of those ranks');
+  }
+ }
+});
