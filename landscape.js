@@ -394,7 +394,10 @@
   // look the same in daylight, and garden and patio lights show only after
   // sunset. In daylight a new slot then repaints nothing (#2456), and a
   // background just painted is current, so the next frame does not repaint it.
-  // The thresholds paintBackground lights them by.
+  // The thresholds paintBackground lights them by: windows past this night
+  // level, and the rooftop gardens' plants and lights after sunset. The
+  // garden paint keeps its sunset test written out, because the rooftop
+  // garden test runs that paint on its own; keep the two the same.
   function windowLightsShown(){return p.night>.2;}
   function afterSunset(){return sky.sun.altitude<0;}
   function cityLightsShown(){return windowLightsShown()||afterSunset();}
@@ -471,12 +474,12 @@
         const deckWidth=Math.max(3,bw*.72),deckX=x+(bw-deckWidth)/2,deckY=y-1.8;
         b.fillStyle=S.mixHex(p.hill,p.front,.42);b.fillRect(deckX,deckY,deckWidth,1.8);
         line(b,deckX,deckY,deckX+deckWidth,deckY,S.mixHex(p.front,p.sky[2],.36),.55);
-        if(afterSunset())for(let pot=0;pot<2;pot++){
+        if(sky.sun.altitude<0)for(let pot=0;pot<2;pot++){
           const px=deckX+deckWidth*(.23+pot*.52);
           b.fillStyle=S.mixHex(p.far,p.hill,.38+rand(i+pot+1100)*.2);b.fillRect(px,deckY-1,Math.max(1,deckWidth*.18),1.1);
           ellipse(b,px+deckWidth*.08,deckY-1.2,.8,.65,S.mixHex(p.far,p.front,.28));
         }
-        if(afterSunset()&&night>.12&&gardenLights.lit[garden.index])for(let light=0;light<garden.lights;light++)
+        if(sky.sun.altitude<0&&night>.12&&gardenLights.lit[garden.index])for(let light=0;light<garden.lights;light++)
           ellipse(b,deckX+deckWidth*(.44+light*.22),deckY-1.1,.55,.55,`rgba(255,228,157,${night*.92})`);
       }
       if(patios.has(i))paintRooftopPatio(b,patios.get(i));
