@@ -4118,6 +4118,42 @@ test('RISK push acknowledgement guidance: mounted Help says the app no longer sa
  assert.ok(helpWords2435(answer)<=130,'the answer stays within the 130-word limit');
 });
 
+// #2459: the changelog says, one bullet a fix, that adding a task during a
+// Started pass no longer stops sync at the next answer, that the first answer
+// after an Add syncs like any other, and that the rank column catches up in
+// short steps.
+test('RISK answer sync guidance: the November 23 changelog says an Add during a Started pass no longer stops sync, the first answer after an Add syncs like any other, and the rank column catches up in short steps, one bullet each',async()=>{
+ const {shim}=await loadApp();
+ shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ const current=shim.document.getElementById('appChangelogCurrent').innerHTML.split('<h3>November 23, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.ok(current,'the changelog has a November 23, 2026 section');
+ const items=current.split('<li>').slice(1).map(item=>item.replace(/<\/li>\s*$/,''));
+ const one=pattern=>{const found=items.filter(item=>pattern.test(item));assert.equal(found.length,1,'one bullet matches '+pattern);return found[0];};
+ assert.equal(one(/no longer stops sync/),'With sync on, adding a task during a pass you began with Start no longer stops sync with an error at your next answer.');
+ assert.equal(one(/first answer after you add a task/),'With sync on, the first answer after you add a task now goes to your other devices within about a second on a large board, like any other answer, instead of sending a full copy of the board at once.');
+ assert.equal(one(/rank column/),'On a large board, the rank column now catches up after each answer in several short steps instead of one long one, so a tap right after an answer waits less. The ranks come out the same as before.');
+});
+// #2459 (AGENTS.md FAQ duty): the extended FAQ answers the same, in what the
+// person sees.
+test('RISK answer sync guidance: mounted Help says a task added during a pass leaves the next answer syncing like any other, and that you can keep tapping while the rank column catches up',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ await app.ctx.onAction('help',{});const help=app.shim.document.getElementById('modalRoot').innerHTML;
+ const added=helpAnswer2435(help,'Does adding a task while scanning change how answers sync?');
+ assert.ok(added,'Data and backups answers whether adding a task while scanning changes how answers sync');
+ assert.ok(help.indexOf('<dt>Does adding a task while scanning change how answers sync?</dt>')>help.indexOf('<summary><h3>Data and backups</h3>'),'with the data and backups answers');
+ assert.match(added,/^No\. A task you add during a pass joins that pass’s scanning order as you add it, so your next answer goes to the cloud within about a second like any other, even on a large board\./);
+ assert.match(added,/Before November 23, 2026, that answer sent a full copy of the board instead, and in a pass you began with Start, sync could stop with an error\.$/,'with what it did before');
+ const ranks=helpAnswer2435(help,'Can I keep tapping while the rank column catches up?');
+ assert.ok(ranks,'Scanning answers whether a tap waits for the rank column');
+ assert.ok(help.indexOf('<dt>Can I keep tapping while the rank column catches up?</dt>')<help.indexOf('<summary><h3>Contexts</h3>'),'with the scanning answers');
+ assert.match(ranks,/^Yes\. On a large board the rank column is worked out again after each answer in several short steps instead of one long one, so a tap right after an answer waits less\./);
+ assert.match(ranks,/Until it finishes, the list shows the ranks from before that answer\. The ranks come out the same as before\.$/,'with what shows meanwhile');
+ for(const answer of [added,ranks]){
+  assert.doesNotMatch(answer,/change record|evidence|replay|projection|weight|sampl/i,'the answer says what the person sees, not how it works');
+  assert.ok(helpWords2435(answer)<=130,'the answer stays within the 130-word limit');
+ }
+});
+
 test('RISK sync responsiveness guidance: mounted Help explains large boards and bounded damaged-source recovery',async()=>{
  const {ctx,shim}=await loadApp();
  for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
