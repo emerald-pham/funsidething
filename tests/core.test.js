@@ -30155,7 +30155,15 @@ test('RISK CLOUD LOOP: repeated revision conflicts cannot spin even when every r
   async push(){pushes++;if(pushes>30)CS.user=null;await flush();return {conflict:true,rev:2};}};
  t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',ctx);});
  shim.window.CLOUD_PUSH_DELAY_MS=2;shim.window.CLOUD_RETRY_DELAY_MS=2;
- await ctx.cloudPull();ctx.addTask('Keep through repeated conflicts');await ctx.persist();ctx.cloudPushNow();await syncSettle(160);
+ await ctx.cloudPull();ctx.addTask('Keep through repeated conflicts');await ctx.persist();ctx.cloudPushNow();
+ // #2467 CI: a fixed 160 ms wait counted only 4 of the 6 attempts on a slow
+ // runner. Wait until the loop has stopped by itself (no push, read or retry
+ // pending, and no new attempt for 100 ms), so a loop that kept going still
+ // fails the count below; the cap only ends a test that never stops.
+ for(const stopBy=Date.now()+5000;Date.now()<stopBy;){
+  const seen=pushes;await syncSettle(100);
+  if(seen===pushes&&!vm.runInContext('!!(cloudRetryTimer||cloudTimer||cloudPushInFlight||pulling)',ctx))break;
+ }
  assert.equal(pushes,6,'one immediate conflict reconciliation plus four delayed retries must eventually stop');
  assert.equal(pulls,6);assert.equal(ctx.reconciled(),false);assert.equal(ctx.state.syncDirty,true);
  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ error');
