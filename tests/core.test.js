@@ -42643,6 +42643,23 @@ test('Changelog #2426: one bullet says two devices saving at the same moment no 
  assert.doesNotMatch(bullets[0],/permission|revision|transaction|Firestore/i,'it says what the person sees, not how it works');
 });
 
+test('Changelog #2461: one bullet says a scanner press held for being too soon now dims its button instead of doing nothing, and Help says so',async t=>{
+ const notes=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ assert.ok(notes.includes('<h3>November 23, 2026</h3>')&&notes.indexOf('<h3>November 23, 2026</h3>')<notes.indexOf('<h3>November 22, 2026</h3>'),'the newest release comes first');
+ const release=notes.split('<h3>November 23, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ const bullets=release.split('<li>').slice(1).filter(item=>/too soon after a new task/.test(item));
+ assert.equal(bullets.length,1,'one bullet covers the change: '+release);
+ assert.match(bullets[0],/its button dims for a moment/);
+ assert.match(bullets[0],/instead of doing nothing/);
+ assert.match(bullets[0],/starts when the new task shows on the screen/,'and says when the moment starts');
+ assert.doesNotMatch(bullets[0],/timeStamp|requestAnimationFrame|guard|paint/i,'it says what the person sees, not how it works');
+ const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();
+ const answer=app.shim.document.getElementById('modalRoot').innerHTML.match(/<dt>Why didn’t my second tap count\?<\/dt><dd>(.*?)<\/dd>/)?.[1]??'';
+ assert.match(answer,/after a new task appears on the screen/);
+ assert.match(answer,/that button dims briefly to show it/);
+ assert.match(answer,/For a moment after Return as candidate closes the editor, every tap, click and key press is ignored, wherever it lands/,'the #221 pause is still explained');
+});
+
 test('Help answers how the steady scanner, backup list, Debug log link and rank column now behave',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();
  const help=app.shim.document.getElementById('modalRoot').innerHTML;
