@@ -12015,7 +12015,11 @@ function maybeIntervene(){
 // a short grace holds: 200 ms there held deliberate presses people made once
 // they could see the card, and they had to press again. #221's pause after
 // Return as candidate keeps the 200 ms below.
+// On a small board the new card can paint 20 ms after the first tap, so a
+// second tap 120 ms later lands after the grace; a press within 200 ms of the
+// last one that acted is held too. Deliberate presses come further apart.
 const TASK_PRESS_GUARD_MS=200,TASK_PRESS_GRACE_AFTER_PAINT_MS=100;
+let lastScannerPressAt=-Infinity;
 // Every button that acts on a task the scanner just drew. Removing a dot can also
 // shift the cards, so a second tap can land on a different button of the next task.
 const SCANNER_TASK_ACTIONS=new Set(["yes","no","cant","postpone","cand-done","bench-done","bench-cant","bench-postpone","dislodge","worked","cand-worked","delete-task"]);
@@ -12044,7 +12048,9 @@ function pressedAt(event){
   const at=event?.timeStamp,now=performance.now();
   return typeof at==="number"&&at>0&&at<=now?at:now;
 }
-function answerBeforeCandidateCouldBeRead(at=performance.now()){return at-tasksOnScreenSince<=TASK_PRESS_GRACE_AFTER_PAINT_MS;}
+function answerBeforeCandidateCouldBeRead(at=performance.now()){
+  return at-tasksOnScreenSince<=TASK_PRESS_GRACE_AFTER_PAINT_MS||at-lastScannerPressAt<=TASK_PRESS_GUARD_MS;
+}
 // #2461: a held press is never silent. Its button takes the app's dimmed,
 // not-now look for a moment, so the person looks before pressing again. It is
 // no prompt and records nothing. The answer's catch-up can draw the panel again
@@ -22612,7 +22618,11 @@ document.addEventListener("click", e=>{
   if(!el) return;
   // The second physical click can land on the replacement card at the same spot.
   if(e.detail>1 && ["cand-done","bench-done","done-task"].includes(el.dataset.act)) return;
-  if(SCANNER_TASK_ACTIONS.has(el.dataset.act)&&answerBeforeCandidateCouldBeRead(pressedAt(e))){acknowledgeHeldPress(el.dataset.act,el);return;}
+  if(SCANNER_TASK_ACTIONS.has(el.dataset.act)){
+    const at=pressedAt(e);
+    if(answerBeforeCandidateCouldBeRead(at)){acknowledgeHeldPress(el.dataset.act,el);return;}
+    lastScannerPressAt=at;
+  }
   onAction(el.dataset.act, el);
 });
 document.addEventListener("change", e=>{
@@ -22760,10 +22770,14 @@ document.addEventListener("keydown", e=>{
   const k=e.key.toLowerCase();
   const plainEditUndo=!e.ctrlKey&&!e.metaKey&&!e.altKey&&!t?.isContentEditable;
   // One held decision key must not answer for the next card dealt by commit().
-  if(["y","n","c","d"].includes(k)&&answerBeforeCandidateCouldBeRead(pressedAt(e))){
-    // A held key shows on the button it presses; a held repeat adds nothing.
-    if(!e.repeat)acknowledgeHeldPress({y:"yes",n:"no",c:"cant"}[k]??(!state.interventionActive&&state.mode==="scan"&&offeredCandidateId()?"cand-done":"bench-done"));
-    return;
+  if(["y","n","c","d"].includes(k)){
+    const at=pressedAt(e);
+    if(answerBeforeCandidateCouldBeRead(at)){
+      // A held key shows on the button it presses; a held repeat adds nothing.
+      if(!e.repeat)acknowledgeHeldPress({y:"yes",n:"no",c:"cant"}[k]??(!state.interventionActive&&state.mode==="scan"&&offeredCandidateId()?"cand-done":"bench-done"));
+      return;
+    }
+    if(!e.repeat)lastScannerPressAt=at;
   }
   if(k==="y"&&!e.repeat&&!state.interventionActive&&offeredCandidateId()) TaskActionOwner.perform({type:"decision",decision:"yes"});   // dot it
   else if(k==="n"&&!e.repeat&&!state.interventionActive&&offeredCandidateId()) TaskActionOwner.perform({type:"decision",decision:"no"});

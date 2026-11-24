@@ -20829,6 +20829,8 @@ test('RISK scanner press guard: on the large board, a deliberate Yes or n key 15
  guard.paint();await clock.advance(1000);
  guard.press('yes');
  const second=ctx.state.candidateId;
+ // Its frame waits 100 ms behind the answer's own work, as on this board.
+ await clock.advance(100);
  guard.paint();
  await clock.advance(50);
  const shown=answeredState2461(ctx);
@@ -20841,6 +20843,7 @@ test('RISK scanner press guard: on the large board, a deliberate Yes or n key 15
  assert.deepEqual([...ctx.state.chain],[...before.chain,second],'it answers that candidate');
  assert.equal(ctx.state.decisionEvents.length,before.decisions+1,'with one decision');
  const third=ctx.state.candidateId;
+ await clock.advance(100);
  guard.paint();
  await clock.advance(150);
  guard.key('n');
