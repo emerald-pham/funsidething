@@ -21217,3 +21217,22 @@ test('RISK add saves once: an Add whose frame waits longer than the edit’s 350
  assert.equal(saved.commits,1,'and commits the board once: '+JSON.stringify(saved));
  assert.equal(saved.checks,1,'with one missing-task check: '+JSON.stringify(saved));
 });
+// #2455 spec: after Add "the box is ready for the next one at once". The box
+// empties in the tap that draws the task, while the device save it waits for
+// still shows as pending, and the next title typed there is its own Add.
+test('RISK add box clears at once: on the large board an Add empties the add box in the tap that draws the task, while its device save still shows pending, and the next title is its own Add',{timeout:300000},async t=>{
+ const device=await relaunchedAdder2457(t,{signedIn:false}),{ctx,shim}=device,input=shim.document.getElementById('addInput');
+ const first=pressAdd2457(device,'Cleared at once 2457');
+ assert.ok(first.drawn,'positive control: the Add is drawn in the tap');
+ assert.equal(first.durability,'pending','and its save shows as pending');
+ assert.equal(first.saveRuns,0,'and has not started');
+ assert.equal(input.value,'','the add box is empty in that same tap');
+ const second=pressAdd2457(device,'Typed right after 2457');
+ assert.ok(second.drawn,'a title typed at once is added in its own tap');
+ assert.equal(input.value,'','and the box empties again');
+ await syncSettled(ctx,{within:60000});
+ assert.equal(device.report().save.localDurability.value,'durable','both Adds are then saved on the device');
+ assert.equal(input.value,'','and the box stays empty');
+ for(const title of ['Cleared at once 2457','Typed right after 2457'])
+  assert.equal(ctx.state.tasks.filter(task=>task.title===title).length,1,'the board holds '+title+' once');
+});

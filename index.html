@@ -13221,21 +13221,48 @@ function submitQuickAdd(text=document.getElementById("addInput").value){
   }
   if(submission.saving)return submission.saving;
   if(submission.needsCommit){commit();submission.needsCommit=false;}
-  // Acceptance mutates the board synchronously, but clearing the form waits for
-  // the existing durable gate. A newer draft or account must never be cleared
-  // by the confirmation of an earlier Add; failures remain available to retry.
+  // #2455: the box is ready for the next task at once. It empties in the tap
+  // that draws the task, once the board has taken it (a commit that throws
+  // leaves the draft), while the board's own save state stays pending until
+  // the device save commits. A failed save brings the draft back for retry,
+  // as before, unless the box has been edited or reset since, or the board's
+  // owner changed: a later draft is never replaced by an earlier Add's. The
+  // retry reuses the accepted tasks, so it never adds a second copy.
+  let cleared=null;
+  if(submission.generation===quickAddDraftGeneration && sameListOwner(submission.owner,state) && submission.ids.every(id=>taskById(id)) && JSON.stringify(quickAddAppearanceValues())===submission.draft){
+    cleared={kept:quickAddDraftCopy()};
+    input.value="";clearQuickAddDraft();
+    cleared.generation=quickAddDraftGeneration;
+    if(submission.result.skipped!==undefined)toast(importSummary(submission.result.added,submission.result.skipped,submission.result.completed));
+  }
   submission.saving=(async()=>{
     let saved=false;
     // #2457: after the frame that draws the task, in the device-save lane.
     try{saved=!submission.ids.length || await deviceSaveAfterFrame();}catch(e){}
-    if(saved && submission.generation===quickAddDraftGeneration && sameListOwner(submission.owner,state) && submission.ids.every(id=>taskById(id)) && JSON.stringify(quickAddAppearanceValues())===submission.draft){
-      input.value="";clearQuickAddDraft();
-      if(submission.result.skipped!==undefined)toast(importSummary(submission.result.added,submission.result.skipped,submission.result.completed));
+    if(!saved && cleared && cleared.generation===quickAddDraftGeneration && sameListOwner(submission.owner,state) && submission.ids.every(id=>taskById(id))){
+      restoreQuickAddDraft(cleared.kept);
+      submission.draft=JSON.stringify(quickAddAppearanceValues());submission.generation=quickAddDraftGeneration;
     }
     if(saved && quickAddSubmission===submission)quickAddSubmission=null;
     submission.saving=null;syncQuickAddAppearance();return saved;
   })();
   return submission.saving;
+}
+// Everything clearQuickAddDraft() resets, so a failed Add's save can put it back.
+function quickAddDraftCopy(){
+  return {values:quickAddAppearanceValues(),modes:{...dependencyDraftModes.add},editable:{...dependencyDraftEditable.add},query:dependencyQueries.add,
+    durationEdited:quickAddEvergreenDurationEdited,uses18:quickAddEvergreenUses18HourDefault};
+}
+function restoreQuickAddDraft(kept){
+  const v=kept.values,field=id=>document.getElementById(id);
+  for(const [id,value] of [["addInput",v.title],["addStart",v.startsAt],["addDue",v.due],["addEverHours",v.hours],["addEverUnit",v.unit]])if(field(id))field(id).value=value;
+  if(field("addEver"))field("addEver").checked=v.evergreen;
+  if(field("addEverReset"))field("addEverReset").checked=v.reset;
+  toggleQuickEvergreenOptions(v.evergreen);
+  quickAddEvergreenDurationEdited=kept.durationEdited;quickAddEvergreenUses18HourDefault=kept.uses18;
+  dependencyDraftModes.add={...kept.modes};dependencyDraftEditable.add={...kept.editable};dependencyQueries.add=kept.query;
+  renderDependencyFields("add",v.dependencies.length?v.dependencies:[""]);
+  syncQuickAddAppearance();
 }
 function quickAddDates(){
   return {startsAt:document.getElementById("addStart").value, due:document.getElementById("addDue").value};

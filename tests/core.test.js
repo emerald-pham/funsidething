@@ -36523,7 +36523,9 @@ test('RISK Add draft durable reset: pending repeated Add and newer edits or rese
  for(const next of ['newer','reset','account','same-after-reset','same-after-edit']){
   const {ctx,shim}=await loadApp();ctx.renderAddPanel();const input=shim.document.getElementById('addInput');input.id='addInput';input.matches=()=>false;input.value='Private pending Add';shim.document.dispatchEvent({type:'input',target:input});
   let release;ctx.persist=()=>new Promise(resolve=>release=resolve);
-  const saving=ctx.onAction('add',{}),repeated=ctx.onAction('add',{});assert.equal(input.value,'Private pending Add','pending save must not clear form');assert.equal(ctx.state.tasks.length,1,'repeated pending submit does not add twice');
+  // #2455: the box empties at once, while the save is pending; a second press on the empty box adds nothing.
+  const saving=ctx.onAction('add',{});assert.equal(input.value,'','the box is ready for the next task while the save is pending');
+  const repeated=ctx.onAction('add',{});assert.equal(ctx.state.tasks.length,1,'repeated pending submit does not add twice');
   if(next==='newer'){input.value='Newer task draft';shim.document.dispatchEvent({type:'input',target:input});}
   if(next==='reset'){input.value='';ctx.clearQuickAddDraft();}
   if(next==='account'){ctx.state.syncAccount='other-private-owner';}
@@ -36532,7 +36534,7 @@ test('RISK Add draft durable reset: pending repeated Add and newer edits or rese
   // #2457: the Add's save starts once the frame that draws the task has run.
   while(!release)await new Promise(resolve=>setImmediate(resolve));
   release(true);await saving;await repeated;
-  assert.equal(input.value,next==='newer'?'Newer task draft':next==='reset'?'':'Private pending Add','confirmation cannot clear a later edit/reset or another owner draft');
+  assert.equal(input.value,next==='newer'?'Newer task draft':next==='reset'||next==='account'?'':'Private pending Add','confirmation cannot clear a later edit or bring back a reset draft');
  }
 });
 
