@@ -24117,15 +24117,16 @@ test("RISK steady scanner browser: a key hint never widens an action beside a ca
     const walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT,{acceptNode:n=>n.parentElement.closest('.keyhint')||!n.textContent.trim()?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT});
     for(let n;(n=walker.nextNode());){range.selectNodeContents(n);rects.push(...[...range.getClientRects()].filter(b=>b.width>0));}
     const label={left:Math.min(...rects.map(b=>b.left)),right:Math.max(...rects.map(b=>b.right)),top:Math.min(...rects.map(b=>b.top)),bottom:Math.max(...rects.map(b=>b.bottom))};
-    const hints=[...el.querySelectorAll('.keyhint')].map(h=>{const b=h.getBoundingClientRect();return {text:h.textContent,left:b.left,right:b.right,top:b.top,bottom:b.bottom};});
+    // A hint is measured by its glyph, which may overflow a box of its own.
+    const hints=[...el.querySelectorAll('.keyhint')].map(h=>{const glyph=document.createRange();glyph.selectNodeContents(h);const b=glyph.getBoundingClientRect();return {text:h.textContent,left:b.left,right:b.right,top:b.top,bottom:b.bottom};});
     // The same button with its hint taken out, then put back as it was.
-    let bare=r.width;
+    let bare=r.width,bareHeight=r.height;
     if(el.querySelector('.keyhint')){
      const taken=[...el.querySelectorAll('.keyhint')].map(h=>[h,h.parentNode,h.nextSibling]);
-     taken.forEach(([h])=>h.remove());bare=el.getBoundingClientRect().width;
+     taken.forEach(([h])=>h.remove());({width:bare,height:bareHeight}=el.getBoundingClientRect());
      taken.reverse().forEach(([h,parent,next])=>parent.insertBefore(h,next));
     }
-    return {act:el.dataset.act,width:r.width,bare,top:r.top,left:r.left,inner,label,hints};
+    return {act:el.dataset.act,width:r.width,bare,height:r.height,bareHeight,top:r.top,left:r.left,inner,label,hints};
    });
   };
   return {bench:rowAfter('.card.bench'),cand:rowAfter('.card.cand')};
@@ -24135,14 +24136,24 @@ test("RISK steady scanner browser: a key hint never widens an action beside a ca
   for(const b of row){
    const bl=`${label}: ${b.act}`;
    assert.ok(Math.abs(b.width-b.bare)<=0.5,`${bl}: its key hint adds no width: ${b.width.toFixed(1)} px with it, ${b.bare.toFixed(1)} px without`);
+   assert.ok(Math.abs(b.height-b.bareHeight)<=0.5,`${bl}: its key hint adds no height: ${b.height.toFixed(1)} px with it, ${b.bareHeight.toFixed(1)} px without`);
    const leftInset=b.label.left-b.inner.left,rightInset=b.inner.right-b.label.right;
    assert.ok(Math.abs(leftInset-rightInset)<=1,`${bl}: its label is centred: ${leftInset.toFixed(1)} px from the left, ${rightInset.toFixed(1)} px from the right`);
    for(const h of b.hints){
     const apart=h.left>=b.label.right||h.right<=b.label.left||h.top>=b.label.bottom||h.bottom<=b.label.top;
     assert.ok(apart,`${bl}: its ${h.text} hint (${h.left.toFixed(1)}-${h.right.toFixed(1)}) stays clear of its label (${b.label.left.toFixed(1)}-${b.label.right.toFixed(1)})`);
-    assert.ok(h.left>=b.inner.left-0.5&&h.right<=b.inner.right+0.5,`${bl}: its ${h.text} hint stays inside the button`);
+    assert.ok(h.left>=b.inner.left-0.5&&b.inner.right-h.right>=2,`${bl}: its ${h.text} hint stays inside the button at least 2 px from its edge: ${(b.inner.right-h.right).toFixed(1)} px`);
    }
   }
+ };
+ // Review B2: a hint flush with the button's edge sat 1.7 px from "Delete" and
+ // 14 px from "Edit". Every hint beside a card follows its label by one gap, as
+ // the Yes, No and Can't hints do.
+ const sameGap=(label,...rows)=>{
+  const gaps=rows.flat().flatMap(b=>b.hints.map(h=>({at:b.act+' '+h.text,gap:h.left-b.label.right})));
+  assert.ok(gaps.length>0,`${label}: positive control: there are hints to compare`);
+  const sizes=gaps.map(g=>g.gap);
+  assert.ok(Math.max(...sizes)-Math.min(...sizes)<=1,`${label}: every hint follows its label by one gap: ${gaps.map(g=>g.at+' '+g.gap.toFixed(1)).join(', ')}`);
  };
  for(const [engineName,engine] of await steadyScannerEngines()){
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
@@ -24185,6 +24196,7 @@ test("RISK steady scanner browser: a key hint never widens an action beside a ca
       assert.ok(!benchLines.some(line=>line.length===1&&line[0]==='delete-task'),`${tl}: Delete is not alone on a line under the dotted task: ${JSON.stringify(benchLines)}`);
      }
      if(spec.benchNoLoneDelete&&!webFonts)assert.ok(benchLines.length<=3,`${tl}: the dotted task's row takes no more lines than the released build's three: ${JSON.stringify(benchLines)}`);
+     sameGap(tl,seen.bench,seen.cand);
      checkActions(`${tl}: dotted task's row`,seen.bench);checkActions(`${tl}: candidate's row`,seen.cand);
      // done adding for now: every hint moves to the dotted task.
      await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
@@ -24193,6 +24205,7 @@ test("RISK steady scanner browser: a key hint never widens an action beside a ca
      await page.waitForFunction(()=>state.mode==='work'&&!document.querySelector('.card.cand'),null,{timeout:10000});
      const after=await readActions(page);
      checkActions(`${label}, dotted task listening: dotted task's row`,after.bench);
+     sameGap(`${label}, dotted task listening`,after.bench);
      assert.deepEqual(errors,[],`${label}: no page errors`);
     }catch(error){failures.push(error.message.split('\n')[0]);}finally{await context.close();}
    }

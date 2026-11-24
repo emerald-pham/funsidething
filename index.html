@@ -185,7 +185,7 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
    Layouts that must share a narrow row still override it with min-width:0. */
 .btn{border-radius:8px;border:1px solid transparent;padding:8px 16px;font-weight:700;font-size:14px;color:#fff;box-shadow:0 1px 2px rgba(20,24,48,.15);min-inline-size:6em;text-align:center}
 .btn:active{transform:translateY(1px)}
-.btn.sm{padding:6px 12px;font-size:13px;position:relative}   /* the siderail size — every action beside a card uses it; relative for its key hint */
+.btn.sm{padding:6px 12px;font-size:13px}   /* the siderail size — every action beside a card uses it */
 .btn.dislodge{background:var(--danger)}
 .btn.worked{background:var(--cant)}
 .btn.yes{background:var(--yes)}
@@ -228,12 +228,20 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
 .decide-finish .sparkbox{margin-left:auto;min-width:0;flex:0 1 auto}
 .decide-finish .spark{width:clamp(56px,12vw,84px);max-width:84px;height:20px}
 .keyhint{font-size:10px;opacity:.7;font-weight:500;margin-left:5px}
-/* Beside a card a hint draws inside the button's right padding, so shown, hidden
-   or absent it never adds width and the label stays centred. A hint that took
-   its own width made the candidate's Worked on it 13px wider than on the
-   released build, and on 407-432px phones its row wrapped with Delete alone
-   where that build kept one line (#2460 review B1). */
-.btn.sm .keyhint{position:absolute;top:0;bottom:0;right:0;margin:0;display:flex;align-items:center}
+/* Beside a card a hint draws in the button's end padding, so shown, hidden or
+   absent it never adds width and the label stays centred. A hint that took its
+   own width made the candidate's Worked on it 13px wider than on the released
+   build, and on 407-432px phones its row wrapped with Delete alone where that
+   build kept one line (#2460 review B1). Pinned to the button's edge instead,
+   it sat 1.7px from "Delete" and 14px from "Edit" (review B2). So it stays in
+   the line, on the label's baseline like the choices' hints, as a zero-width
+   box its glyph overflows, nudged one 2px gap past the label's end. The 12px
+   padding has to hold gap, glyph and a 2px inset, and the rows have no width
+   to spare for more padding (the dotted task's second line at 375px with
+   Postpone has 5px), so the hint is 7.5px, which makes ⌫ about 8px wide. It
+   stays in px like the padding: an em size grows with enlarged text, and w
+   then overran Worked on it's edge at 150%. */
+.btn.sm .keyhint{position:relative;inset-inline-start:2px;margin:0;display:inline-block;inline-size:0;font-size:7.5px;white-space:nowrap}
 /* A hint on the card the key doesn't act on isn't seen or read (#2460). */
 .keyhint.unheard{visibility:hidden}
 .sparkbox{display:flex;align-items:center;gap:8px;margin-left:auto}
@@ -15738,8 +15746,8 @@ const boardPresentation=Object.freeze({
   // The actions beside a card, for the dotted task and the candidate alike (#2460):
   // built separately, the same action rendered at different widths under the two
   // cards. Order is fixed here: Done, Edit, Worked on it, the card's own actions,
-  // Delete last. A key hint sits inside the button's padding (.btn.sm .keyhint),
-  // so it never adds width; on the card the key doesn't act on it is hidden and
+  // Delete last. A key hint sits in the button's padding just after its label
+  // (.btn.sm .keyhint), so it never adds width; on the card the key doesn't act on it is hidden and
   // kept out of the accessibility tree, and a button keeps its width when the
   // keys move between cards. `listening` is the set of keys this card answers
   // now (d and ⌫ go to the candidate when one shows). A
