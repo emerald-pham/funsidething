@@ -24132,11 +24132,16 @@ test("RISK steady scanner browser: a key hint never widens an action beside a ca
   return {bench:rowAfter('.card.bench'),cand:rowAfter('.card.cand')};
  });
  const lines=row=>{const tops=[...new Set(row.map(b=>Math.round(b.top)))].sort((a,b)=>a-b);return tops.map(t=>row.filter(b=>Math.abs(Math.round(b.top)-t)<=1).sort((a,b)=>a.left-b.left).map(b=>b.act));};
- const checkActions=(label,row)=>{
+ // At the normal text size a hint takes no room of its own, so the rows keep
+ // the released build's lines. Enlarged text may widen a button to keep the
+ // hint clear of its label, as the released build's hint always did.
+ const checkActions=(label,row,normalText)=>{
   for(const b of row){
    const bl=`${label}: ${b.act}`;
-   assert.ok(Math.abs(b.width-b.bare)<=0.5,`${bl}: its key hint adds no width: ${b.width.toFixed(1)} px with it, ${b.bare.toFixed(1)} px without`);
-   assert.ok(Math.abs(b.height-b.bareHeight)<=0.5,`${bl}: its key hint adds no height: ${b.height.toFixed(1)} px with it, ${b.bareHeight.toFixed(1)} px without`);
+   if(normalText){
+    assert.ok(Math.abs(b.width-b.bare)<=0.5,`${bl}: its key hint adds no width: ${b.width.toFixed(1)} px with it, ${b.bare.toFixed(1)} px without`);
+    assert.ok(Math.abs(b.height-b.bareHeight)<=0.5,`${bl}: its key hint adds no height: ${b.height.toFixed(1)} px with it, ${b.bareHeight.toFixed(1)} px without`);
+   }
    const leftInset=b.label.left-b.inner.left,rightInset=b.inner.right-b.label.right;
    assert.ok(Math.abs(leftInset-rightInset)<=1,`${bl}: its label is centred: ${leftInset.toFixed(1)} px from the left, ${rightInset.toFixed(1)} px from the right`);
    for(const h of b.hints){
@@ -24153,20 +24158,42 @@ test("RISK steady scanner browser: a key hint never widens an action beside a ca
   const gaps=rows.flat().flatMap(b=>b.hints.map(h=>({at:b.act+' '+h.text,gap:h.left-b.label.right})));
   assert.ok(gaps.length>0,`${label}: positive control: there are hints to compare`);
   const sizes=gaps.map(g=>g.gap);
-  assert.ok(Math.max(...sizes)-Math.min(...sizes)<=1,`${label}: every hint follows its label by one gap: ${gaps.map(g=>g.at+' '+g.gap.toFixed(1)).join(', ')}`);
+  assert.ok(Math.max(...sizes)-Math.min(...sizes)<=1&&Math.min(...sizes)>=1.5,`${label}: every hint follows its label by one gap of at least 1.5 px: ${gaps.map(g=>g.at+' '+g.gap.toFixed(1)).join(', ')}`);
  };
+ // Text enlarged where the padding stays put (review B2, independent review):
+ // a platform text scale multiplies every font size, the hints' included, and
+ // a browser minimum font size raises every smaller one, generated content
+ // included. Both are modelled on the rows' own computed sizes, so the model
+ // doesn't depend on how the hint is built. Rules name classes, not nodes, so
+ // they outlast a re-render.
+ const enlargeRowText=(page,{scale,minimum})=>page.evaluate(({scale,minimum})=>{
+  const rules=new Map();
+  for(const row of document.querySelectorAll('.siderail,.actionrow'))for(const el of row.querySelectorAll('*')){
+   const selector='.'+row.classList[0]+' '+el.localName+[...el.classList].filter(c=>c!=='unheard').map(c=>'.'+c).join('');
+   for(const pseudo of ['','::before','::after']){
+    const cs=getComputedStyle(el,pseudo||null);if(pseudo&&(cs.content==='none'||cs.content==='normal'))continue;
+    const size=parseFloat(cs.fontSize),to=scale?size*scale:Math.max(size,minimum);
+    rules.set(selector+pseudo,selector+pseudo+'{font-size:'+to+'px!important}');
+   }
+  }
+  const style=document.createElement('style');style.textContent=[...rules.values()].join('\n');document.head.append(style);
+ },{scale:scale||0,minimum:minimum||0});
  for(const [engineName,engine] of await steadyScannerEngines()){
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
   try{
    for(const spec of [
-    {name:'small phone with enlarged text and Postpone',width:320,height:568,enlarged:true,showPostpone:true},
+    {name:'small phone at 150% text with Postpone',width:320,height:568,scale:1.5,showPostpone:true},
     {name:'common phone',width:375,height:812},
     {name:'common phone with Postpone',width:375,height:812,showPostpone:true,benchNoLoneDelete:true},
     {name:'412 px phone',width:412,height:915,candOneLine:true},
     {name:'414 px phone',width:414,height:896,candOneLine:true},
     {name:'428 px phone',width:428,height:926,candOneLine:true},
     {name:'430 px phone',width:430,height:932,candOneLine:true},
-    {name:'large phone at 200% text with Postpone',width:430,height:932,enlarged:true,doubleText:true,showPostpone:true},
+    {name:'common phone at 150% text with Postpone',width:375,height:812,scale:1.5,showPostpone:true},
+    {name:'common phone at 200% text with Postpone',width:375,height:812,scale:2,showPostpone:true},
+    {name:'large phone at 200% text with Postpone',width:430,height:932,scale:2,showPostpone:true},
+    {name:'common phone with a 16 px minimum font size and Postpone',width:375,height:812,minimum:16,showPostpone:true},
+    {name:'desktop with a 16 px minimum font size',width:1000,height:900,touch:false,minimum:16,showPostpone:true},
     {name:'desktop with Postpone',width:1000,height:900,touch:false,showPostpone:true},
    ])for(const webFonts of [true,false]){
     const label=`${engineName} ${spec.name} ${webFonts?'with web fonts':'fonts blocked'}`;
@@ -24177,9 +24204,10 @@ test("RISK steady scanner browser: a key hint never widens an action beside a ca
       await page.reload({waitUntil:'domcontentloaded'});
       await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]'),null,{timeout:60000});
      }
-     if(spec.enlarged)await page.addStyleTag({content:spec.doubleText?STEADY_DOUBLE_TEXT:STEADY_ENLARGED_TEXT});
      await page.waitForFunction(()=>!!document.querySelector('.card.bench')&&!!document.querySelector('.card.cand')&&!!document.querySelector('[data-act="cand-worked"]'),null,{timeout:15000});
      await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(80);
+     const normalText=!spec.scale&&!spec.minimum;
+     if(!normalText){await enlargeRowText(page,spec);await page.waitForTimeout(80);}
      const loadedFonts=await page.evaluate(()=>[...document.fonts].filter(face=>face.status==='loaded').length);
      if(webFonts)assert.ok(loadedFonts>0,`${label}: positive control: the web fonts loaded, which needs the network`);
      else assert.equal(loadedFonts,0,`${label}: positive control: no web font loaded`);
@@ -24197,14 +24225,14 @@ test("RISK steady scanner browser: a key hint never widens an action beside a ca
      }
      if(spec.benchNoLoneDelete&&!webFonts)assert.ok(benchLines.length<=3,`${tl}: the dotted task's row takes no more lines than the released build's three: ${JSON.stringify(benchLines)}`);
      sameGap(tl,seen.bench,seen.cand);
-     checkActions(`${tl}: dotted task's row`,seen.bench);checkActions(`${tl}: candidate's row`,seen.cand);
+     checkActions(`${tl}: dotted task's row`,seen.bench,normalText);checkActions(`${tl}: candidate's row`,seen.cand,normalText);
      // done adding for now: every hint moves to the dotted task.
      await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
      const finish=page.locator('[data-act="start-working"]');
      if(spec.touch===false)await finish.click();else await finish.tap();
      await page.waitForFunction(()=>state.mode==='work'&&!document.querySelector('.card.cand'),null,{timeout:10000});
      const after=await readActions(page);
-     checkActions(`${label}, dotted task listening: dotted task's row`,after.bench);
+     checkActions(`${label}, dotted task listening: dotted task's row`,after.bench,normalText);
      sameGap(`${label}, dotted task listening`,after.bench);
      assert.deepEqual(errors,[],`${label}: no page errors`);
     }catch(error){failures.push(error.message.split('\n')[0]);}finally{await context.close();}
