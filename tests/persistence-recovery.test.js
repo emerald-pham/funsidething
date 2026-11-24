@@ -25,6 +25,7 @@ import {
   largeSignedInBoardFixture,
 } from "./shared.js";
 import { openApp } from "./shared.js"; // #2378 app driver
+import { driveApp } from "./shared.js"; // #2458: the same driver for an app opened with loadApp
 import { syncSettled, outsideWork, settledTogether } from "./shared.js"; // #2378 app driver
 import { answersCaughtUp } from "./shared.js"; // #2407: History and ranks catch up after an answer shows
 import { rewriteGenerationFixture } from "./shared.js";
@@ -19256,6 +19257,152 @@ async function openingOnce2429(t,{signed}){
 }
 test('RISK opening once: a warm relaunch of the large board with sync off parses, checks and hashes the board it opens once, the preview alone checks its older copy, and the preview shows the same board',{timeout:300000},t=>openingOnce2429(t,{signed:false}));
 test('RISK opening once: a warm relaunch of the large board with sync on parses, checks and hashes the board it opens once, the preview alone checks its older copy, and the preview shows the same board',{timeout:300000},t=>openingOnce2429(t,{signed:true}));
+
+// #2458: opening signed in, with nothing changed in the cloud, checks each
+// copy's decision evidence at most once, and the acknowledged copy the cloud
+// still holds not at all. The large board is opened signed in, published and
+// acknowledged, then relaunched over the same device storage and shared fake
+// cloud, and read again as a reconnect reads it (pageshow, focus, online).
+// Copies are told apart by their saved texts, read from device storage before
+// the relaunch: the device head (this device's board) and the acknowledged
+// copy its decision base holds. Work is counted, never timed: a whole check of
+// a copy's decision evidence (decisionEvidenceIssue or decisionProjectionIssue
+// on a board parsed from that text; a check inside another check of the same
+// board is part of it) and each derivation of a copy's decision base identity,
+// on the main thread (decisionBaseIdOf) or in the app's worker (the message
+// that asks it). The checks have no outside boundary, so the counter wraps the
+// app's own functions in place before the app boots, as #2429's does.
+const readObserver2458=`{const source=globalThis.__copies2458,work=globalThis.__reads2458,active=new Set();
+for(const name of ['decisionEvidenceIssue','decisionProjectionIssue']){const check=globalThis[name];
+ globalThis[name]=function(board,...rest){const id=source.get(board),outer=!!id&&!active.has(board);
+  if(outer){work.count(id,'decisionChecks');active.add(board);}
+  try{return check.call(this,board,...rest);}finally{if(outer)active.delete(board);}};}
+const idOf=decisionBaseIdOf;decisionBaseIdOf=function(fact,hash){work.derived(fact,'mainThreadIdentities');return idOf(fact,hash);};}
+`;
+function readWork2458(){
+ const texts=new Map(),rows={};
+ const idOf=text=>{if(typeof text!=='string'||text.length<100000)return null;for(const [id,saved] of texts)if(text===saved)return id;return null;};
+ const row=id=>rows[id]??={parses:0,decisionChecks:0,mainThreadIdentities:0,workerIdentities:0};
+ return {texts,rows,idOf,row,count(id,kind){row(id)[kind]++;},
+  derived(fact,kind){let id=null;try{id=idOf(JSON.parse(fact)[2]);}catch{}if(id)row(id)[kind]++;}};
+}
+async function openSigned2458(t,{indexedDB,dbName,storage,docs,work=null,user={uid:'owner',email:'e@example.com'}}){
+ const copies=new WeakMap();
+ assert.ok(appSrc.includes('(async function init(){'),'the app boots from its init function');
+ const app=driveApp(await loadApp({appSource:work?appSrc.replace('(async function init(){',readObserver2458+'(async function init(){'):appSrc,
+  indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage,cryptoProvider:webcrypto,
+  beforeAppScript(sandbox){
+   if(!work)return;
+   const host=JSON,HostWorker=sandbox.Worker;sandbox.__copies2458=copies;sandbox.__reads2458=work;
+   sandbox.JSON={[Symbol.toStringTag]:'JSON',stringify:host.stringify,parse(text,...rest){
+    const value=host.parse(text,...rest),id=work.idOf(text);
+    if(id){work.count(id,'parses');if(value&&typeof value==='object')copies.set(value,id);}
+    return value;}};
+   // The app's one worker names decision bases (DECISION_BASE_WORKER_SOURCE).
+   sandbox.Worker=class extends HostWorker{postMessage(data){
+    if(typeof data?.payload==='string')work.derived(host.stringify([data.account,data.revision,data.payload]),'workerIdentities');
+    return super.postMessage(data);}};
+  }}));
+ t.after(()=>app.dispose());
+ const backend=await loadCloudBackendV2({runtimeWindow:app.ctx.window,sharedDocs:docs,failures:{authPending:true},timeoutMs:5000,
+  recordSyncError:app.ctx.recordSyncError,cryptoProvider:webcrypto,serverClock:Date.now});
+ t.after(()=>backend.CS.suspend());
+ app.ctx.window.cloudPull=app.ctx.cloudPull;app.ctx.window.CLOUD_PUSH_DELAY_MS=20;
+ if(user)backend.emitAuth(user);
+ await app.settled({within:60000,synced:!!user});
+ return {...app,backend,close:async()=>{backend.CS.suspend();await app.dispose();}};
+}
+// A reconnect reads the cloud again, as the browser's own events ask.
+async function reconnect2458(device){
+ for(const type of ['pageshow','focus','online'])device.shim.window.dispatchEvent({type,persisted:false});
+ await device.settled({within:60000,synced:true});
+}
+// The large board, signed in, published and acknowledged on its first opening;
+// then relaunched with the counter. between(docs) runs between the two.
+async function relaunchSigned2458(t,{between=null}={}){
+ const fixture=await largeSignedInBoardFixture('e@example.com');
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),dbName='signed-open-2458-'+Math.random();
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:fixture.payload,[LOCAL_HEAD_KEY]:fixture.payload}),docs=new Map();
+ await (await openSigned2458(t,{indexedDB,dbName,storage,docs})).close();
+ await between?.({docs,indexedDB,dbName,storage});
+ const store=loadStorageV2({indexedDB}).createDeviceStore({indexedDB,crypto:webcrypto,dbName});await store.open();
+ const head=await store.readHead();await store.close?.();
+ const base=JSON.parse(head?.payload??'null')?.decisionBase;
+ assert.ok(typeof base?.payload==='string'&&base.copy?.generationId,'positive control: the first opening acknowledged a published copy this device names');
+ const work=readWork2458();work.texts.set('device board',head.payload);work.texts.set('acknowledged copy',base.payload);
+ const device=await openSigned2458(t,{indexedDB,dbName,storage,docs,work});
+ return {device,work,docs,base};
+}
+const cloudReads2458=ctx=>JSON.parse(ctx.supportDiagnosticsText()).events.filter(event=>event.stage==='cloud-pull').map(event=>event.status);
+test('RISK signed-in opening: a relaunch and reconnect that find the acknowledged copy unchanged check the board’s decision evidence once and the acknowledged copy’s never, and name its decision base off the main thread',{timeout:300000},async t=>{
+ const {device,work}=await relaunchSigned2458(t);
+ const {ctx}=device;
+ await reconnect2458(device);
+ const reads=cloudReads2458(ctx);
+ t.diagnostic(JSON.stringify({reads,work:work.rows}));
+ // Positive controls: the board opened, every read found the acknowledged
+ // copy unchanged (two at least: the opening's and the reconnect's), and the
+ // counter recognised both copies.
+ assert.equal(ctx.state.tasks.length,LARGE_BOARD_SHAPE.tasks,'the large board opened');
+ assert.ok(reads.length>=2&&reads.every(status=>status==='unchanged'),'every read found the acknowledged copy unchanged: '+JSON.stringify(reads));
+ assert.ok(work.rows['device board']?.parses>=1&&work.rows['acknowledged copy']?.parses>=1,'positive control: the counter sees both copies: '+JSON.stringify(work.rows));
+ assert.equal(ctx.state.syncDirty,false,'the board is synced');
+ const board=work.rows['device board'],acknowledged=work.rows['acknowledged copy'];
+ // This device's board is checked once, never skipped: nothing earlier in this
+ // app proved it.
+ assert.equal(board.decisionChecks,1,'the board’s decision evidence is checked exactly once over every read: '+JSON.stringify(work.rows));
+ // The copy the cloud still holds is this board's own cloud text, so the
+ // board's check covers it.
+ assert.equal(acknowledged.decisionChecks,0,'the unchanged acknowledged copy’s decision evidence is not checked: '+JSON.stringify(work.rows));
+ // Its decision base identity is still verified, once, by the app's worker.
+ assert.deepEqual({main:acknowledged.mainThreadIdentities,worker:acknowledged.workerIdentities},{main:0,worker:1},
+  'the acknowledged decision base is named once, off the main thread: '+JSON.stringify(work.rows));
+});
+// #2458: a read without that proof still checks in full. After the opening's
+// read, each case reads again, and the copy it has no proof for is checked:
+// the board once its proof is gone (the page hidden and shown, a deliberate
+// Retry sync, a sign-out and sign-in, an edit the cloud acknowledged since),
+// and a cloud copy the read downloads (Retry sync and signing in again read
+// in full; another device's newer revision).
+const NO_PROOF2458={
+ 'hidden and shown':{checked:['device board'],async act({device}){
+  const {shim}=device;
+  shim.document.hidden=true;shim.document.dispatchEvent({type:'visibilitychange'});await device.settled({within:60000});
+  shim.document.hidden=false;shim.document.dispatchEvent({type:'visibilitychange'});await device.settled({within:60000,synced:true});}},
+ 'Retry sync':{checked:['device board','acknowledged copy'],async act({device}){
+  await device.ctx.onAction('sync-retry',{});await device.settled({within:60000,synced:true});}},
+ 'signed out and in':{checked:['device board','acknowledged copy'],async act({device}){
+  device.backend.emitAuth(null);await device.settled({within:60000});
+  device.backend.emitAuth({uid:'owner',email:'e@example.com'});await device.settled({within:60000,synced:true});}},
+ 'board edited':{checked:['device board'],async act({device,before}){
+  device.ctx.addTask('Edited after the read 2458');await device.settled({within:60000,synced:true});
+  // The edit's own push checks the board; the read after it is what counts.
+  before();await reconnect2458(device);}},
+ 'changed revision':{checked:['changed copy'],async act(t,{device,work,docs}){
+  const laptop=await openSigned2458(t,{indexedDB:new (await import('fake-indexeddb')).IDBFactory(),dbName:'laptop-2458-'+Math.random(),storage:sharedScannerStorage(),docs});
+  laptop.ctx.addTask('Added on the laptop 2458');await laptop.settled({within:60000,synced:true});
+  work.texts.set('changed copy',vm.runInContext('syncView().known.payload',laptop.ctx));await laptop.close();
+  await reconnect2458(device);
+  assert.ok(device.ctx.state.tasks.some(task=>task.title==='Added on the laptop 2458'),'the newer revision reached this device');}},
+};
+async function noProof2458(t,name){
+  const {checked,act}=NO_PROOF2458[name];
+  const {device,work,docs}=await relaunchSigned2458(t);
+  let start=null;
+  const before=()=>{start=JSON.parse(JSON.stringify(work.rows));};before();
+  const readsBefore=cloudReads2458(device.ctx).length;
+  await (act.length>1?act(t,{device,work,docs}):act({device,work,docs,before}));
+  const reads=cloudReads2458(device.ctx).slice(readsBefore);
+  t.diagnostic(JSON.stringify({reads,start,work:work.rows}));
+  assert.ok(reads.length>=1,'the case read the cloud again: '+JSON.stringify(reads));
+  for(const id of checked)
+   assert.ok((work.rows[id]?.decisionChecks??0)-(start[id]?.decisionChecks??0)>=1,'the '+id+'’s decision evidence is checked in full: '+JSON.stringify({start,work:work.rows}));
+}
+test('RISK signed-in opening: a read without proof checks in full: hidden and shown',{timeout:300000},t=>noProof2458(t,'hidden and shown'));
+test('RISK signed-in opening: a read without proof checks in full: Retry sync',{timeout:300000},t=>noProof2458(t,'Retry sync'));
+test('RISK signed-in opening: a read without proof checks in full: signed out and in',{timeout:300000},t=>noProof2458(t,'signed out and in'));
+test('RISK signed-in opening: a read without proof checks in full: board edited',{timeout:300000},t=>noProof2458(t,'board edited'));
+test('RISK signed-in opening: a read without proof checks in full: changed revision',{timeout:300000},t=>noProof2458(t,'changed revision'));
 
 // #2427: the work one cloud push costs this device's main thread, with sync
 // on, counted and never timed, from the end of the answer's own device save
