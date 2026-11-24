@@ -24884,7 +24884,6 @@
     "previousBehavior": "An Add during the Started pass followed by a Can't made decisionEvidenceIssue non-null, the phone sent no change record of the Can't, and the laptop stayed free of errors and kept syncing its own edits.",
     "intendedBehavior": "The same expectations hold for a sender board made unprojectable by a pass draw that differs from the Start's recorded draw in a recorded weight: no change record of the answer is sent, the laptop shows no cloud error, and its own later edit still reaches the cloud. A task added during a Started pass is covered by the new #2459 cases, where the next answer syncs and goes as a change record.",
     "replacementTests": [
-      "RISK change records: an answer whose board the sender could not push goes as no record, and the other device keeps syncing",
       "RISK change records: after an Add in a Started pass, a Yes still syncs: the added task’s frozen chance weight does not make the board’s decisions fail their check",
       "RISK change records: a Yes right after an Add on the large board goes as a change record, not a full copy"
     ],
