@@ -25,6 +25,7 @@ import {
   largeSignedInBoardFixture,
 } from "./shared.js";
 import { openApp } from "./shared.js"; // #2378 app driver
+import { driveApp } from "./shared.js"; // #2458: the same driver for an app opened with loadApp
 import { syncSettled, outsideWork, settledTogether } from "./shared.js"; // #2378 app driver
 import { answersCaughtUp } from "./shared.js"; // #2407: History and ranks catch up after an answer shows
 import { rewriteGenerationFixture } from "./shared.js";
@@ -39,6 +40,7 @@ import { benchmarkEdit } from "./shared.js";
 import { woopFields2421, woopBoard2421, woopSnapshot2421 } from "./shared.js"; // #2421 saved WOOP data
 import { decisionMixedActionsApp146 } from "./shared.js"; // #2435: every kind of recorded choice, for the check before a change record
 import v8 from "node:v8"; // #2435 review: a collection, to show a replaced board's decision data is let go
+import { mulberry32 } from "./shared.js"; // #2459: one random stream for two devices' rank sampling
 
 test('RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap',async t=>{
  if(process.env.CHAIN_RECOVERY_MEMORY_CHILD!=='1'){
@@ -16161,6 +16163,9 @@ function answerClock2408(ctx,counters){
    ctx.setTimeout=(fn,ms,...args)=>{const id={answerClock2408:++serial};timers.set(id,{at:now+Math.max(0,Number(ms)||0),serial,fn:()=>fn(...args)});return id;};
    ctx.clearTimeout=id=>{timers.delete(id);};
    ctx.performance={now:()=>base+now};ctx.__answerClockNow2408=()=>start+now;
+   // #2461: frames run on this clock too, one every 16 ms, since the press
+   // guard is timed from the frame that paints a new candidate.
+   ctx.requestAnimationFrame=fn=>ctx.setTimeout(()=>fn(base+now),16);
    vm.runInContext('Date.now=()=>__answerClockNow2408()',ctx);
   },
   sleep(ms){return new Promise(resolve=>ctx.setTimeout(resolve,ms));},
@@ -17667,9 +17672,11 @@ test('RISK change records: a server-only repair of a damaged full copy publishes
 });
 
 // #2417 specialist review B1: an answer that leaves the sender's board
-// unprojectable (#2395: a task added during a started pass, then an answer)
-// goes as no change record, as its full copy does not go; the other device
-// shows no error and keeps syncing.
+// unprojectable goes as no change record, as its full copy does not go; the
+// other device shows no error and keeps syncing. #2459: #2395's path here (a
+// task added during a started pass, then an answer) no longer leaves the board
+// unprojectable; a pass draw changed behind its Start's recorded draw, after
+// the answer's replay and before its record goes, still does.
 test('RISK change records: an answer whose board the sender could not push goes as no record, and the other device keeps syncing',{timeout:240000},async t=>{
  const docs=new Map();
  const phone=await answeringDevice2408(t,{board:answeringBoard2408({tasks:3,padBytes:0}),docs,saveMs:0,dropDatabase:true});
@@ -17679,10 +17686,9 @@ test('RISK change records: an answer whose board the sender could not push goes 
  await settledTogether([phone,laptop],[],{within:60000});
  holdFullCopy2417(t,phone);
  const written=recordsWritten2417(phone);
- phone.ctx.addTask('Added during the started pass');
- await new Promise(resolve=>setTimeout(resolve,300));
  phone.tap('cant');
- await until2417(()=>vm.runInContext('decisionEvidenceIssue(state,window.CloudSync.user)',phone.ctx)!==null,'positive control: the answer leaves the phone’s board unprojectable (#2395)');
+ const weights=phone.ctx.state.chance.weights,changed=Object.keys(weights)[0];weights[changed]/=2;
+ await until2417(()=>vm.runInContext('decisionEvidenceIssue(state,window.CloudSync.user)',phone.ctx)!==null,'positive control: the changed draw leaves the phone’s board unprojectable');
  await new Promise(resolve=>setTimeout(resolve,1500));
  assert.equal(recordsWritten2417(phone),written,'the phone sends no record of it');
  await syncSettled(laptop.ctx,{within:30000});
@@ -19255,6 +19261,158 @@ async function openingOnce2429(t,{signed}){
 test('RISK opening once: a warm relaunch of the large board with sync off parses, checks and hashes the board it opens once, the preview alone checks its older copy, and the preview shows the same board',{timeout:300000},t=>openingOnce2429(t,{signed:false}));
 test('RISK opening once: a warm relaunch of the large board with sync on parses, checks and hashes the board it opens once, the preview alone checks its older copy, and the preview shows the same board',{timeout:300000},t=>openingOnce2429(t,{signed:true}));
 
+// #2458: opening signed in, with nothing changed in the cloud, checks each
+// copy's decision evidence at most once, and the acknowledged copy the cloud
+// still holds not at all. The large board is opened signed in, published and
+// acknowledged, then relaunched over the same device storage and shared fake
+// cloud, and read again as a reconnect reads it (pageshow, focus, online).
+// Copies are told apart by their saved texts, read from device storage before
+// the relaunch: the device head (this device's board) and the acknowledged
+// copy its decision base holds. Work is counted, never timed: a whole check of
+// a copy's decision evidence (decisionEvidenceIssue or decisionProjectionIssue
+// on a board parsed from that text; a check inside another check of the same
+// board is part of it) and each derivation of a copy's decision base identity,
+// on the main thread (decisionBaseIdOf) or in the app's worker (the message
+// that asks it). The checks have no outside boundary, so the counter wraps the
+// app's own functions in place before the app boots, as #2429's does.
+const readObserver2458=`{const source=globalThis.__copies2458,work=globalThis.__reads2458,active=new Set();
+for(const name of ['decisionEvidenceIssue','decisionProjectionIssue']){const check=globalThis[name];
+ globalThis[name]=function(board,...rest){const id=source.get(board),outer=!!id&&!active.has(board);
+  if(outer){work.count(id,'decisionChecks');active.add(board);}
+  try{return check.call(this,board,...rest);}finally{if(outer)active.delete(board);}};}
+const idOf=decisionBaseIdOf;decisionBaseIdOf=function(fact,hash){work.derived(fact,'mainThreadIdentities');return idOf(fact,hash);};}
+`;
+function readWork2458(){
+ const texts=new Map(),rows={};
+ const idOf=text=>{if(typeof text!=='string'||text.length<100000)return null;for(const [id,saved] of texts)if(text===saved)return id;return null;};
+ const row=id=>rows[id]??={parses:0,decisionChecks:0,mainThreadIdentities:0,workerIdentities:0};
+ return {texts,rows,idOf,row,count(id,kind){row(id)[kind]++;},
+  derived(fact,kind){let id=null;try{id=idOf(JSON.parse(fact)[2]);}catch{}if(id)row(id)[kind]++;}};
+}
+async function openSigned2458(t,{indexedDB,dbName,storage,docs,work=null,user={uid:'owner',email:'e@example.com'}}){
+ const copies=new WeakMap();
+ assert.ok(appSrc.includes('(async function init(){'),'the app boots from its init function');
+ // A counted run waits far longer for the worker before naming the base on the
+ // main thread: the 1.5 s fallback is the app's guard against a stuck worker,
+ // and a loaded CI runner can pass it (run 45379303255), which counts runner
+ // speed, not the app's work.
+ const waitLine='const ACKNOWLEDGED_BASE_WORKER_WAIT_MS=1500;';
+ assert.ok(appSrc.includes(waitLine),'the app names its acknowledged-base worker wait');
+ const app=driveApp(await loadApp({appSource:work?appSrc.replace(waitLine,'const ACKNOWLEDGED_BASE_WORKER_WAIT_MS=60000;').replace('(async function init(){',readObserver2458+'(async function init(){'):appSrc,
+  indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage,cryptoProvider:webcrypto,
+  beforeAppScript(sandbox){
+   if(!work)return;
+   const host=JSON,HostWorker=sandbox.Worker;sandbox.__copies2458=copies;sandbox.__reads2458=work;
+   sandbox.JSON={[Symbol.toStringTag]:'JSON',stringify:host.stringify,parse(text,...rest){
+    const value=host.parse(text,...rest),id=work.idOf(text);
+    if(id){work.count(id,'parses');if(value&&typeof value==='object')copies.set(value,id);}
+    return value;}};
+   // The app's one worker names decision bases (DECISION_BASE_WORKER_SOURCE).
+   sandbox.Worker=class extends HostWorker{postMessage(data){
+    if(typeof data?.payload==='string')work.derived(host.stringify([data.account,data.revision,data.payload]),'workerIdentities');
+    return super.postMessage(data);}};
+  }}));
+ t.after(()=>app.dispose());
+ const backend=await loadCloudBackendV2({runtimeWindow:app.ctx.window,sharedDocs:docs,failures:{authPending:true},timeoutMs:5000,
+  recordSyncError:app.ctx.recordSyncError,cryptoProvider:webcrypto,serverClock:Date.now});
+ t.after(()=>backend.CS.suspend());
+ app.ctx.window.cloudPull=app.ctx.cloudPull;app.ctx.window.CLOUD_PUSH_DELAY_MS=20;
+ if(user)backend.emitAuth(user);
+ await app.settled({within:60000,synced:!!user});
+ return {...app,backend,close:async()=>{backend.CS.suspend();await app.dispose();}};
+}
+// A reconnect reads the cloud again, as the browser's own events ask.
+async function reconnect2458(device){
+ for(const type of ['pageshow','focus','online'])device.shim.window.dispatchEvent({type,persisted:false});
+ await device.settled({within:60000,synced:true});
+}
+// The large board, signed in, published and acknowledged on its first opening;
+// then relaunched with the counter. between(docs) runs between the two.
+async function relaunchSigned2458(t,{between=null}={}){
+ const fixture=await largeSignedInBoardFixture('e@example.com');
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),dbName='signed-open-2458-'+Math.random();
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:fixture.payload,[LOCAL_HEAD_KEY]:fixture.payload}),docs=new Map();
+ await (await openSigned2458(t,{indexedDB,dbName,storage,docs})).close();
+ await between?.({docs,indexedDB,dbName,storage});
+ const store=loadStorageV2({indexedDB}).createDeviceStore({indexedDB,crypto:webcrypto,dbName});await store.open();
+ const head=await store.readHead();await store.close?.();
+ const base=JSON.parse(head?.payload??'null')?.decisionBase;
+ assert.ok(typeof base?.payload==='string'&&base.copy?.generationId,'positive control: the first opening acknowledged a published copy this device names');
+ const work=readWork2458();work.texts.set('device board',head.payload);work.texts.set('acknowledged copy',base.payload);
+ const device=await openSigned2458(t,{indexedDB,dbName,storage,docs,work});
+ return {device,work,docs,base};
+}
+const cloudReads2458=ctx=>JSON.parse(ctx.supportDiagnosticsText()).events.filter(event=>event.stage==='cloud-pull').map(event=>event.status);
+test('RISK signed-in opening: a relaunch and reconnect that find the acknowledged copy unchanged check the board’s decision evidence once and the acknowledged copy’s never, and name its decision base off the main thread',{timeout:300000},async t=>{
+ const {device,work}=await relaunchSigned2458(t);
+ const {ctx}=device;
+ await reconnect2458(device);
+ const reads=cloudReads2458(ctx);
+ t.diagnostic(JSON.stringify({reads,work:work.rows}));
+ // Positive controls: the board opened, every read found the acknowledged
+ // copy unchanged (two at least: the opening's and the reconnect's), and the
+ // counter recognised both copies.
+ assert.equal(ctx.state.tasks.length,LARGE_BOARD_SHAPE.tasks,'the large board opened');
+ assert.ok(reads.length>=2&&reads.every(status=>status==='unchanged'),'every read found the acknowledged copy unchanged: '+JSON.stringify(reads));
+ assert.ok(work.rows['device board']?.parses>=1&&work.rows['acknowledged copy']?.parses>=1,'positive control: the counter sees both copies: '+JSON.stringify(work.rows));
+ assert.equal(ctx.state.syncDirty,false,'the board is synced');
+ const board=work.rows['device board'],acknowledged=work.rows['acknowledged copy'];
+ // This device's board is checked once, never skipped: nothing earlier in this
+ // app proved it.
+ assert.equal(board.decisionChecks,1,'the board’s decision evidence is checked exactly once over every read: '+JSON.stringify(work.rows));
+ // The copy the cloud still holds is this board's own cloud text, so the
+ // board's check covers it.
+ assert.equal(acknowledged.decisionChecks,0,'the unchanged acknowledged copy’s decision evidence is not checked: '+JSON.stringify(work.rows));
+ // Its decision base identity is still verified, once, by the app's worker.
+ assert.deepEqual({main:acknowledged.mainThreadIdentities,worker:acknowledged.workerIdentities},{main:0,worker:1},
+  'the acknowledged decision base is named once, off the main thread: '+JSON.stringify(work.rows));
+});
+// #2458: a read without that proof still checks in full. After the opening's
+// read, each case reads again, and the copy it has no proof for is checked:
+// the board once its proof is gone (the page hidden and shown, a deliberate
+// Retry sync, a sign-out and sign-in, an edit the cloud acknowledged since),
+// and a cloud copy the read downloads (Retry sync and signing in again read
+// in full; another device's newer revision).
+const NO_PROOF2458={
+ 'hidden and shown':{checked:['device board'],async act({device}){
+  const {shim}=device;
+  shim.document.hidden=true;shim.document.dispatchEvent({type:'visibilitychange'});await device.settled({within:60000});
+  shim.document.hidden=false;shim.document.dispatchEvent({type:'visibilitychange'});await device.settled({within:60000,synced:true});}},
+ 'Retry sync':{checked:['device board','acknowledged copy'],async act({device}){
+  await device.ctx.onAction('sync-retry',{});await device.settled({within:60000,synced:true});}},
+ 'signed out and in':{checked:['device board','acknowledged copy'],async act({device}){
+  device.backend.emitAuth(null);await device.settled({within:60000});
+  device.backend.emitAuth({uid:'owner',email:'e@example.com'});await device.settled({within:60000,synced:true});}},
+ 'board edited':{checked:['device board'],async act({device,before}){
+  device.ctx.addTask('Edited after the read 2458');await device.settled({within:60000,synced:true});
+  // The edit's own push checks the board; the read after it is what counts.
+  before();await reconnect2458(device);}},
+ 'changed revision':{checked:['changed copy'],async act(t,{device,work,docs}){
+  const laptop=await openSigned2458(t,{indexedDB:new (await import('fake-indexeddb')).IDBFactory(),dbName:'laptop-2458-'+Math.random(),storage:sharedScannerStorage(),docs});
+  laptop.ctx.addTask('Added on the laptop 2458');await laptop.settled({within:60000,synced:true});
+  work.texts.set('changed copy',vm.runInContext('syncView().known.payload',laptop.ctx));await laptop.close();
+  await reconnect2458(device);
+  assert.ok(device.ctx.state.tasks.some(task=>task.title==='Added on the laptop 2458'),'the newer revision reached this device');}},
+};
+async function noProof2458(t,name){
+  const {checked,act}=NO_PROOF2458[name];
+  const {device,work,docs}=await relaunchSigned2458(t);
+  let start=null;
+  const before=()=>{start=JSON.parse(JSON.stringify(work.rows));};before();
+  const readsBefore=cloudReads2458(device.ctx).length;
+  await (act.length>1?act(t,{device,work,docs}):act({device,work,docs,before}));
+  const reads=cloudReads2458(device.ctx).slice(readsBefore);
+  t.diagnostic(JSON.stringify({reads,start,work:work.rows}));
+  assert.ok(reads.length>=1,'the case read the cloud again: '+JSON.stringify(reads));
+  for(const id of checked)
+   assert.ok((work.rows[id]?.decisionChecks??0)-(start[id]?.decisionChecks??0)>=1,'the '+id+'’s decision evidence is checked in full: '+JSON.stringify({start,work:work.rows}));
+}
+test('RISK signed-in opening: a read without proof checks in full: hidden and shown',{timeout:300000},t=>noProof2458(t,'hidden and shown'));
+test('RISK signed-in opening: a read without proof checks in full: Retry sync',{timeout:300000},t=>noProof2458(t,'Retry sync'));
+test('RISK signed-in opening: a read without proof checks in full: signed out and in',{timeout:300000},t=>noProof2458(t,'signed out and in'));
+test('RISK signed-in opening: a read without proof checks in full: board edited',{timeout:300000},t=>noProof2458(t,'board edited'));
+test('RISK signed-in opening: a read without proof checks in full: changed revision',{timeout:300000},t=>noProof2458(t,'changed revision'));
+
 // #2427: the work one cloud push costs this device's main thread, with sync
 // on, counted and never timed, from the end of the answer's own device save
 // until the push and its acknowledgement are done and sync is settled. One No
@@ -20569,4 +20727,679 @@ test('RISK decision evidence replay: on a board with no account the incremental 
  t.diagnostic(JSON.stringify({fast:twin.fast,steps:twin.steps}));
  assert.ok(twin.apps[0].ctx.state.decisionEvents.every(event=>event.account===null),'positive control: its decisions name no account');
  assert.ok(twin.fast.settle>=8,'positive control: its answers replay their own decision alone: '+JSON.stringify(twin.fast));
+});
+
+// ---------- #2461: the scanner's press guard, timed from the person's press ----------
+// #2312's guard stops the second tap of a double tap answering the candidate
+// that just replaced the one answered. #2461 times it as the person sees it:
+// from when the new candidate was first painted to when they pressed (the
+// event's own time), on this device's clock. These use #2408's answering
+// device. Frames are the test's: the page asks for one and it is painted when
+// the test says, so a frame held behind a long task can be shown. A press is
+// a click or key event stamped with the time it was made and handled when the
+// test dispatches it, later if a long task held it.
+function pressGuard2461(device){
+ const {ctx,shim}=device,frames=[],scan=shim.document.getElementById('scan');
+ const now=()=>vm.runInContext('performance.now()',ctx);
+ ctx.requestAnimationFrame=fn=>{frames.push(fn);return frames.length;};
+ // The scan panel's buttons as the page holds them: drawing the panel again
+ // makes new ones, and each keeps the classes the page gives it.
+ let drawn=null,buttons=new Map();
+ const button=act=>{
+  if(scan.innerHTML!==drawn){drawn=scan.innerHTML;buttons=new Map();}
+  if(!buttons.has(act)){
+   const markup=scannerControl2406(scan.innerHTML,act),classes=new Set(markup.classes);
+   const el={dataset:{...markup.dataset},isConnected:true,classList:{add:name=>{classes.add(name);},remove:name=>{classes.delete(name);},
+    contains:name=>classes.has(name),toggle:(name,force=!classes.has(name))=>{if(force)classes.add(name);else classes.delete(name);return force;}}};
+   el.closest=()=>el;el.matches=()=>false;buttons.set(act,el);
+  }
+  return buttons.get(act);
+ };
+ scan.querySelector=selector=>{const act=/data-act="([^"]+)"/.exec(selector)?.[1];return act&&markupButtons(scan.innerHTML).some(control=>control.dataset.act===act)?button(act):null;};
+ return {now,button,
+  paint(){const due=frames.splice(0),at=now();for(const fn of due)fn(at);},
+  press(act,{at=now()}={}){const target=button(act);shim.document.dispatchEvent({type:'click',detail:1,isTrusted:true,timeStamp:at,target});return target;},
+  key(key,{at=now()}={}){shim.document.dispatchEvent({type:'keydown',key,repeat:false,timeStamp:at,target:null});},
+ };
+}
+// What a test compares: the board as it would be saved, and the answered state.
+const answeredState2461=ctx=>({chain:[...ctx.state.chain],candidate:ctx.state.candidateId,decisions:ctx.state.decisionEvents.length,payload:ctx.cloudPayload()});
+
+test('RISK scanner press guard: on the large board, a press within the guard of the new candidate first painting, by touch click or by key, is held with a visible acknowledgement on its button and changes nothing, though the frame waited behind a long task',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,guard=pressGuard2461(device);
+ guard.paint();await clock.advance(1000);
+ const first=ctx.state.candidateId;
+ guard.press('yes');
+ assert.ok(ctx.state.chain.includes(first),'positive control: the first Yes, long after its candidate painted, answers it');
+ const next=ctx.state.candidateId;assert.ok(next&&next!==first,'positive control: a new candidate is drawn');
+ // The frame that shows it waits behind 150 ms of other work.
+ await clock.advance(150);
+ guard.paint();
+ // 100 ms after it painted, 250 ms after the panel was drawn.
+ await clock.advance(100);
+ const shown=answeredState2461(ctx);
+ const yes=guard.press('yes');
+ assert.deepEqual(answeredState2461(ctx),shown,'a Yes 100 ms after the new candidate painted is held: nothing is answered or changed');
+ assert.ok(yes.classList.contains('held'),'and Yes shows that it was held');
+ guard.key('n');
+ assert.deepEqual(answeredState2461(ctx),shown,'the n key at the same moment is held too');
+ assert.ok(guard.button('no').classList.contains('held'),'and No shows that it was held');
+ // The acknowledgement is brief.
+ guard.paint();await clock.advance(1000);
+ assert.ok(!guard.button('yes').classList.contains('held')&&!guard.button('no').classList.contains('held'),'a moment later neither shows it');
+ assert.deepEqual(answeredState2461(ctx),shown,'and the held presses changed nothing later');
+});
+
+test('RISK scanner press guard: on the large board, a press made more than the guard after the new candidate painted counts exactly once though a long task held its handler, by touch click and by key, and one made before the frame paints is held however long the frame waits',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,guard=pressGuard2461(device);
+ guard.paint();await clock.advance(1000);
+ guard.press('yes');
+ const second=ctx.state.candidateId;
+ // The frame that would show the new candidate waits behind 300 ms of work,
+ // longer than the guard: the old card is still on the screen.
+ await clock.advance(300);
+ const unpainted=answeredState2461(ctx);
+ const early=guard.press('yes');
+ assert.deepEqual(answeredState2461(ctx),unpainted,'a Yes before the new candidate has painted is held, 300 ms after the panel was drawn');
+ assert.ok(early.classList.contains('held'),'and shows that it was held');
+ guard.paint();const painted=guard.now();
+ // Pressed 250 ms after the paint; its handler waits 300 ms more behind a long task.
+ await clock.advance(550);
+ const before=answeredState2461(ctx);
+ const late=guard.press('yes',{at:painted+250});
+ assert.ok(!late.classList.contains('held'),'a Yes pressed 250 ms after its candidate painted is not held, though handled 550 ms after the paint');
+ assert.deepEqual([...ctx.state.chain],[...before.chain,second],'it answers that candidate: Yes adds it to the chain once');
+ assert.equal(ctx.state.decisionEvents.length,before.decisions+1,'one decision is recorded');
+ const third=ctx.state.candidateId;assert.ok(third&&third!==second,'positive control: the next candidate is drawn');
+ guard.paint();const shownAt=guard.now();
+ await clock.advance(600);
+ const beforeKey=answeredState2461(ctx);
+ guard.key('n',{at:shownAt+250});
+ assert.equal(ctx.state.considered[third],'no','the n key pressed 250 ms after the next candidate painted answers it, though handled 600 ms after the paint');
+ assert.equal(ctx.state.decisionEvents.length,beforeKey.decisions+1,'with one decision');
+ assert.deepEqual([...ctx.state.chain],beforeKey.chain,'and No leaves the chain as it was');
+});
+
+// #2461 coordinator decision: a press before the new card paints is the
+// second tap of a double tap and is always held; after the paint the hold is
+// a short grace, so a deliberate press soon after the card shows counts.
+test('RISK scanner press guard: on the large board, a deliberate Yes or n key 150 ms after the new candidate painted answers it, while one 50 ms after is held',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,guard=pressGuard2461(device);
+ guard.paint();await clock.advance(1000);
+ guard.press('yes');
+ const second=ctx.state.candidateId;
+ // Its frame waits 100 ms behind the answer's own work, as on this board.
+ await clock.advance(100);
+ guard.paint();
+ await clock.advance(50);
+ const shown=answeredState2461(ctx);
+ assert.ok(guard.press('yes').classList.contains('held'),'positive control: a Yes 50 ms after the new candidate painted is held');
+ assert.deepEqual(answeredState2461(ctx),shown,'and changes nothing');
+ await clock.advance(100);
+ const before=answeredState2461(ctx);
+ const yes=guard.press('yes');
+ assert.ok(!yes.classList.contains('held'),'a Yes 150 ms after the new candidate painted is not held');
+ assert.deepEqual([...ctx.state.chain],[...before.chain,second],'it answers that candidate');
+ assert.equal(ctx.state.decisionEvents.length,before.decisions+1,'with one decision');
+ const third=ctx.state.candidateId;
+ await clock.advance(100);
+ guard.paint();
+ await clock.advance(150);
+ guard.key('n');
+ assert.equal(ctx.state.considered[third],'no','the n key 150 ms after the next candidate painted answers it');
+});
+
+// Measured on #2461: a held press followed by a 0.5 s device save had its dim
+// time run out before any frame painted it.
+test('RISK scanner press guard: a held press stays dimmed until a frame has shown it for a moment, however long the work after it blocks the frames',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,guard=pressGuard2461(device);
+ guard.paint();await clock.advance(1000);
+ guard.press('yes');
+ await clock.advance(100);guard.paint();await clock.advance(50);
+ const shown=answeredState2461(ctx);
+ assert.ok(guard.press('yes').classList.contains('held'),'positive control: a Yes 50 ms after the new candidate painted is held and dims');
+ // No frame paints for the next 600 ms: other work holds the page.
+ await clock.advance(600);
+ assert.ok(guard.button('yes').classList.contains('held'),'Yes is still dimmed when the next frame comes, 600 ms later');
+ guard.paint();await clock.advance(200);
+ assert.ok(guard.button('yes').classList.contains('held'),'and stays dimmed 200 ms after that frame');
+ guard.paint();await clock.advance(400);
+ assert.ok(!guard.button('yes').classList.contains('held'),'then the dim ends');
+ assert.deepEqual(answeredState2461(ctx),shown,'and the held press changed nothing');
+});
+
+// A page that is never given a frame must not hold every press for good.
+test('RISK scanner press guard: when no frame ever comes to paint the new candidate, a press a moment later still counts, and one within the guard of the panel being drawn is still held',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,guard=pressGuard2461(device);
+ guard.paint();await clock.advance(1000);
+ guard.press('yes');
+ const second=ctx.state.candidateId;
+ await clock.advance(100);
+ const drawn=answeredState2461(ctx);
+ assert.ok(guard.press('yes').classList.contains('held'),'positive control: a Yes 100 ms after the panel was drawn is held');
+ assert.deepEqual(answeredState2461(ctx),drawn,'and changes nothing');
+ // No frame is painted from here on.
+ await clock.advance(1500);
+ const before=answeredState2461(ctx);
+ assert.ok(!guard.press('yes').classList.contains('held'),'a Yes 1.6 s after the panel was drawn is not held, though no frame came');
+ assert.deepEqual([...ctx.state.chain],[...before.chain,second],'and answers the candidate shown');
+});
+
+test('RISK scanner press guard: signed in on the large board, a held Yes reaches neither the device save nor the cloud, and the next Yes after the guard does',{timeout:600000},async t=>{
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock,counters}=device,guard=pressGuard2461(device);
+ guard.paint();await clock.advance(1000);
+ const first=ctx.state.candidateId;
+ guard.press('yes');
+ const second=ctx.state.candidateId;
+ // The board already holds older answers about it; only a new one would be the held Yes.
+ const earlier=[...decisionsAbout2417(ctx.state,[second])];
+ guard.paint();await clock.advance(100);
+ const shown=answeredState2461(ctx);
+ assert.ok(guard.press('yes').classList.contains('held'),'a Yes 100 ms after the new candidate painted is held and shows it');
+ assert.deepEqual(answeredState2461(ctx),shown,'and changes nothing on the board');
+ await clock.settle();
+ const commits=counters.commits.map(commit=>JSON.parse(commit.payload)),uploads=counters.uploads.map(upload=>JSON.parse(upload.payload));
+ assert.ok(commits.some(board=>decisionsAbout2417(board,[first]).length),'positive control: the first Yes reached a device save');
+ for(const board of commits)assert.deepEqual(decisionsAbout2417(board,[second]),earlier,'no device save holds a new answer about the candidate the held Yes landed on');
+ for(const board of uploads)assert.deepEqual(decisionsAbout2417(board,[second]),earlier,'no full copy uploaded holds one');
+ const cloud=(await device.cloud()).board;
+ assert.ok(decisionsAbout2417(cloud,[first]).length,'positive control: the cloud holds the first Yes');
+ assert.deepEqual(decisionsAbout2417(cloud,[second]),earlier,'the cloud holds no new answer about it');
+ assert.deepEqual([...decisionsAbout2417(ctx.state,[second])],earlier,'nor does this device');
+ assert.equal(ctx.state.candidateId,second,'it is still the candidate');
+ guard.press('yes');
+ assert.ok(ctx.state.chain.includes(second),'a Yes after the guard answers it');
+ await clock.settle();
+ assert.ok(decisionsAbout2417((await device.cloud()).board,[second]).length>earlier.length,'and reaches the cloud');
+});
+
+// #2459: the board a Yes after an Add leaves, on the large board with sync on.
+// A Start records its pass's draw (the chance weights of every task then on
+// the board) as the pass's scan-mode choice. A task added later joins that
+// draw the first time a draw scores it, with a frozen weight of its own,
+// which the recorded draw never held. Counted, never timed.
+async function yesAfterAdd2459(t,label){
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock,counters,shim}=device;
+ shim.document.getElementById('addInput').value=label;
+ ctx.onAction('add',{});
+ const added=ctx.state.tasks.find(task=>task.title===label);
+ assert.ok(added,'positive control: the Add is taken');
+ await clock.settle();
+ assert.ok(counters.uploads.at(-1)?.payload.includes(added.id),'positive control: the Add went up by the full copy');
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','positive control: the Add is synced');
+ const before={records:recordsWritten2417(device),uploads:counters.uploads.length};
+ const candidate=device.tap('yes');
+ assert.equal(ctx.state.chain.at(-1),candidate,'positive control: the Yes is taken');
+ assert.ok(Object.hasOwn(ctx.state.chance.weights,added.id),'positive control: the added task has joined the pass’s draw');
+ return {device,added,candidate,before};
+}
+test('RISK change records: after an Add in a Started pass, a Yes still syncs: the added task’s frozen chance weight does not make the board’s decisions fail their check',{timeout:300000},async t=>{
+ const {device,added,candidate}=await yesAfterAdd2459(t,'Added before the Yes 2459 sync');
+ const {ctx,clock,shim}=device;
+ await clock.settle();
+ assert.equal(ctx.window.CloudSync.errorCode??null,null,'sync reports no error');
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','sync ends synced');
+ const cloud=await device.cloud();
+ assert.ok(cloud.board.chain.includes(candidate),'the cloud copy holds the Yes');
+ assert.ok(cloud.board.tasks.some(task=>task.id===added.id),'and the added task');
+ assert.equal(cloud.board.chance.weights[added.id],ctx.state.chance.weights[added.id],'and the added task’s frozen weight in the pass’s draw');
+});
+// #2459: the Yes's change record carries the parts of the board the Yes
+// touched. Where the added task first joined the pass's draw in the Yes's own
+// draw, the Yes touched the whole draw (about 98 KB on the large board, over
+// the 64 KB a record may carry), so it went as a full copy at once instead.
+test('RISK change records: a Yes right after an Add on the large board goes as a change record, not a full copy',{timeout:300000},async t=>{
+ const {device,before}=await yesAfterAdd2459(t,'Added before the Yes 2459 record');
+ const {clock,counters}=device;
+ await clock.advance(1500);
+ const sent={records:recordsWritten2417(device)-before.records,uploads:counters.uploads.length-before.uploads};
+ t.diagnostic(JSON.stringify(sent));
+ assert.equal(sent.records,1,'the Yes goes as a change record');
+ assert.equal(sent.uploads,0,'and asks for no full copy at once');
+ await clock.settle();
+ assert.equal(device.shim.document.getElementById('syncBtn').textContent,'☁ synced','and sync ends synced');
+});
+
+// #2459: a full copy reads its chunks back to verify them: on the large board
+// it writes 2.76 MB and reads every chunk three times, as a listing, in the
+// transaction that seals the copy and in the one that publishes it. No read
+// proves what another checks (cloud-store-v2.js push), so all three stay, and
+// this pins that number: it never grows with the board or its history.
+// Counted, never timed: each read of each chunk of the copy, from the push to
+// Settled.
+function chunkReads2459(device){
+ const reads=new Map(),{docs,faults}=device;
+ const count=path=>reads.set(path,(reads.get(path)||0)+1);
+ const chunk=/^users\/owner\/generations\/[^/]+\/chunks\/[^/]+$/,listing=/^users\/owner\/generations\/[^/]+\/chunks$/;
+ faults.transactionRead=path=>{if(chunk.test(path))count(path);};
+ faults.serverRead=path=>{if(listing.test(path))for(const key of docs.keys())if(key.startsWith(path+'/')&&chunk.test(key))count(key);};
+ return reads;
+}
+test('RISK full copy readback: a full copy on the large board reads each of its chunks at most three times, once in each verification, and publishes one revision on',{timeout:300000},async t=>{
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock,counters,shim,docs}=device;
+ const revision=docs.get('users/owner').rev,reads=chunkReads2459(device);
+ shim.document.getElementById('addInput').value='Added for a full copy 2459';
+ ctx.onAction('add',{});
+ await clock.settle();
+ const root=docs.get('users/owner'),generation=root.activeGeneration;
+ const chunks=[...docs.keys()].filter(key=>key.startsWith('users/owner/generations/'+generation+'/chunks/'));
+ const own=[...reads].filter(([path])=>path.startsWith('users/owner/generations/'+generation+'/'));
+ t.diagnostic(JSON.stringify({chunks:chunks.length,reads:own.map(([,n])=>n)}));
+ assert.equal(root.rev,revision+1,'positive control: the full copy published one revision on');
+ assert.ok(counters.uploads.at(-1)?.payload.includes('Added for a full copy 2459'),'positive control: it carries the Add');
+ assert.ok(chunks.length>1,'positive control: the large board takes several chunks');
+ assert.deepEqual(chunks.filter(path=>!reads.has(path)),[],'every chunk is read back');
+ assert.deepEqual(own.filter(([,n])=>n>3).map(([path,n])=>path.split('/').at(-1)+':'+n),[],'no chunk is read back more than three times: the listing, the seal and the publication');
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','and sync ends synced');
+});
+
+// #2459: an answer's rank sampling (the list's ranks and History's Top x)
+// runs after the answer's paint (#2407), and on the large board it was one
+// 60-80 ms task: 447 tasks times 250 samples, about 112,000 draws, so a tap in
+// that time waited for all of it. Counted, never timed: the draws (calls to
+// the page's random source) each task after the tap makes, on the clock's own
+// timers. RANK_TASK_DRAWS2459 is about what an 80-task board samples at once.
+const RANK_TASK_DRAWS2459=20000;
+function drawsPerTask2459(device){
+ const {ctx}=device,tasks=[];
+ vm.runInContext('(()=>{const random=Math.random;globalThis.__draws2459=0;Math.random=function(){globalThis.__draws2459++;return random.call(Math);};})()',ctx);
+ const draws=()=>vm.runInContext('__draws2459',ctx),schedule=ctx.setTimeout;
+ ctx.setTimeout=(fn,ms,...args)=>schedule((...given)=>{const from=draws();try{return fn(...given);}finally{tasks.push(draws()-from);}},ms,...args);
+ return {tasks,draws};
+}
+test('RISK rank work per answer: a Yes on the large board samples its ranks in tasks of a bounded number of draws, and still samples every open task 250 times',{timeout:300000},async t=>{
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,open=ctx.state.tasks.filter(task=>!task.done).length,samples=ctx.state.settings.samples;
+ const counted=drawsPerTask2459(device),ranks=()=>vm.runInContext('rankCache',ctx),before=ranks();
+ const fromTap=counted.draws();
+ device.tap('yes');
+ const inTap=counted.draws()-fromTap;
+ await clock.advance(1500);
+ const total=counted.draws()-fromTap,largest=Math.max(0,...counted.tasks);
+ t.diagnostic(JSON.stringify({open,samples,inTap,total,largest,tasks:counted.tasks.filter(n=>n>0)}));
+ assert.ok(open>400,'positive control: the large board');
+ assert.ok(total>=open*samples,'positive control: the Yes samples every open task '+samples+' times: '+total+' draws');
+ assert.notEqual(ranks(),before,'positive control: and replaces the ranks it found');
+ assert.equal(ranks().size,open,'with a rank for every open task');
+ assert.ok(inTap<=RANK_TASK_DRAWS2459,'the tap itself samples no ranks: '+inTap+' draws');
+ assert.ok(largest<=RANK_TASK_DRAWS2459,'no task after the tap draws more than '+RANK_TASK_DRAWS2459+': the largest drew '+largest);
+});
+// #2459: ranks sampled in parts after a Yes are exactly the ranks one whole
+// sampling of the same open tasks gives from the same random draws. The page
+// draws from a seeded stream whose position can be put back: right after the
+// Yes, one whole sampling of the open tasks is taken from it, the stream is
+// put back, and the answer's catch-up then samples in parts on the clock. The
+// tap itself draws nothing (the test above).
+test('RISK rank work per answer: ranks sampled in parts after a Yes on the large board equal one whole sampling of the same tasks from the same draws, and History records their Top x',{timeout:300000},async t=>{
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,signedIn:false,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,run=source=>vm.runInContext(source,ctx);
+ const ranksOf=source=>JSON.parse(run(`JSON.stringify([...(${source})].map(([id,rank])=>[id,rank.topK,rank.n,Array.from(rank.hist),Array.from(rank.cdf)]))`));
+ // mulberry32 with its state in view, so the stream can be put back.
+ run(`globalThis.__stream2459={a:2459};Math.random=function(){let t=(__stream2459.a=(__stream2459.a+0x6D2B79F5)>>>0);
+  t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};_spare=null`);
+ const answered=device.tap('yes');
+ const at=run('JSON.stringify([__stream2459.a,_spare])');
+ const expected=ranksOf('rankStats(openTasks().map(t=>({id:t.id,mu:t.mu,sigma:t.sigma})),state.settings.samples)');
+ assert.notEqual(run('__stream2459.a'),JSON.parse(at)[0],'positive control: the whole sampling drew from the stream');
+ run(`(()=>{const [a,spare]=${at};__stream2459.a=a;_spare=spare;})()`);
+ await clock.advance(1500);
+ const actual=ranksOf('rankCache');
+ assert.equal(actual.length,447,'positive control: a rank for every open task');
+ assert.ok(new Set(actual.map(([,topK])=>topK)).size>1,'positive control: the ranks tell tasks apart');
+ // Compared as text: a diff of 447 ranks of 447 places each is too large to print.
+ const differing=actual.filter((rank,index)=>JSON.stringify(rank)!==JSON.stringify(expected[index])).map(([id])=>id);
+ assert.equal(actual.length,expected.length,'the parts rank as many tasks as the whole sampling');
+ assert.deepEqual(differing.slice(0,5),[],'the parts give exactly the whole sampling’s ranks: '+differing.length+' tasks differ');
+ const after=ctx.state.tasks.find(task=>task.id===answered).ratingHistory.at(-1).after;
+ assert.equal(after.topK,expected.find(([id])=>id===answered)[1],'History records the Top x of those ranks');
+});
+
+// #2457 (spec #2455): adding a task on the large board shows it in the tap and
+// saves the board once, after the tap. Counted, never timed (responsiveness
+// guidance), at the agreed seam: the loaded app on the device store
+// (answeringDevice2408) reopened on largeBoardFixture(), a title typed in the
+// add box and the Add button pressed as one click on the document, then
+// syncSettled. Counted:
+// - in the tap: device save runs started while the Add's click is handled
+//   (the support report's save runs), and whether the new task is drawn;
+// - after it: device saves committed (device head commits), and each save's
+//   missing-task check, the merge of the saved board into the live one
+//   (#2333), with how many tasks it merged. A check that merges most of the
+//   board's tasks is a full merge; a task the saved board holds exactly as
+//   the live board does holds nothing to merge (#2428).
+function addSaveWork2457(device){
+ const {ctx}=device,checks=[];ctx.__checks2457=checks;
+ vm.runInContext(`(()=>{const checks=__checks2457,keep=keepMissingTasks,mergeHistory=mergeTaskRatingHistory;let open=null;
+  keepMissingTasks=function(source,keptFrom){
+   const check={keptFrom,tasks:0,boardTasks:state.tasks.length};checks.push(check);const outer=open;open=check;
+   try{return keep.apply(this,arguments);}finally{open=outer;}};
+  mergeTaskRatingHistory=function(){if(open)open.tasks++;return mergeHistory.apply(this,arguments);};
+ })()`,ctx);
+ let commits=device.counters.commits.length,from=0;
+ return {
+  reset(){commits=device.counters.commits.length;from=checks.length;},
+  now(){
+   const saved=checks.slice(from).filter(check=>check.keptFrom==='last-save');
+   return {commits:device.counters.commits.length-commits,checks:saved.length,tasksMerged:saved.map(check=>check.tasks),
+    fullMerges:saved.filter(check=>check.tasks*2>=check.boardTasks).length};
+  }};
+}
+// A person types a title in the add box and presses Add. Returns what the
+// tap itself did: save runs it started and whether the task is drawn, and the
+// save state the report gives then.
+function pressAdd2457(device,title){
+ const {ctx,shim}=device;
+ shim.document.getElementById('addInput').value=title;
+ const before=device.report().save.persistCalls.value;
+ const target={dataset:{act:'add'},classList:{contains:()=>false}};target.closest=()=>target;
+ shim.document.dispatchEvent({type:'click',detail:1,target});
+ const report=device.report().save;
+ return {saveRuns:report.persistCalls.value-before,durability:report.localDurability.value,
+  added:ctx.state.tasks.some(task=>task.title===title),drawn:shim.document.getElementById('listBody').innerHTML.includes(title)};
+}
+// The large board, opened once to move it into device storage (and, signed
+// in, to publish it), then opened again as a warm relaunch does.
+async function relaunchedAdder2457(t,{signedIn}){
+ const fixture=signedIn?await largeSignedInBoardFixture(ACCOUNT2408.email):await largeBoardFixture();
+ const first=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,signedIn});
+ await syncSettled(first.ctx,{within:60000});
+ await first.close();
+ const device=await answeringDevice2408(t,{docs:first.docs,indexedDB:first.indexedDB,dbName:first.dbName,storage:first.storage,saveMs:0,signedIn});
+ await syncSettled(device.ctx,{within:60000});
+ assert.equal(device.ctx.state.tasks.length,LARGE_BOARD_SHAPE.tasks,'positive control: the large board opened');
+ return device;
+}
+const QUICK_ADDS2457=['Second task 2457','Third task 2457','Fourth task 2457'];
+async function addsSaveOnce2457(t,{signedIn}){
+ const device=await relaunchedAdder2457(t,{signedIn}),{ctx}=device,work=addSaveWork2457(device);
+ const settle=()=>syncSettled(ctx,{within:60000});
+ const saveRuns=()=>device.report().save.persistCalls.value;
+ // The first Add after opening.
+ work.reset();
+ let runs=saveRuns();
+ const first=pressAdd2457(device,'First task added after opening 2457');
+ assert.ok(first.added,'positive control: the Add is taken');
+ assert.ok(first.drawn,'the new task is drawn in the tap');
+ assert.equal(first.durability,'pending','and the board shows its save as pending');
+ assert.equal(first.saveRuns,0,'the tap starts no device save: '+JSON.stringify(first));
+ await settle();
+ const opening=work.now();
+ t.diagnostic(JSON.stringify({signedIn,first,opening}));
+ assert.equal(device.report().save.localDurability.value,'durable','positive control: the Add is saved on the device');
+ assert.equal(opening.commits,1,'the first Add after opening saves the board once: '+JSON.stringify(opening));
+ assert.equal(opening.checks,1,'and checks it for missing tasks once: '+JSON.stringify(opening));
+ assert.equal(opening.fullMerges,0,'with no full merge, as any later save: '+JSON.stringify(opening));
+ // With sync off nothing else saves: the Add's edit is saved by one save run,
+ // its debounced save included.
+ if(!signedIn)assert.equal(saveRuns()-runs,1,'the Add’s board is saved by one save run');
+ // Adds made close together, as a person enters a list.
+ work.reset();runs=saveRuns();
+ const quick=QUICK_ADDS2457.map(title=>pressAdd2457(device,title));
+ assert.ok(quick.every(add=>add.added&&add.drawn),'each Add is drawn in its tap: '+JSON.stringify(quick));
+ assert.deepEqual(quick.map(add=>add.saveRuns),[0,0,0],'no tap starts a device save');
+ await settle();
+ const later=work.now();
+ t.diagnostic(JSON.stringify({signedIn,quick,later}));
+ assert.equal(later.commits,1,'Adds made close together share one device save: '+JSON.stringify(later));
+ assert.equal(later.checks,later.commits,'one missing-task check per committed save: '+JSON.stringify(later));
+ assert.equal(later.fullMerges,0,'and no full merge: '+JSON.stringify(later));
+ if(!signedIn)assert.equal(saveRuns()-runs,1,'by one save run');
+ // With sync on, the cloud copy holds them too.
+ if(signedIn){
+  const cloud=await cloudCopy2408(device.docs);
+  for(const title of ['First task added after opening 2457',...QUICK_ADDS2457])
+   assert.ok(cloud.tasks.some(task=>task.title===title),'the cloud copy holds '+title);
+ }
+ // What the device saved holds every Add.
+ await device.close();
+ const reopened=await answeringDevice2408(t,{docs:device.docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,signedIn:false,dropDatabase:true});
+ for(const title of ['First task added after opening 2457',...QUICK_ADDS2457])
+  assert.ok(reopened.ctx.state.tasks.some(task=>task.title===title),'the saved board holds '+title);
+}
+test('RISK add saves once: on the large board with sync off, an Add draws the task in the tap and starts no device save there, the first Add after opening saves once with one missing-task check and no full merge, and Adds made close together share one save',{timeout:300000},t=>addsSaveOnce2457(t,{signedIn:false}));
+test('RISK add saves once: on the large board with sync on, an Add draws the task in the tap and starts no device save there, the first Add after opening saves once with one missing-task check and no full merge, Adds made close together share one save, and the cloud copy holds every Add',{timeout:300000},t=>addsSaveOnce2457(t,{signedIn:true}));
+// #2457: the Add's save waits for the frame after its tap. Leaving the app
+// before then starts it at once, and the board is saved.
+test('RISK add saves once: leaving the app right after an Add starts its device save at once, and the reopened board holds the task',{timeout:300000},async t=>{
+ const device=await relaunchedAdder2457(t,{signedIn:false}),{ctx,shim}=device,title='Added just before leaving 2457';
+ const added=pressAdd2457(device,title);
+ assert.ok(added.drawn,'positive control: the Add is drawn');
+ const runs=device.report().save.persistCalls.value;
+ shim.document.hidden=true;shim.document.dispatchEvent({type:'visibilitychange'});shim.window.dispatchEvent({type:'pagehide'});
+ assert.equal(device.report().save.persistCalls.value-runs+added.saveRuns,1,'leaving the app starts the Add’s device save at once, and only one');
+ await syncSettled(ctx,{within:60000});
+ assert.equal(device.report().save.localDurability.value,'durable','the Add is saved on the device');
+ await device.close();
+ const reopened=await answeringDevice2408(t,{indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,signedIn:false,dropDatabase:true});
+ assert.ok(reopened.ctx.state.tasks.some(task=>task.title===title),'the reopened board holds the task');
+});
+// #2455 review: a frame can wait behind other work for longer than the edit's
+// 350 ms debounced save. The Add's queued save takes that debounce over when
+// the Add commits, so the one Add still makes one device save however late
+// its frame comes. The frame here waits 600 ms, under the 1 s no-frame wait.
+test('RISK add saves once: an Add whose frame waits longer than the edit’s 350 ms save debounce still saves the board once',{timeout:300000},async t=>{
+ const device=await relaunchedAdder2457(t,{signedIn:false}),{ctx}=device,work=addSaveWork2457(device);
+ const running=ctx.requestAnimationFrame;t.after(()=>{ctx.requestAnimationFrame=running;});
+ let frames=0;ctx.requestAnimationFrame=fn=>{frames++;return ctx.setTimeout(()=>fn(vm.runInContext('performance.now()',ctx)),600);};
+ work.reset();
+ const runs=device.report().save.persistCalls.value;
+ const added=pressAdd2457(device,'Added before a late frame 2457');
+ assert.ok(added.drawn,'positive control: the Add is drawn in the tap');
+ assert.equal(added.saveRuns,0,'and starts no device save there');
+ await syncSettled(ctx,{within:60000});
+ const saved=work.now();
+ t.diagnostic(JSON.stringify({frames,saved,runs:device.report().save.persistCalls.value-runs}));
+ assert.ok(frames>0,'positive control: the Add waited for a frame');
+ assert.equal(device.report().save.localDurability.value,'durable','the Add is saved on the device');
+ assert.equal(device.report().save.persistCalls.value-runs,1,'the one Add makes one device save run');
+ assert.equal(saved.commits,1,'and commits the board once: '+JSON.stringify(saved));
+ assert.equal(saved.checks,1,'with one missing-task check: '+JSON.stringify(saved));
+});
+// #2455 spec: after Add "the box is ready for the next one at once". The box
+// empties in the tap that draws the task, while the device save it waits for
+// still shows as pending, and the next title typed there is its own Add.
+test('RISK add box clears at once: on the large board an Add empties the add box in the tap that draws the task, while its device save still shows pending, and the next title is its own Add',{timeout:300000},async t=>{
+ const device=await relaunchedAdder2457(t,{signedIn:false}),{ctx,shim}=device,input=shim.document.getElementById('addInput');
+ const first=pressAdd2457(device,'Cleared at once 2457');
+ assert.ok(first.drawn,'positive control: the Add is drawn in the tap');
+ assert.equal(first.durability,'pending','and its save shows as pending');
+ assert.equal(first.saveRuns,0,'and has not started');
+ assert.equal(input.value,'','the add box is empty in that same tap');
+ const second=pressAdd2457(device,'Typed right after 2457');
+ assert.ok(second.drawn,'a title typed at once is added in its own tap');
+ assert.equal(input.value,'','and the box empties again');
+ await syncSettled(ctx,{within:60000});
+ assert.equal(device.report().save.localDurability.value,'durable','both Adds are then saved on the device');
+ assert.equal(input.value,'','and the box stays empty');
+ for(const title of ['Cleared at once 2457','Typed right after 2457'])
+  assert.equal(ctx.state.tasks.filter(task=>task.title===title).length,1,'the board holds '+title+' once');
+});
+
+// #2455 review: an Add, an import, a Done or Dot from the task editor and a
+// delete each sampled every open task's ranks inside the tap, one whole
+// sampling of about 112,000 draws on the large board. Their ranks now catch up
+// after the frame that shows the action, in tasks of a bounded number of draws,
+// as an answer's do (#2459). Counted with the #2459 draw counter, never timed,
+// on #2408's answering device. Each action is a person's press, one click on
+// the document: Add with a title, Add with a list, the editor's Done and Dot,
+// and Delete.
+function rankActions2455(device){
+ const {ctx,shim}=device,run=source=>vm.runInContext(source,ctx);
+ const press=(act,dataset={})=>{const target={dataset:{act,...dataset},classList:{contains:()=>false}};target.closest=()=>target;shim.document.dispatchEvent({type:'click',detail:1,target});};
+ const typed=title=>()=>{shim.document.getElementById('addInput').value=title;press('add');};
+ // A pool task the editor can Dot, Done or Delete: not the candidate, not dotted.
+ const free=()=>run('pool().find(t=>canDotTask(t)&&t.id!==state.candidateId&&!t.evergreen)?.id');
+ const editor=action=>()=>{const id=free();hydrateUnchangedEditorDraft(device,id);return ()=>{press(action,{id});return id;};};
+ return [
+  ['Add',()=>typed('Ranked after its tap 2455')],
+  ['import',()=>typed('Imported first 2455\nImported second 2455')],
+  ['editor Done',editor('done-task')],
+  ['editor Dot',editor('dot-task')],
+  ['Delete',()=>{const id=free();return ()=>{press('delete-task',{id});return id;};}],
+ ];
+}
+test('RISK rank work per action: an Add, an import, an editor Done or Dot and a Delete on the large board sample no ranks in the tap, then rank every open task in tasks of a bounded number of draws',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,signedIn:false,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,samples=ctx.state.settings.samples,counted=drawsPerTask2459(device),ranks=()=>vm.runInContext('rankCache',ctx);
+ const open=()=>ctx.state.tasks.filter(task=>!task.done).length;
+ for(const [name,prepare] of rankActions2455(device)){
+  const act=prepare(),before=ranks(),tasksBefore=ctx.state.tasks.length,doneBefore=ctx.state.tasks.filter(task=>task.done).length;
+  counted.tasks.length=0;const from=counted.draws();
+  act();
+  const inTap=counted.draws()-from;
+  await clock.advance(1500);
+  const total=counted.draws()-from,largest=Math.max(0,...counted.tasks);
+  t.diagnostic(JSON.stringify({name,open:open(),inTap,total,largest}));
+  assert.ok(ctx.state.tasks.length!==tasksBefore||ctx.state.tasks.filter(task=>task.done).length!==doneBefore||ctx.state.chain.length>1,'positive control: the '+name+' changed the board');
+  assert.ok(total>=open()*samples,'positive control: the '+name+'’s ranks sample every open task '+samples+' times: '+total+' draws');
+  assert.notEqual(ranks(),before,'positive control: and replace the ranks it found');
+  assert.equal(ranks().size,open(),'the '+name+' leaves a rank for every open task');
+  assert.ok(inTap<=RANK_TASK_DRAWS2459,'the '+name+'’s tap samples no ranks: '+inTap+' draws');
+  assert.ok(largest<=RANK_TASK_DRAWS2459,'no task after the '+name+' draws more than '+RANK_TASK_DRAWS2459+': the largest drew '+largest);
+ }
+});
+// Ranks caught up after an Add, and after a Dot from the editor whose History
+// records the dotted task's Top x, are exactly one whole sampling of the same
+// open tasks from the same draws, as #2459 checks after a Yes: right after the
+// tap one whole sampling is taken from a seeded stream, the stream is put
+// back, and the catch-up then samples on the clock.
+test('RISK rank work per action: ranks caught up after an Add or an editor Dot on the large board equal one whole sampling of the same tasks from the same draws, and the Dot’s History records their Top x',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,signedIn:false,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,run=source=>vm.runInContext(source,ctx);
+ const ranksOf=source=>JSON.parse(run(`JSON.stringify([...(${source})].map(([id,rank])=>[id,rank.topK,rank.n,Array.from(rank.hist),Array.from(rank.cdf)]))`));
+ run(`globalThis.__stream2455={a:2455};Math.random=function(){let t=(__stream2455.a=(__stream2455.a+0x6D2B79F5)>>>0);
+  t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};_spare=null`);
+ const actions=new Map(rankActions2455(device));
+ for(const name of ['Add','editor Dot']){
+  const act=actions.get(name)();
+  const acted=act();
+  const at=run('JSON.stringify([__stream2455.a,_spare])');
+  const expected=ranksOf('rankStats(openTasks().map(t=>({id:t.id,mu:t.mu,sigma:t.sigma})),state.settings.samples)');
+  run(`(()=>{const [a,spare]=${at};__stream2455.a=a;_spare=spare;})()`);
+  await clock.advance(1500);
+  const actual=ranksOf('rankCache');
+  assert.equal(actual.length,ctx.state.tasks.filter(task=>!task.done).length,'positive control: after the '+name+' every open task has a rank');
+  assert.ok(new Set(actual.map(([,topK])=>topK)).size>1,'positive control: the ranks tell tasks apart');
+  const differing=actual.filter((rank,index)=>JSON.stringify(rank)!==JSON.stringify(expected[index])).map(([id])=>id);
+  assert.equal(actual.length,expected.length,'the catch-up after the '+name+' ranks as many tasks as the whole sampling');
+  assert.deepEqual(differing.slice(0,5),[],'it gives exactly the whole sampling’s ranks: '+differing.length+' tasks differ');
+  if(name==='editor Dot'){
+   const after=ctx.state.tasks.find(task=>task.id===acted).ratingHistory.at(-1).after;
+   assert.equal(after.topK,expected.find(([id])=>id===acted)[1],'the Dot’s History records the Top x of those ranks');
+  }
+ }
+});
+
+// #2467 review B1: a Yes, No, Can't, Done or Dislodge records History's
+// "before" values (each answered task's chance and Top x) from the ranks the
+// board shows when it is pressed. Main sampled an Add's, a Delete's or an
+// editor Done's ranks in that action's tap, so a Yes pressed next read ranks
+// that held the action. Since #2459 a person's action leaves its ranks to
+// catch up after the frame that shows it, and a Yes pressed before then
+// dropped them: its before Top x read ranks of a different number of open
+// tasks and was saved as null ("Unavailable"), for good. Here the frame that
+// shows each action paints 400 ms late, as on a slow phone, and the Yes comes
+// 250 ms after the action, a person's press each, past the repeat-press guard
+// and the editor's Return pause. The expected Top x is one whole sampling of
+// the open tasks as the action left them, from the seeded stream the
+// catch-up then draws from (the stream is put back after it). Neither tap
+// draws from the stream, so this is also what main sampled in the action's tap.
+test('RISK History before values: a Yes pressed after a person’s Add, Delete or editor Done on the large board, before that action’s ranks catch up, records each answered task’s before Top x from the ranks the action left',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,signedIn:false,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,run=source=>vm.runInContext(source,ctx);
+ run(`globalThis.__stream2467={a:2467};Math.random=function(){let t=(__stream2467.a=(__stream2467.a+0x6D2B79F5)>>>0);
+  t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};_spare=null`);
+ const actions=new Map(rankActions2455(device)),frame=ctx.requestAnimationFrame,recorded=[],wanted=[];
+ for(const name of ['Add','Delete','editor Done']){
+  await clock.advance(1500);
+  const act=actions.get(name)(),tasksBefore=ctx.state.tasks.filter(task=>!task.done).length;
+  ctx.requestAnimationFrame=fn=>ctx.setTimeout(()=>fn(ctx.performance.now()),400);
+  act();
+  const open=ctx.state.tasks.filter(task=>!task.done).map(task=>({id:task.id,mu:task.mu,sigma:task.sigma}));
+  assert.notEqual(open.length,tasksBefore,'positive control: the '+name+' changes which tasks are open');
+  await clock.advance(250);
+  ctx.requestAnimationFrame=frame;
+  const candidate=ctx.state.candidateId,benchmark=ctx.state.chain.at(-1);
+  assert.ok(candidate&&benchmark,'positive control: a candidate and a benchmark are shown after the '+name);
+  const at=run('JSON.stringify([__stream2467.a,_spare])');
+  const expected=new Map(JSON.parse(run(`JSON.stringify([...rankStats(${JSON.stringify(open)},state.settings.samples)].map(([id,rank])=>[id,{topK:rank.topK,n:rank.n}]))`)));
+  run(`(()=>{const [a,spare]=${at};__stream2467.a=a;_spare=spare;})()`);
+  device.tap('yes');
+  assert.ok(ctx.state.chain.includes(candidate),'positive control: the Yes after the '+name+' answers its candidate');
+  assert.equal(run('JSON.stringify([__stream2467.a,_spare])'),at,'the Yes’s tap samples no ranks');
+  await clock.advance(1500);
+  for(const id of [candidate,benchmark]){
+   const row=ctx.state.tasks.find(task=>task.id===id).ratingHistory.at(-1);
+   assert.equal(row.kind,'yes','positive control: the Yes after the '+name+' records History for '+id);
+   recorded.push({name,id,topK:row.before.topK,n:row.before.n});wanted.push({name,id,...expected.get(id)});
+  }
+ }
+ t.diagnostic(JSON.stringify({recorded,wanted}));
+ assert.ok(new Set(wanted.map(({topK})=>topK)).size>1,'positive control: the answered tasks’ Top x differ');
+ assert.deepEqual(recorded.filter(({topK})=>topK===null).map(({name})=>name),[],'History’s before Top x is recorded after each action, not Unavailable');
+ assert.deepEqual(recorded,wanted,'History’s before Top x after each action is the Top x of the ranks that action left');
+});
+
+// #2461 round 2 (bce540e0): on a small board the new card can paint about
+// 20 ms after the first tap, so a double tap's second tap 120 ms later lands
+// after the 100 ms grace. A press within 200 ms of the last scanner press the
+// guard let through is held too; a deliberate press further apart still acts.
+test('RISK scanner press guard: a press 150 ms after the last Yes that acted is held though the new candidate painted 140 ms before it, and one 260 ms after acts',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,guard=pressGuard2461(device);
+ guard.paint();await clock.advance(1000);
+ const first=ctx.state.candidateId;
+ const pressed=guard.now();guard.press('yes');
+ assert.ok(ctx.state.chain.includes(first),'positive control: the first Yes answers its candidate');
+ const second=ctx.state.candidateId;assert.ok(second&&second!==first,'positive control: a new candidate is drawn');
+ // The new card paints 10 ms after the tap, as on a small board.
+ await clock.advance(10);guard.paint();
+ await clock.advance(140);
+ assert.equal(guard.now()-pressed,150,'fixture: the second press comes 150 ms after the first');
+ const shown=answeredState2461(ctx);
+ const quick=guard.press('yes');
+ assert.ok(quick.classList.contains('held'),'a Yes 150 ms after the last Yes that acted is held, though 140 ms after its card painted');
+ assert.deepEqual(answeredState2461(ctx),shown,'and changes nothing');
+ guard.key('n');
+ assert.deepEqual(answeredState2461(ctx),shown,'the n key at that moment is held too');
+ await clock.advance(110);
+ const before=answeredState2461(ctx);
+ assert.ok(!guard.press('yes').classList.contains('held'),'a Yes 260 ms after the last one that acted is not held');
+ assert.deepEqual([...ctx.state.chain],[...before.chain,second],'and answers the candidate shown');
 });

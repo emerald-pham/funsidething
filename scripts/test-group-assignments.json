@@ -546,6 +546,41 @@
   ],
   "environmentSkips": [
     {
+      "root": "Scanner browser: a keyboard-held press shows at half strength in a normal row, the dimmed side rail and the dimmed check-in row in both themes in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "Scanner browser: a keyboard-focused held button keeps its focus ring at full strength while it looks dimmed, in both themes in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK idle scenery mirror browser: at tablet and short-landscape sizes frames with unchanged inputs reuse the mirror and a changed scene rebuilds it, and under reduced motion a daylight light slot repaints the life without rebuilding it, each matching a fresh paint, in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK opening scenery unsynced paint browser: a resize after the board shows and before the opening paint syncs the scene and paints the background without errors, then the opening finishes, in Chromium and WebKit under both motion choices",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK opening scenery plan task browser: the scenery boot works out no day plan, and the plan runs after the board shows as its own task with no scenery paint, in Chromium and WebKit under both motion choices",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK idle scenery lights browser: in daylight a new window-light slot and the first frames after opening leave the background as painted, matching a fresh paint at that instant, while at night a new slot repaints it, in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK idle scenery browser: frames whose reflected scene is unchanged keep drawing the ambient motion without rebuilding the reflection, and a changed scene rebuilds it, in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
       "root": "RISK saved view invisible active scanner: the action rows keep their live geometry and the scanner its height in the saved view with the rows at 200% text on a phone and at tablet and desktop width",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
