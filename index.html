@@ -12292,7 +12292,7 @@ const answerCatchUp=(()=>{
     answer.after=ranked?captureRatingInputs(answer.ids):null;
     answer.frame=undoStack.at(-1)||null;
     Object.assign(answer,{save:doSave,immediate:!!immediate,deferRanks,steps:[seal,store,draw]});
-    if(ranked){answer.steps.unshift(ratings);dropRanks();}
+    if(ranked){answer.steps.unshift(ratings);takeOverRanks(answer);}
     queue.push(answer);
     if(!work)work=trackSyncWork("answer-catch-up");
     settleCommit();
@@ -12307,12 +12307,14 @@ const answerCatchUp=(()=>{
      but moves no rating and records no History, so only its ranks catch up:
      in parts, as an answer's, from the open tasks as the action left them,
      once the frame that shows the action has painted. Until then the board
-     keeps its earlier ranks; a new task shows no rank yet. Nothing saved or
-     synced reads ranks, so a save or push does not wait for them (flush
-     leaves them queued) and nor does a scanner answer; any other action runs
-     them first, as it sees the board as it was. Any later sampling of the ranks (another
-     action's, or a whole recomputeRanks()) replaces them, since its inputs
-     are newer. Their random draws are only ever ranks. */
+     keeps its earlier ranks; a new task shows no rank yet. A save or push
+     does not wait for them (flush leaves them queued), since what it saves
+     holds no ranks. A scanner answer that records History reads them, for
+     each answered task's Top x before the answer, which is saved and synced:
+     it takes them over as its own first steps (takeOverRanks). Any other
+     action runs them first, as it sees the board as it was. Any later
+     sampling of the ranks (another action's, or a whole recomputeRanks())
+     replaces them, since its inputs are newer. */
   function ranks(){
     dropRanks();
     const entry={kind:"ranks",ranksOnly:true,painted:false,ranking:{},
@@ -12332,6 +12334,25 @@ const answerCatchUp=(()=>{
   function dropRanks(){
     for(let index=queue.length-1;index>=0;index--)if(queue[index].ranksOnly)queue.splice(index,1);
     if(!queue.length)finish();
+  }
+  /* #2467 review B1: an answer's History works out each answered task's Top x
+     before the answer from the ranks on the board (ratings), which on main
+     already held an earlier Add's, import's, Delete's or editor Done's tasks,
+     sampled in that action's tap. Dropped, as a later sampling's are, they
+     left History reading ranks of another number of open tasks, and the
+     before Top x was saved as unavailable for good. So an answer given while
+     they still wait takes them over as its first steps: they run in parts
+     ahead of its History, in its catch-up and in any flush that runs it, from
+     the same draws a whole sampling would take. Its tap still samples none. */
+  function takeOverRanks(answer){
+    let waiting=null;
+    for(const entry of queue)if(entry.ranksOnly)waiting=entry;
+    dropRanks();
+    if(waiting?.steps[0]!==rankParts)return;
+    const earlierRanks=()=>{
+      if(recomputeRanks(waiting.after.open,waiting.after.samples,waiting.ranking)===false)answer.steps.unshift(earlierRanks);
+    };
+    answer.steps.unshift(earlierRanks);
   }
   // The entry a step runs next: ranks wait for their frame.
   const runnable=entry=>!entry.ranksOnly||entry.painted;

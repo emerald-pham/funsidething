@@ -21316,6 +21316,58 @@ test('RISK rank work per action: ranks caught up after an Add or an editor Dot o
  }
 });
 
+// #2467 review B1: a Yes, No, Can't, Done or Dislodge records History's
+// "before" values (each answered task's chance and Top x) from the ranks the
+// board shows when it is pressed. Main sampled an Add's, a Delete's or an
+// editor Done's ranks in that action's tap, so a Yes pressed next read ranks
+// that held the action. Since #2459 a person's action leaves its ranks to
+// catch up after the frame that shows it, and a Yes pressed before then
+// dropped them: its before Top x read ranks of a different number of open
+// tasks and was saved as null ("Unavailable"), for good. Here the frame that
+// shows each action paints 400 ms late, as on a slow phone, and the Yes comes
+// 250 ms after the action, a person's press each, past the repeat-press guard
+// and the editor's Return pause. The expected Top x is one whole sampling of
+// the open tasks as the action left them, from the seeded stream the
+// catch-up then draws from (the stream is put back after it). Neither tap
+// draws from the stream, so this is also what main sampled in the action's tap.
+test('RISK History before values: a Yes pressed after a person’s Add, Delete or editor Done on the large board, before that action’s ranks catch up, records each answered task’s before Top x from the ranks the action left',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,signedIn:false,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,run=source=>vm.runInContext(source,ctx);
+ run(`globalThis.__stream2467={a:2467};Math.random=function(){let t=(__stream2467.a=(__stream2467.a+0x6D2B79F5)>>>0);
+  t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};_spare=null`);
+ const actions=new Map(rankActions2455(device)),frame=ctx.requestAnimationFrame,recorded=[],wanted=[];
+ for(const name of ['Add','Delete','editor Done']){
+  await clock.advance(1500);
+  const act=actions.get(name)(),tasksBefore=ctx.state.tasks.filter(task=>!task.done).length;
+  ctx.requestAnimationFrame=fn=>ctx.setTimeout(()=>fn(ctx.performance.now()),400);
+  act();
+  const open=ctx.state.tasks.filter(task=>!task.done).map(task=>({id:task.id,mu:task.mu,sigma:task.sigma}));
+  assert.notEqual(open.length,tasksBefore,'positive control: the '+name+' changes which tasks are open');
+  await clock.advance(250);
+  ctx.requestAnimationFrame=frame;
+  const candidate=ctx.state.candidateId,benchmark=ctx.state.chain.at(-1);
+  assert.ok(candidate&&benchmark,'positive control: a candidate and a benchmark are shown after the '+name);
+  const at=run('JSON.stringify([__stream2467.a,_spare])');
+  const expected=new Map(JSON.parse(run(`JSON.stringify([...rankStats(${JSON.stringify(open)},state.settings.samples)].map(([id,rank])=>[id,{topK:rank.topK,n:rank.n}]))`)));
+  run(`(()=>{const [a,spare]=${at};__stream2467.a=a;_spare=spare;})()`);
+  device.tap('yes');
+  assert.ok(ctx.state.chain.includes(candidate),'positive control: the Yes after the '+name+' answers its candidate');
+  assert.equal(run('JSON.stringify([__stream2467.a,_spare])'),at,'the Yes’s tap samples no ranks');
+  await clock.advance(1500);
+  for(const id of [candidate,benchmark]){
+   const row=ctx.state.tasks.find(task=>task.id===id).ratingHistory.at(-1);
+   assert.equal(row.kind,'yes','positive control: the Yes after the '+name+' records History for '+id);
+   recorded.push({name,id,topK:row.before.topK,n:row.before.n});wanted.push({name,id,...expected.get(id)});
+  }
+ }
+ t.diagnostic(JSON.stringify({recorded,wanted}));
+ assert.ok(new Set(wanted.map(({topK})=>topK)).size>1,'positive control: the answered tasks’ Top x differ');
+ assert.deepEqual(recorded.filter(({topK})=>topK===null).map(({name})=>name),[],'History’s before Top x is recorded after each action, not Unavailable');
+ assert.deepEqual(recorded,wanted,'History’s before Top x after each action is the Top x of the ranks that action left');
+});
+
 // #2461 round 2 (bce540e0): on a small board the new card can paint about
 // 20 ms after the first tap, so a double tap's second tap 120 ms later lands
 // after the 100 ms grace. A press within 200 ms of the last scanner press the
