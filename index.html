@@ -12010,7 +12010,12 @@ function maybeIntervene(){
 // drawn; until that frame every press is too soon. The press is timed by its
 // event's own timeStamp, so a long task between the press and its handler
 // never counts against the person.
-const TASK_PRESS_GUARD_MS=200;
+// #2461: a double tap's second tap lands 100 to 150 ms after the first, before
+// the new card paints, so every press before the paint is held. After it only
+// a short grace holds: 200 ms there held deliberate presses people made once
+// they could see the card, and they had to press again. #221's pause after
+// Return as candidate keeps the 200 ms below.
+const TASK_PRESS_GUARD_MS=200,TASK_PRESS_GRACE_AFTER_PAINT_MS=100;
 // Every button that acts on a task the scanner just drew. Removing a dot can also
 // shift the cards, so a second tap can land on a different button of the next task.
 const SCANNER_TASK_ACTIONS=new Set(["yes","no","cant","postpone","cand-done","bench-done","bench-cant","bench-postpone","dislodge","worked","cand-worked","delete-task"]);
@@ -12029,7 +12034,7 @@ function noteTasksOnScreen(){
   const frame=++tasksOnScreenFrame,drawnAt=performance.now();
   requestAnimationFrame(()=>{if(frame===tasksOnScreenFrame)tasksOnScreenSince=performance.now();});
   // A page that is never given a frame must not hold every press for good:
-  // after a second it is timed from when the panel was drawn, as before #2461.
+  // after a second the grace is timed from when the panel was drawn instead.
   setTimeout(()=>{if(frame===tasksOnScreenFrame&&tasksOnScreenSince===Infinity)tasksOnScreenSince=drawnAt;},TASKS_ON_SCREEN_FRAME_WAIT_MS);
 }
 // When the person pressed, on the clock the guard reads. A browser stamps each
@@ -12039,7 +12044,7 @@ function pressedAt(event){
   const at=event?.timeStamp,now=performance.now();
   return typeof at==="number"&&at>0&&at<=now?at:now;
 }
-function answerBeforeCandidateCouldBeRead(at=performance.now()){return at-tasksOnScreenSince<=TASK_PRESS_GUARD_MS;}
+function answerBeforeCandidateCouldBeRead(at=performance.now()){return at-tasksOnScreenSince<=TASK_PRESS_GRACE_AFTER_PAINT_MS;}
 // #2461: a held press is never silent. Its button takes the app's dimmed,
 // not-now look for a moment, so the person looks before pressing again. It is
 // no prompt and records nothing. The answer's catch-up can draw the panel again

@@ -20818,6 +20818,35 @@ test('RISK scanner press guard: on the large board, a press made more than the g
  assert.deepEqual([...ctx.state.chain],beforeKey.chain,'and No leaves the chain as it was');
 });
 
+// #2461 coordinator decision: a press before the new card paints is the
+// second tap of a double tap and is always held; after the paint the hold is
+// a short grace, so a deliberate press soon after the card shows counts.
+test('RISK scanner press guard: on the large board, a deliberate Yes or n key 150 ms after the new candidate painted answers it, while one 50 ms after is held',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,guard=pressGuard2461(device);
+ guard.paint();await clock.advance(1000);
+ guard.press('yes');
+ const second=ctx.state.candidateId;
+ guard.paint();
+ await clock.advance(50);
+ const shown=answeredState2461(ctx);
+ assert.ok(guard.press('yes').classList.contains('held'),'positive control: a Yes 50 ms after the new candidate painted is held');
+ assert.deepEqual(answeredState2461(ctx),shown,'and changes nothing');
+ await clock.advance(100);
+ const before=answeredState2461(ctx);
+ const yes=guard.press('yes');
+ assert.ok(!yes.classList.contains('held'),'a Yes 150 ms after the new candidate painted is not held');
+ assert.deepEqual([...ctx.state.chain],[...before.chain,second],'it answers that candidate');
+ assert.equal(ctx.state.decisionEvents.length,before.decisions+1,'with one decision');
+ const third=ctx.state.candidateId;
+ guard.paint();
+ await clock.advance(150);
+ guard.key('n');
+ assert.equal(ctx.state.considered[third],'no','the n key 150 ms after the next candidate painted answers it');
+});
+
 // A page that is never given a frame must not hold every press for good.
 test('RISK scanner press guard: when no frame ever comes to paint the new candidate, a press a moment later still counts, and one within the guard of the panel being drawn is still held',{timeout:300000},async t=>{
  const fixture=await largeBoardFixture();
