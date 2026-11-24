@@ -1241,6 +1241,7 @@ window.formatScannerCalendarDate = (date,timeZone) => {
   return formatCalendarDate(field("year")+"-"+field("month")+"-"+field("day"),{year:true});
 };
 let saveTimer = null;
+let saveTimerBackupId = null; // #2457: the backup id the save on saveTimer keeps from retirement
 let saveRequestGeneration = 0;
 /* #2427 review: counts every change made to the live board in place, whether
    or not a save has been asked for yet: an edit or answer (markBoardEdited,
@@ -5343,9 +5344,39 @@ function save(preserveBackupId=null){
       // Settles as persist() does: true once the board is durable here.
       saveTimer=null;return deviceSaveLane.request({preserveBackupId}).done;
     },350));
-    saveTimer=timer;
+    saveTimer=timer;saveTimerBackupId=preserveBackupId;
   }
 }
+/* #2457: an Add's device save runs after the frame that draws the new task,
+   as an answer's does (#2407), in this tab's one device-save lane (#2408).
+   Before, the Add's handler ran persist() itself, so the board was serialized
+   and merged inside the tap, and the edit's own debounced save then ran
+   beside it, outside the lane, and merged the board again. Adds made before
+   this save starts share it; one made while it runs joins the lane's next
+   save. A lane save writes the board as it is when it starts, so it also
+   serves the edit's debounced save, which is dropped, unless that keeps a
+   backup id of its own. Until the save is in the lane the debounce stays set,
+   so nothing shows the board saved before it commits. Hiding the page starts
+   it at once, as it runs an answer's catch-up. Resolves as persist() does. */
+let afterFrameSave=null;
+function deviceSaveAfterFrame(){
+  if(afterFrameSave)return afterFrameSave.done;
+  let settle;
+  const job={done:new Promise(resolve=>{settle=resolve;}),timer:null,start:null};
+  job.start=()=>{
+    if(afterFrameSave!==job)return;
+    afterFrameSave=null;
+    if(job.timer!==null){clearSyncTimeout(job.timer);job.timer=null;}
+    if(saveTimer&&saveTimerBackupId===null){clearSyncTimeout(saveTimer);saveTimer=null;}
+    settle(deviceSaveLane.request().done);
+  };
+  // Counted as the debounce is, so the Settled signal (#2378) waits for it.
+  const timer=countSyncTimer("save-debounce",setTimeout(()=>{endSyncTimer(timer);if(job.timer===timer)job.timer=null;job.start();},0));
+  job.timer=timer;afterFrameSave=job;
+  return job.done;
+}
+window.addEventListener("pagehide",()=>afterFrameSave?.start());
+document.addEventListener("visibilitychange",()=>{if(document.hidden)afterFrameSave?.start();});
 
 /* ---------- cloud sync glue (no-ops until Firebase is configured) ----------
    Server revision notifications wake the same safe reconciliation as focus.
@@ -12910,7 +12941,8 @@ function submitQuickAdd(text=document.getElementById("addInput").value){
   // by the confirmation of an earlier Add; failures remain available to retry.
   submission.saving=(async()=>{
     let saved=false;
-    try{saved=!submission.ids.length || await persist();}catch(e){}
+    // #2457: after the frame that draws the task, in the device-save lane.
+    try{saved=!submission.ids.length || await deviceSaveAfterFrame();}catch(e){}
     if(saved && submission.generation===quickAddDraftGeneration && sameListOwner(submission.owner,state) && submission.ids.every(id=>taskById(id)) && JSON.stringify(quickAddAppearanceValues())===submission.draft){
       input.value="";clearQuickAddDraft();
       if(submission.result.skipped!==undefined)toast(importSummary(submission.result.added,submission.result.skipped,submission.result.completed));
@@ -22599,7 +22631,7 @@ window.addEventListener("hashchange",()=>{if(state&&debugLogLinkRequested()){deb
 (async function init(){
   if(debugLogLinkRequested())await debugLogLinkHoldOpening();
   showOpeningSavedBoard();
-  const loaded = await loadState();
+  const loaded = await loadState(),loadedRaw=lastPersistedRaw;
   // This inline script can resume before the deferred landscape modules run.
   // Wait until their setup has registered the scene mirrors, then apply the
   // saved board so a cold reload paints the chosen sky on its first frame.
@@ -22622,6 +22654,14 @@ window.addEventListener("hashchange",()=>{if(state&&debugLogLinkRequested()){deb
       assertCompleteSavedCollections(state);
       dropRemovedFields(state);
       repairedDeletionLog=hydrateState(state);
+    }
+    // #2457: the saved board's task rows, recorded as it opens. The board is
+    // still the saved text, parsed and hydrated as a save's missing-task check
+    // reads it (savedPayloadBoard), before anything below changes it, so the
+    // first save after opening merges only the tasks whose rows changed, as
+    // every later save does (#2428). Before, that save merged every task.
+    if(loaded&&typeof loadedRaw==="string"&&lastPersistedRaw===loadedRaw&&Array.isArray(state.tasks)){
+      const {rows,ids}=taskRowTexts(state.tasks);savedBoardPieces={raw:loadedRaw,rows,ids};
     }
     if(Array.isArray(state.decisionEvents)&&state.decisionEvents.some(event=>event?.kind==="undo"))projectDecisionEvents(state);
   }catch(e){
