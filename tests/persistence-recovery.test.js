@@ -20870,3 +20870,123 @@ test('RISK rank work per answer: ranks sampled in parts after a Yes on the large
  const after=ctx.state.tasks.find(task=>task.id===answered).ratingHistory.at(-1).after;
  assert.equal(after.topK,expected.find(([id])=>id===answered)[1],'History records the Top x of those ranks');
 });
+
+// #2457 (spec #2455): adding a task on the large board shows it in the tap and
+// saves the board once, after the tap. Counted, never timed (responsiveness
+// guidance), at the agreed seam: the loaded app on the device store
+// (answeringDevice2408) reopened on largeBoardFixture(), a title typed in the
+// add box and the Add button pressed as one click on the document, then
+// syncSettled. Counted:
+// - in the tap: device save runs started while the Add's click is handled
+//   (the support report's save runs), and whether the new task is drawn;
+// - after it: device saves committed (device head commits), and each save's
+//   missing-task check, the merge of the saved board into the live one
+//   (#2333), with how many tasks it merged. A check that merges most of the
+//   board's tasks is a full merge; a task the saved board holds exactly as
+//   the live board does holds nothing to merge (#2428).
+function addSaveWork2457(device){
+ const {ctx}=device,checks=[];ctx.__checks2457=checks;
+ vm.runInContext(`(()=>{const checks=__checks2457,keep=keepMissingTasks,mergeHistory=mergeTaskRatingHistory;let open=null;
+  keepMissingTasks=function(source,keptFrom){
+   const check={keptFrom,tasks:0,boardTasks:state.tasks.length};checks.push(check);const outer=open;open=check;
+   try{return keep.apply(this,arguments);}finally{open=outer;}};
+  mergeTaskRatingHistory=function(){if(open)open.tasks++;return mergeHistory.apply(this,arguments);};
+ })()`,ctx);
+ let commits=device.counters.commits.length,from=0;
+ return {
+  reset(){commits=device.counters.commits.length;from=checks.length;},
+  now(){
+   const saved=checks.slice(from).filter(check=>check.keptFrom==='last-save');
+   return {commits:device.counters.commits.length-commits,checks:saved.length,tasksMerged:saved.map(check=>check.tasks),
+    fullMerges:saved.filter(check=>check.tasks*2>=check.boardTasks).length};
+  }};
+}
+// A person types a title in the add box and presses Add. Returns what the
+// tap itself did: save runs it started and whether the task is drawn, and the
+// save state the report gives then.
+function pressAdd2457(device,title){
+ const {ctx,shim}=device;
+ shim.document.getElementById('addInput').value=title;
+ const before=device.report().save.persistCalls.value;
+ const target={dataset:{act:'add'},classList:{contains:()=>false}};target.closest=()=>target;
+ shim.document.dispatchEvent({type:'click',detail:1,target});
+ const report=device.report().save;
+ return {saveRuns:report.persistCalls.value-before,durability:report.localDurability.value,
+  added:ctx.state.tasks.some(task=>task.title===title),drawn:shim.document.getElementById('listBody').innerHTML.includes(title)};
+}
+// The large board, opened once to move it into device storage (and, signed
+// in, to publish it), then opened again as a warm relaunch does.
+async function relaunchedAdder2457(t,{signedIn}){
+ const fixture=signedIn?await largeSignedInBoardFixture(ACCOUNT2408.email):await largeBoardFixture();
+ const first=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,signedIn});
+ await syncSettled(first.ctx,{within:60000});
+ await first.close();
+ const device=await answeringDevice2408(t,{docs:first.docs,indexedDB:first.indexedDB,dbName:first.dbName,storage:first.storage,saveMs:0,signedIn});
+ await syncSettled(device.ctx,{within:60000});
+ assert.equal(device.ctx.state.tasks.length,LARGE_BOARD_SHAPE.tasks,'positive control: the large board opened');
+ return device;
+}
+const QUICK_ADDS2457=['Second task 2457','Third task 2457','Fourth task 2457'];
+async function addsSaveOnce2457(t,{signedIn}){
+ const device=await relaunchedAdder2457(t,{signedIn}),{ctx}=device,work=addSaveWork2457(device);
+ const settle=()=>syncSettled(ctx,{within:60000});
+ const saveRuns=()=>device.report().save.persistCalls.value;
+ // The first Add after opening.
+ work.reset();
+ let runs=saveRuns();
+ const first=pressAdd2457(device,'First task added after opening 2457');
+ assert.ok(first.added,'positive control: the Add is taken');
+ assert.ok(first.drawn,'the new task is drawn in the tap');
+ assert.equal(first.durability,'pending','and the board shows its save as pending');
+ assert.equal(first.saveRuns,0,'the tap starts no device save: '+JSON.stringify(first));
+ await settle();
+ const opening=work.now();
+ t.diagnostic(JSON.stringify({signedIn,first,opening}));
+ assert.equal(device.report().save.localDurability.value,'durable','positive control: the Add is saved on the device');
+ assert.equal(opening.commits,1,'the first Add after opening saves the board once: '+JSON.stringify(opening));
+ assert.equal(opening.checks,1,'and checks it for missing tasks once: '+JSON.stringify(opening));
+ assert.equal(opening.fullMerges,0,'with no full merge, as any later save: '+JSON.stringify(opening));
+ // With sync off nothing else saves: the Add's edit is saved by one save run,
+ // its debounced save included.
+ if(!signedIn)assert.equal(saveRuns()-runs,1,'the Add’s board is saved by one save run');
+ // Adds made close together, as a person enters a list.
+ work.reset();runs=saveRuns();
+ const quick=QUICK_ADDS2457.map(title=>pressAdd2457(device,title));
+ assert.ok(quick.every(add=>add.added&&add.drawn),'each Add is drawn in its tap: '+JSON.stringify(quick));
+ assert.deepEqual(quick.map(add=>add.saveRuns),[0,0,0],'no tap starts a device save');
+ await settle();
+ const later=work.now();
+ t.diagnostic(JSON.stringify({signedIn,quick,later}));
+ assert.equal(later.commits,1,'Adds made close together share one device save: '+JSON.stringify(later));
+ assert.equal(later.checks,later.commits,'one missing-task check per committed save: '+JSON.stringify(later));
+ assert.equal(later.fullMerges,0,'and no full merge: '+JSON.stringify(later));
+ if(!signedIn)assert.equal(saveRuns()-runs,1,'by one save run');
+ // With sync on, the cloud copy holds them too.
+ if(signedIn){
+  const cloud=await cloudCopy2408(device.docs);
+  for(const title of ['First task added after opening 2457',...QUICK_ADDS2457])
+   assert.ok(cloud.tasks.some(task=>task.title===title),'the cloud copy holds '+title);
+ }
+ // What the device saved holds every Add.
+ await device.close();
+ const reopened=await answeringDevice2408(t,{docs:device.docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,signedIn:false,dropDatabase:true});
+ for(const title of ['First task added after opening 2457',...QUICK_ADDS2457])
+  assert.ok(reopened.ctx.state.tasks.some(task=>task.title===title),'the saved board holds '+title);
+}
+test('RISK add saves once: on the large board with sync off, an Add draws the task in the tap and starts no device save there, the first Add after opening saves once with one missing-task check and no full merge, and Adds made close together share one save',{timeout:300000},t=>addsSaveOnce2457(t,{signedIn:false}));
+test('RISK add saves once: on the large board with sync on, an Add draws the task in the tap and starts no device save there, the first Add after opening saves once with one missing-task check and no full merge, Adds made close together share one save, and the cloud copy holds every Add',{timeout:300000},t=>addsSaveOnce2457(t,{signedIn:true}));
+// #2457: the Add's save waits for the frame after its tap. Leaving the app
+// before then starts it at once, and the board is saved.
+test('RISK add saves once: leaving the app right after an Add starts its device save at once, and the reopened board holds the task',{timeout:300000},async t=>{
+ const device=await relaunchedAdder2457(t,{signedIn:false}),{ctx,shim}=device,title='Added just before leaving 2457';
+ const added=pressAdd2457(device,title);
+ assert.ok(added.drawn,'positive control: the Add is drawn');
+ const runs=device.report().save.persistCalls.value;
+ shim.document.hidden=true;shim.document.dispatchEvent({type:'visibilitychange'});shim.window.dispatchEvent({type:'pagehide'});
+ assert.equal(device.report().save.persistCalls.value-runs+added.saveRuns,1,'leaving the app starts the Add’s device save at once, and only one');
+ await syncSettled(ctx,{within:60000});
+ assert.equal(device.report().save.localDurability.value,'durable','the Add is saved on the device');
+ await device.close();
+ const reopened=await answeringDevice2408(t,{indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,signedIn:false,dropDatabase:true});
+ assert.ok(reopened.ctx.state.tasks.some(task=>task.title===title),'the reopened board holds the task');
+});

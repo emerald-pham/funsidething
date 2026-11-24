@@ -1257,6 +1257,11 @@ async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactor
     if(disposed)clearTimeout(timer);else ownedTimers.add(timer);
     timer.unref?.();return timer;
   };
+  // #2457: a frame callback keeps the test process alive until it runs, as a
+  // browser draws the next frame: an Add's device save waits for the frame
+  // that draws the task. Every other app timer stays unref'd. Disposing the
+  // app still ends a frame loop (the disposed guard above).
+  const scheduleFrame=fn=>{const timer=schedule(fn,0);timer.ref?.();return timer;};
   const cancel=timer=>{ownedTimers.delete(timer);clearTimeout(timer);};
   if(locationHref)shim.window.location=new URL(locationHref);
   if(fetchProvider){shim.window.fetch=fetchProvider;shim.window.AbortController=AbortController;}
@@ -1309,7 +1314,7 @@ async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactor
     CustomEvent: class CustomEvent { constructor(type, opts) { this.type = type; Object.assign(this, opts || {}); } },
     setTimeout: schedule,
     clearTimeout: cancel,
-    requestAnimationFrame: (fn) => schedule(fn, 0),
+    requestAnimationFrame: scheduleFrame,
     confirm: () => true,
     alert: () => {},
     prompt: () => null,
