@@ -872,8 +872,8 @@
     // half of each frame's work (#2456). Rebuilt only when one of those inputs
     // changes, a frame with nothing new to reflect reuses it while the ripples
     // and everything else still move every frame. Clouds count once they have
-    // moved a device pixel, under a second at their drift, so a reused mirror
-    // is never more than that behind the sky above it.
+    // moved a device pixel (about a second at their drift), so the clouds in a
+    // reused mirror are never more than a device pixel behind the sky above it.
     // Meteors, sky visitors and nest birds are the visitors painted above before the mirror is taken.
     const nextReflection=reflectionInputs(paintEvents.some(e=>e.type==='meteor'||e.type==='bird'||(airborne.has(e.type)&&!waterEvents.has(e.type))),weather);
     if(nextReflection===null||nextReflection!==reflectionKey||p!==reflectionPalette){
@@ -1537,6 +1537,7 @@
   // writes run, so a caller can apply them in the same step that paints the
   // sky; otherwise new text could sit over the old sky (#2194 review F7).
   // Without it every write happens at once, in the existing order.
+  let sceneUnsynced=false;
   function computeScene(deferred=null){
     const apply=deferred?write=>deferred.push(write):write=>write();
     const location=globalThis.LivingLocation?.current();
@@ -1548,7 +1549,7 @@
       // and the first sync works out the whole UTC day's plan, about 60 ms at
       // 4x CPU. The opening paint does it in a task of its own once the board
       // shows, instead of inside the boot or a refresh owed to it (#2456).
-      document.documentElement.dataset.sceneSeason=sceneSeason;if(!openingPaint||openingPaint.painting)syncScene(Date.now());updateChrome();
+      document.documentElement.dataset.sceneSeason=sceneSeason;if(!openingPaint||openingPaint.painting)syncScene(Date.now());else sceneUnsynced=true;updateChrome();
       document.documentElement.style.setProperty('--scene-tint',p.tint);
       document.documentElement.dataset.scenePeriod=sky.period;
     });
@@ -1558,7 +1559,8 @@
   // A refresh owed to the opening paint leaves the scene unsynced (#2456), so
   // a paint that runs before that opening paint syncs first, as the refresh did.
   function paintScene(){
-    syncScene(Date.now());paintBackground();paintLife(world.elapsed);
+    if(sceneUnsynced)syncScene(Date.now());
+    paintBackground();syncScene(Date.now());paintLife(world.elapsed);
   }
   // During the opening task a refresh computes the scene but owes its paint.
   // Opening used to paint the whole landscape two or three times in the same
@@ -1603,6 +1605,7 @@
   }
   function scenePose(e,firework=false){return reduced?{...e,age:firework===true?(e.type==='festival'?e.duration:Math.min(e.duration,60))*.5:e.duration*.5,...(firework===true?{fireworkDeckAge:e.duration*.5,fireworkActive:e.age<(e.type==='festival'?e.duration:60)}:{})}:e;}
   function syncScene(now){
+    sceneUnsynced=false;
     const location=globalThis.LivingLocation?.current();
     const key=JSON.stringify([sceneSeason,location,S.readSceneTime(sceneStorage),S.readSceneSeason(sceneStorage)]);
     if(key!==timelineKey){
