@@ -5378,12 +5378,14 @@ function save(preserveBackupId=null){
       // Settles as persist() does: true once the board is durable here.
       saveTimer=null;
       // #2457: an Add's save that started after this edit and saved it, with
-      // nothing changed since it started, has saved this board.
+      // nothing changed since it started, has saved this board. One still
+      // waiting for its frame will save the board as it is then, this edit
+      // included, so this waits for it instead of saving beside it.
       const served=debounceServedBy;debounceServedBy=null;
-      if(served?.timer===timer&&served.generation===saveRequestGeneration&&served.edits===boardEditSerial){
-        const again=()=>deviceSaveLane.request({preserveBackupId}).done;
+      const again=()=>deviceSaveLane.request({preserveBackupId}).done;
+      if(served?.timer===timer&&served.job&&afterFrameSave===served.job)return served.job.done.then(saved=>saved===true||again(),again);
+      if(served?.timer===timer&&!served.job&&served.generation===saveRequestGeneration&&served.edits===boardEditSerial)
         return served.done.then(saved=>saved===true||again(),again);
-      }
       return deviceSaveLane.request({preserveBackupId}).done;
     },350));
     saveTimer=timer;saveTimerBackupId=preserveBackupId;debounceServedBy=null;
@@ -5400,33 +5402,52 @@ function save(preserveBackupId=null){
    (debounceServedBy), unless that keeps a backup id of its own: the debounce
    still runs when it is due, and starts no second save when nothing changed
    since this one started and this one saved. The debounce stays set until
-   then, as for any edit, so nothing shows the board saved early. Waiting
-   counts as sync work (#2378). Hiding the page starts the save at once, as it
-   runs an answer's catch-up; a page that draws no frame starts it within a
-   second. Resolves as persist() does. */
+   then, as for any edit, so nothing shows the board saved early.
+   #2455 review: a frame can wait behind other work for longer than the
+   debounce, which then saved the board beside this save, two saves for one
+   Add. This save takes the debounce over when the Add commits: a debounce
+   due before the frame waits for this save, which writes the board as it is
+   when it starts, that edit included. Waiting counts as sync work (#2378).
+   Hiding the page starts the save at once, as it runs an answer's catch-up;
+   a page that draws no frame starts it within FRAME_WAIT_FALLBACK_MS.
+   Resolves as persist() does. */
+// How long the app waits for a frame before it goes on without one: a hidden
+// or throttled page may be given none. Work that waits for a paint, the press
+// guard's start (noteTasksOnScreen) and a held press's dim all use it.
+const FRAME_WAIT_FALLBACK_MS=1000;
+// Runs fn once, in the task after the next frame paints (a frame callback runs
+// before its frame paints; the next task, after it), or after
+// FRAME_WAIT_FALLBACK_MS if no frame comes. Without frames it runs in the next
+// task. Returns a function that runs fn at once instead, as hiding the page does.
+function afterNextPaint(fn){
+  let done=false,fallback=0;
+  const run=()=>{if(done)return;done=true;clearTimeout(fallback);fn();};
+  if(typeof requestAnimationFrame!=="function"){fallback=setTimeout(run,0);return run;}
+  fallback=setTimeout(run,FRAME_WAIT_FALLBACK_MS);
+  requestAnimationFrame(()=>{
+    if(done)return;
+    if(typeof MessageChannel!=="function")return run();
+    const channel=new MessageChannel();
+    channel.port1.onmessage=()=>{channel.port1.close();run();};
+    channel.port2.postMessage(null);
+  });
+  return run;
+}
 let afterFrameSave=null,debounceServedBy=null;
 function deviceSaveAfterFrame(){
-  if(afterFrameSave)return afterFrameSave.done;
+  // Each Add's own debounce, an earlier Add's replaced, is the one taken over.
+  const takeOver=job=>{if(saveTimer&&saveTimerBackupId===null)debounceServedBy={timer:saveTimer,job};};
+  if(afterFrameSave){takeOver(afterFrameSave);return afterFrameSave.done;}
   let settle;
-  const job={done:new Promise(resolve=>{settle=resolve;}),work:trackSyncWork("save-debounce"),fallback:null,start:null};
-  job.start=()=>{
+  const job={done:new Promise(resolve=>{settle=resolve;}),work:trackSyncWork("save-debounce"),start:null};
+  job.start=afterNextPaint(()=>{
     if(afterFrameSave!==job)return;
-    afterFrameSave=null;clearTimeout(job.fallback);job.work.end();
+    afterFrameSave=null;job.work.end();
     const request=deviceSaveLane.request();
     if(saveTimer&&saveTimerBackupId===null)debounceServedBy={timer:saveTimer,done:request.done,generation:saveRequestGeneration,edits:boardEditSerial};
     settle(request.done);
-  };
-  afterFrameSave=job;
-  if(typeof requestAnimationFrame==="function"){
-    job.fallback=setTimeout(job.start,1000);
-    // A frame callback runs before that frame paints; the next task, after it.
-    requestAnimationFrame(()=>{
-      if(typeof MessageChannel!=="function")return job.start();
-      const channel=new MessageChannel();
-      channel.port1.onmessage=()=>{channel.port1.close();job.start();};
-      channel.port2.postMessage(null);
-    });
-  }else job.fallback=setTimeout(job.start,0);
+  });
+  afterFrameSave=job;takeOver(job);
   return job.done;
 }
 window.addEventListener("pagehide",()=>afterFrameSave?.start());
@@ -12082,7 +12103,6 @@ let lastScannerPressAt=-Infinity;
 // shift the cards, so a second tap can land on a different button of the next task.
 const SCANNER_TASK_ACTIONS=new Set(["yes","no","cant","postpone","cand-done","bench-done","bench-cant","bench-postpone","dislodge","worked","cand-worked","delete-task"]);
 let tasksOnScreen=null,tasksOnScreenSince=-Infinity,tasksOnScreenFrame=0;
-const TASKS_ON_SCREEN_FRAME_WAIT_MS=1000;
 function noteTasksOnScreen(){
   const shown=state.candidateId+"|"+(state.chain.at(-1)??"");
   if(shown===tasksOnScreen)return;
@@ -12097,7 +12117,7 @@ function noteTasksOnScreen(){
   requestAnimationFrame(()=>{if(frame===tasksOnScreenFrame)tasksOnScreenSince=performance.now();});
   // A page that is never given a frame must not hold every press for good:
   // after a second the grace is timed from when the panel was drawn instead.
-  setTimeout(()=>{if(frame===tasksOnScreenFrame&&tasksOnScreenSince===Infinity)tasksOnScreenSince=drawnAt;},TASKS_ON_SCREEN_FRAME_WAIT_MS);
+  setTimeout(()=>{if(frame===tasksOnScreenFrame&&tasksOnScreenSince===Infinity)tasksOnScreenSince=drawnAt;},FRAME_WAIT_FALLBACK_MS);
 }
 // When the person pressed, on the clock the guard reads. A browser stamps each
 // event on that clock; a stamp that is missing or not on it (an old engine's
@@ -12135,7 +12155,7 @@ function acknowledgeHeldPress(act,pressed){
   const current=heldPress;
   const end=()=>{if(heldPress!==current)return;current.button?.classList?.remove("held");heldPress=null;};
   const count=()=>{if(heldPress!==current||current.until!==Infinity)return;current.until=performance.now()+HELD_PRESS_SHOW_MS;clearTimeout(current.timer);current.timer=setTimeout(end,HELD_PRESS_SHOW_MS);};
-  if(typeof requestAnimationFrame==="function"){requestAnimationFrame(count);current.timer=setTimeout(count,TASKS_ON_SCREEN_FRAME_WAIT_MS);}
+  if(typeof requestAnimationFrame==="function"){requestAnimationFrame(count);current.timer=setTimeout(count,FRAME_WAIT_FALLBACK_MS);}
   else count();
   showHeldPress(pressed&&pressed.isConnected!==false?pressed:heldPressButton(act,id));
 }

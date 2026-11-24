@@ -21195,3 +21195,25 @@ test('RISK add saves once: leaving the app right after an Add starts its device 
  const reopened=await answeringDevice2408(t,{indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,signedIn:false,dropDatabase:true});
  assert.ok(reopened.ctx.state.tasks.some(task=>task.title===title),'the reopened board holds the task');
 });
+// #2455 review: a frame can wait behind other work for longer than the edit's
+// 350 ms debounced save. The Add's queued save takes that debounce over when
+// the Add commits, so the one Add still makes one device save however late
+// its frame comes. The frame here waits 600 ms, under the 1 s no-frame wait.
+test('RISK add saves once: an Add whose frame waits longer than the edit’s 350 ms save debounce still saves the board once',{timeout:300000},async t=>{
+ const device=await relaunchedAdder2457(t,{signedIn:false}),{ctx}=device,work=addSaveWork2457(device);
+ const running=ctx.requestAnimationFrame;t.after(()=>{ctx.requestAnimationFrame=running;});
+ let frames=0;ctx.requestAnimationFrame=fn=>{frames++;return ctx.setTimeout(()=>fn(vm.runInContext('performance.now()',ctx)),600);};
+ work.reset();
+ const runs=device.report().save.persistCalls.value;
+ const added=pressAdd2457(device,'Added before a late frame 2457');
+ assert.ok(added.drawn,'positive control: the Add is drawn in the tap');
+ assert.equal(added.saveRuns,0,'and starts no device save there');
+ await syncSettled(ctx,{within:60000});
+ const saved=work.now();
+ t.diagnostic(JSON.stringify({frames,saved,runs:device.report().save.persistCalls.value-runs}));
+ assert.ok(frames>0,'positive control: the Add waited for a frame');
+ assert.equal(device.report().save.localDurability.value,'durable','the Add is saved on the device');
+ assert.equal(device.report().save.persistCalls.value-runs,1,'the one Add makes one device save run');
+ assert.equal(saved.commits,1,'and commits the board once: '+JSON.stringify(saved));
+ assert.equal(saved.checks,1,'with one missing-task check: '+JSON.stringify(saved));
+});
