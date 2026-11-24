@@ -24872,5 +24872,29 @@
       "command": "COMPATIBILITY_BASE_SHA=6fd49455e19aa979def1ab105a0068fb1936c1dc node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <git-common-dir>/agent-test-runs/issue-2453 --purpose preimplementation-red -- npm run test:compatibility",
       "failure": "Record 5d43c6c7 on 6fd49455 before the test change: # tests 30, # pass 28, # fail 2, # skipped 0. Subtest 6fd4945 of the #2436 case failed 'one acknowledged revision behind: it reads the head alone' with expected 2, actual 3; the floor subtest 7b9c92a passed."
     }
+  },
+  {
+    "baseCommit": "2d87e4397d62685e04cf67de698f67496520eb0b",
+    "weakenedTestLines": [
+      "tests/persistence-recovery.test.js:-phone.ctx.addTask('Added during the started pass');",
+      "tests/persistence-recovery.test.js:-await new Promise(resolve=>setTimeout(resolve,300));",
+      "tests/persistence-recovery.test.js:-await until2417(()=>vm.runInContext('decisionEvidenceIssue(state,window.CloudSync.user)',phone.ctx)!==null,'positive control: the answer leaves the phone’s board unprojectable (#2395)');"
+    ],
+    "reason": "#2459: the #2417 B1 case reached an unprojectable sender board through bug #2395: a task added during a Started pass joined the pass's draw at the next answer's redraw, and the replay of the Start's recorded draw dropped that joined weight, so the decision-evidence check held every push and record. #2459 fixes that bug (a replay keeps joined weights of the same draw, and a pool task joins as its change commits), so the Add no longer makes the board unprojectable and the case's positive control failed. The fixture, not the expectation under test, changed: the case now changes one recorded weight of the pass's draw right after the answer's replay, before its record goes, which the check still refuses.",
+    "previousBehavior": "An Add during the Started pass followed by a Can't made decisionEvidenceIssue non-null, the phone sent no change record of the Can't, and the laptop stayed free of errors and kept syncing its own edits.",
+    "intendedBehavior": "The same expectations hold for a sender board made unprojectable by a pass draw that differs from the Start's recorded draw in a recorded weight: no change record of the answer is sent, the laptop shows no cloud error, and its own later edit still reaches the cloud. A task added during a Started pass is covered by the new #2459 cases, where the next answer syncs and goes as a change record.",
+    "replacementTests": [
+      "RISK change records: an answer whose board the sender could not push goes as no record, and the other device keeps syncing",
+      "RISK change records: after an Add in a Started pass, a Yes still syncs: the added task’s frozen chance weight does not make the board’s decisions fail their check",
+      "RISK change records: a Yes right after an Add on the large board goes as a change record, not a full copy"
+    ],
+    "preservedCoverage": [
+      "Every assertion after the positive control runs unchanged: no record of the answer is written, the laptop settles without a cloud error, and the laptop's own Add reaches the cloud.",
+      "The other #2395 references (the Return-as-candidate intervention case and the Undo-reopen case) tolerate either outcome and are unchanged."
+    ],
+    "redEvidence": {
+      "command": "npm run test:group -- --group persistence-recovery --output-dir <scratchpad>/evidence/2459/groups/persistence-recovery-1 --repository emerald-pham/funsidething --event-policy local --run-id 2459-pr-1 --run-attempt 1 --source-sha 7fb34faf7be8b09deab1d5d1bc767926dc7b8fd8 --comparison-base 2d87e4397d62685e04cf67de698f67496520eb0b",
+      "failure": "On 7fb34faf (the #2459 fix, before this test change) the group failed one case: not ok 518 'RISK change records: an answer whose board the sender could not push goes as no record, and the other device keeps syncing' with 'positive control: the answer leaves the phone’s board unprojectable (#2395)' (until2417 timed out: decisionEvidenceIssue stayed null after the Add and Can't)."
+    }
   }
 ]

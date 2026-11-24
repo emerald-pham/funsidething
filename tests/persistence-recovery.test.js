@@ -17668,9 +17668,11 @@ test('RISK change records: a server-only repair of a damaged full copy publishes
 });
 
 // #2417 specialist review B1: an answer that leaves the sender's board
-// unprojectable (#2395: a task added during a started pass, then an answer)
-// goes as no change record, as its full copy does not go; the other device
-// shows no error and keeps syncing.
+// unprojectable goes as no change record, as its full copy does not go; the
+// other device shows no error and keeps syncing. #2459: #2395's path here (a
+// task added during a started pass, then an answer) no longer leaves the board
+// unprojectable; a pass draw changed behind its Start's recorded draw, after
+// the answer's replay and before its record goes, still does.
 test('RISK change records: an answer whose board the sender could not push goes as no record, and the other device keeps syncing',{timeout:240000},async t=>{
  const docs=new Map();
  const phone=await answeringDevice2408(t,{board:answeringBoard2408({tasks:3,padBytes:0}),docs,saveMs:0,dropDatabase:true});
@@ -17680,10 +17682,9 @@ test('RISK change records: an answer whose board the sender could not push goes 
  await settledTogether([phone,laptop],[],{within:60000});
  holdFullCopy2417(t,phone);
  const written=recordsWritten2417(phone);
- phone.ctx.addTask('Added during the started pass');
- await new Promise(resolve=>setTimeout(resolve,300));
  phone.tap('cant');
- await until2417(()=>vm.runInContext('decisionEvidenceIssue(state,window.CloudSync.user)',phone.ctx)!==null,'positive control: the answer leaves the phone’s board unprojectable (#2395)');
+ const weights=phone.ctx.state.chance.weights,changed=Object.keys(weights)[0];weights[changed]/=2;
+ await until2417(()=>vm.runInContext('decisionEvidenceIssue(state,window.CloudSync.user)',phone.ctx)!==null,'positive control: the changed draw leaves the phone’s board unprojectable');
  await new Promise(resolve=>setTimeout(resolve,1500));
  assert.equal(recordsWritten2417(phone),written,'the phone sends no record of it');
  await syncSettled(laptop.ctx,{within:30000});
