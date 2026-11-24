@@ -152,6 +152,22 @@
           if(!current(stillCurrent)) return {cancelled:true,generationId};
           await adapter.writeChunks(uid,generationId,missing.slice(offset,offset+batchSize));
         }
+        // #2459: a full copy reads each chunk three times: this listing, the
+        // seal transaction and the publish transaction (sealGeneration and
+        // publishGeneration's verifiedGeneration). Each read proves something
+        // the others do not, so all three stay:
+        // - this listing is the only read of the whole chunk collection, as a
+        //   pull reads it, so only it finds a chunk beyond the copy's count;
+        //   a transaction reads documents by path and cannot list.
+        // - the seal reads the chunks inside the transaction that seals them,
+        //   so a chunk lost or changed after this listing fails the seal.
+        // - the publication reads them under the root's revision guard, inside
+        //   the transaction that names the copy; the seal has no revision
+        //   guard, and only firestore.rules keep a sealed copy's chunks from
+        //   changing in between. The RISK CLOUD TRANSACTION tests change and
+        //   delete chunks after the seal and require the publication to fail.
+        // Dropping one needs a read that proves what it checks: the same chunk
+        // list and hashes under the same revision guard.
         const verifiedChunks=await adapter.readChunks(uid,generationId);
         if(!current(stillCurrent)) return {cancelled:true,generationId};
         if(await root.ChainStorageV2.decodeSnapshot(encoded,verifiedChunks)!==payload)

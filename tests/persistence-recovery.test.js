@@ -20620,3 +20620,39 @@ test('RISK change records: a Yes right after an Add on the large board goes as a
  await clock.settle();
  assert.equal(device.shim.document.getElementById('syncBtn').textContent,'☁ synced','and sync ends synced');
 });
+
+// #2459: a full copy reads its chunks back to verify them: on the large board
+// it writes 2.76 MB and reads every chunk three times, as a listing, in the
+// transaction that seals the copy and in the one that publishes it. No read
+// proves what another checks (cloud-store-v2.js push), so all three stay, and
+// this pins that number: it never grows with the board or its history.
+// Counted, never timed: each read of each chunk of the copy, from the push to
+// Settled.
+function chunkReads2459(device){
+ const reads=new Map(),{docs,faults}=device;
+ const count=path=>reads.set(path,(reads.get(path)||0)+1);
+ const chunk=/^users\/owner\/generations\/[^/]+\/chunks\/[^/]+$/,listing=/^users\/owner\/generations\/[^/]+\/chunks$/;
+ faults.transactionRead=path=>{if(chunk.test(path))count(path);};
+ faults.serverRead=path=>{if(listing.test(path))for(const key of docs.keys())if(key.startsWith(path+'/')&&chunk.test(key))count(key);};
+ return reads;
+}
+test('RISK full copy readback: a full copy on the large board reads each of its chunks at most three times, once in each verification, and publishes one revision on',{timeout:300000},async t=>{
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock,counters,shim,docs}=device;
+ const revision=docs.get('users/owner').rev,reads=chunkReads2459(device);
+ shim.document.getElementById('addInput').value='Added for a full copy 2459';
+ ctx.onAction('add',{});
+ await clock.settle();
+ const root=docs.get('users/owner'),generation=root.activeGeneration;
+ const chunks=[...docs.keys()].filter(key=>key.startsWith('users/owner/generations/'+generation+'/chunks/'));
+ const own=[...reads].filter(([path])=>path.startsWith('users/owner/generations/'+generation+'/'));
+ t.diagnostic(JSON.stringify({chunks:chunks.length,reads:own.map(([,n])=>n)}));
+ assert.equal(root.rev,revision+1,'positive control: the full copy published one revision on');
+ assert.ok(counters.uploads.at(-1)?.payload.includes('Added for a full copy 2459'),'positive control: it carries the Add');
+ assert.ok(chunks.length>1,'positive control: the large board takes several chunks');
+ assert.deepEqual(chunks.filter(path=>!reads.has(path)),[],'every chunk is read back');
+ assert.deepEqual(own.filter(([,n])=>n>3).map(([path,n])=>path.split('/').at(-1)+':'+n),[],'no chunk is read back more than three times: the listing, the seal and the publication');
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','and sync ends synced');
+});
