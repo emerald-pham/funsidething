@@ -7466,6 +7466,78 @@ test('RISK idle scenery lights browser: in daylight a new window-light slot and 
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
 
+// #2456: the scenery's boot task worked out the day's scene plan (every
+// arrival opportunity of the UTC day and their admission), about 60 ms of a
+// 125 ms task at 4x CPU, while the app was still opening its board, even on a
+// warm relaunch that keeps the day's sun. The plan must wait until the board
+// shows and then run as a task of its own, with no scenery paint in it, before
+// the scenery first paints. The plan's work is counted where it draws each
+// arrival's type, LandscapeConfig.pickEvent; a microtask queued at the first
+// draw of a task closes that task's count. Only ordering and counts are
+// asserted, never elapsed time.
+test('RISK opening scenery plan task browser: the scenery boot works out no day plan, and the plan runs after the board shows as its own task with no scenery paint, in Chromium and WebKit under both motion choices',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=12;
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('plan-task-'+i,'Plan task board task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true}));
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const motion of ['normal','reduced']){
+    const label=`${engineName}/${motion}`,context=await browser.newContext({viewport:{width:390,height:844},timezoneId:'America/New_York',serviceWorkers:'block',reducedMotion:motion==='reduced'?'reduce':'no-preference'});
+    try{
+     await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+     await context.addInitScript(({board,motion,ROWS})=>{
+      Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+      localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:motion,savedAt:Date.parse('2026-11-18T12:00:00Z')}));
+      if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+      const plan=window.__planTask={draws:0,boot:null,tasks:[],painted:false};
+      const ready=()=>document.documentElement.dataset.appReady==='true'&&document.querySelectorAll('#listBody [data-row]').length===ROWS;
+      let task=null;
+      let config;Object.defineProperty(globalThis,'LandscapeConfig',{configurable:true,enumerable:true,get:()=>config,set(value){
+       // The configuration is frozen, so the page sees a copy whose pickEvent counts.
+       const pick=value.pickEvent;config=Object.freeze({...value,pickEvent(...args){
+        plan.draws++;
+        if(!task){task={draws:0,paintsBefore:plan.paints||0,ready:ready(),afterBoot:plan.boot!==null&&plan.boot.closed};plan.tasks.push(task);queueMicrotask(()=>{task.paintsAfter=plan.paints||0;task=null;});}
+        task.draws++;return pick.apply(value,args);
+       }});
+      }});
+      // The scenery boot sizes its canvases; a microtask then closes the boot's count.
+      const width=Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype,'width');
+      Object.defineProperty(HTMLCanvasElement.prototype,'width',{configurable:true,enumerable:width.enumerable,get(){return width.get.call(this);},set(value){
+       if(!plan.boot&&this.closest?.('#landscape')){plan.boot={drawsBefore:plan.draws,closed:false};queueMicrotask(()=>{plan.boot.draws=plan.draws-plan.boot.drawsBefore;plan.boot.closed=true;});}
+       width.set.call(this,value);
+      }});
+      const context2d=CanvasRenderingContext2D.prototype;
+      for(const method of ['clearRect','fillRect','fill','stroke','drawImage','putImageData']){
+       const original=context2d[method];
+       context2d[method]=function(...args){if(this.canvas?.closest?.('#landscape'))plan.paints=(plan.paints||0)+1;return original.apply(this,args);};
+      }
+     },{board,motion,ROWS});
+     const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+     await page.waitForFunction(()=>getComputedStyle(document.querySelector('#landscape [data-scenery]')).visibility==='visible'&&window.__planTask.paints>0,null,{timeout:30000,polling:100});
+     const result=await page.evaluate(()=>window.__planTask);
+     const plans=result.tasks.filter(task=>task.draws>=100);
+     observed.push({label,boot:result.boot,tasks:result.tasks.map(task=>({...task}))});
+     // Fixture preconditions: the boot was seen and a day plan was worked out.
+     assert.ok(result.boot?.closed,`${label}: the scenery boot was observed`);
+     assert.ok(plans.length>=1,`${label}: a day plan was worked out (${JSON.stringify(result.tasks)})`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+     // Behavior under test.
+     if(result.boot.draws>0)failures.push(`${label}: the scenery boot task worked out ${result.boot.draws} draws of the day plan`);
+     const first=plans[0];
+     if(!first.ready||!first.afterBoot)failures.push(`${label}: the day plan ran before the board showed ${JSON.stringify(first)}`);
+     if(first.paintsAfter!==first.paintsBefore)failures.push(`${label}: the day plan's task also painted scenery ${JSON.stringify(first)}`);
+     if(first.paintsBefore>0)failures.push(`${label}: the scenery painted before its day plan ${JSON.stringify(first)}`);
+    }finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
 // #2430: every opening worked out the day's plan from the sun's position at
 // each minute of the UTC day, about 210 ms of astronomy at 4x CPU, before the
 // scenery could paint. A warm relaunch on the same day in the same place must

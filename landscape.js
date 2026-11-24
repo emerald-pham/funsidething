@@ -93,7 +93,7 @@
   }
   let rooftopRoofs=[],rooftopParty=null,clocktowerVisit=null,partyTimer=0;
   // The lake mirror is rebuilt only when what it reflects changes (#2456).
-  let backgroundVersion=0,reflectionKey=null,reflectionPalette=null,reflectionVersion=0;
+  let backgroundVersion=0,reflectionKey=null,reflectionPalette=null;
   let sceneSeason=S.readSceneSeason(sceneStorage)||LandscapeMood.season(new Date(),globalThis.LivingLocation?.current()).name,treeOrigins=[];
   let W=0,H=0,hy=0,dpr=1,frame=0,last=0,nextPaint=0,sky,p,world={elapsed:0,events:[]};
   let skyTimer=0,resizeTimer=0,refreshPaint=null,yieldChannel=null,returnFocus=null;
@@ -141,7 +141,7 @@
   function composite(name){const c=layers[name];if(c)g.drawImage(c,0,c.top,c.width/dpr,c.height/dpr);}
   function createWaterDistortion(){
     const canvas=document.createElement('canvas');
-    let gl=null,ready=false,unavailable=false,program,texture,position,time,size,uploaded=null;
+    let gl=null,ready=false,unavailable=false,program,texture,position,time,size,uploaded=null,changed=true;
     canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();ready=false;});
     canvas.addEventListener('webglcontextrestored',()=>{ready=false;});
     function initialize(){
@@ -193,17 +193,17 @@
       time=gl.getUniformLocation(program,'time');size=gl.getUniformLocation(program,'size');
       uploaded=null;ready=true;return true;
     }
-    // `version` names the mirror's content: an unchanged mirror keeps the
-    // texture already on the GPU, and only the ripple time moves (#2456).
-    // Uploading the canvas again cost a full read of it on every frame.
-    return {render(source,t,wind,frozen,width,height,version=null){
+    // An unchanged mirror keeps the texture already on the GPU and only the
+    // ripple time moves (#2456): uploading the canvas again read all of it on
+    // every frame. The painter calls changed() whenever it rebuilds the mirror.
+    return {changed(){changed=true;},render(source,t,wind,frozen,width,height){
       // Reduced motion and unavailable/lost GPU contexts retain a complete,
       // undistorted mirror. No rows, meshes, or extra water strokes are drawn.
       if(frozen||unavailable||gl?.isContextLost())return source;
       if(!ready&&!initialize()){unavailable=true;return source;}
       if(canvas.width!==source.width||canvas.height!==source.height){canvas.width=source.width;canvas.height=source.height;uploaded=null;}
       gl.viewport(0,0,canvas.width,canvas.height);
-      if(version===null||version!==uploaded){gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,source);uploaded=version;}
+      if(changed||source!==uploaded){gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,source);uploaded=source;changed=false;}
       gl.uniform1f(time,t*Math.max(.35,Number(wind)||1));gl.uniform2f(size,width,height);
       gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
       return canvas;
@@ -217,9 +217,9 @@
     }};
   }
   const waterDistortion=createWaterDistortion();
-  function paintHorizonReflection(source,t,opacity=1,version=null){
+  function paintHorizonReflection(source,t,opacity=1){
     const surface=geometry.reflectionSurface(p.night);
-    source=waterDistortion.render(source,t,wind,reduced,W,geometry.waterTop,version);
+    source=waterDistortion.render(source,t,wind,reduced,W,geometry.waterTop);
     // A continuous pixel displacement bends local patches without introducing
     // strip boundaries, lowering resolution, or swaying the lake as one sheet.
     g.save();g.globalAlpha=opacity;
@@ -390,13 +390,13 @@
     ellipse(ctx,q.x-3,q.y+4,3,2,'rgba(119,133,132,.16)');ellipse(ctx,q.x+5,q.y-4,2,3,'rgba(119,133,132,.15)');
     ctx.restore();
   }
-  // The window-light slot only shows where lights can: lit and unlit windows
+  // A window-light slot shows only where lights can: lit and unlit windows
   // look the same in daylight, and garden and patio lights show only after
   // sunset. In daylight a new slot then repaints nothing (#2456), and a
   // background just painted is current, so the next frame does not repaint it.
-  function cityLightsShown(){return p.night>.2||sky.sun.altitude<0?sceneSnapshot.windowsSlot:'unlit';}
+  function cityLightsShown(){return p.night>.2||sky.sun.altitude<0;}
   function paintBackground(){
-    backgroundVersion++;lastCitySlot=cityLightsShown();
+    backgroundVersion++;lastCitySlot=sceneSnapshot.windowsSlot;
     treeOrigins=[];
     b=base;
     const gradient=b.createLinearGradient(0,0,0,hy+H*.12);
@@ -815,26 +815,25 @@
       g.restore();
     }
   }
-  // Everything the lake mirror shows, as one comparable value. A visitor,
-  // firework, party or weather in the sky above the water changes every frame,
-  // so its frame time is part of the value; seasonal particles too, once one
+  // Everything the lake mirror shows, as one comparable value, or null when
+  // it must be rebuilt anyway: a visitor, firework, party or weather in the sky
+  // above the water changes every frame, and so do seasonal particles once one
   // is inside the reflected part of the sky. Rows above that part never reach
   // the water, so a cloud entirely above it does not count.
-  function reflectionInputs(skyVisitor,weather,weatherPhase,t){
+  function reflectionInputs(skyVisitor,weather){
     const surface=geometry.reflectionSurface(p.night);
     // The lake is clipped between the waterline and the far shore; the blur,
     // the ripples and antialiasing reach a few pixels past it.
     let shore=geometry.waterTop;for(let x=0;x<=W;x+=12)shore=Math.max(shore,far(x));shore=Math.max(shore,far(W));
     const reflectedTop=2*surface.axisY-shore-8;
-    const moving=skyVisitor||world.events.some(e=>e.type==='fireworks'||e.type==='festival')
-      ||(rooftopParty?.active&&p.night>.12)||!!clocktowerVisit?.active||weather.intensity>0
-      ||(!reduced&&LandscapeSeasonal.particles(world.elapsed,sceneSeason,treeOrigins,geometry,W,H,weather).some(particle=>Math.min(particle.y,particle.y2??particle.y)-8<geometry.waterTop));
+    if(skyVisitor||world.events.some(e=>e.type==='fireworks'||e.type==='festival')||(rooftopParty?.active&&p.night>.12)||clocktowerVisit?.active||weather.intensity>0
+      ||(!reduced&&LandscapeSeasonal.particles(world.elapsed,sceneSeason,treeOrigins,geometry,W,H,weather).some(particle=>Math.min(particle.y,particle.y2??particle.y)-8<geometry.waterTop)))return null;
     const clouds=sceneSnapshot.clouds.map(pose=>{
       const size=(W<600?18:27)+pose.size*30,y=25+pose.y*hy;
       if(y+size*.5<reflectedTop)return '';
       return Math.round((reduced?(rand(pose.index+71)*1.2-.1)*W:pose.x*W)*dpr);
     });
-    return JSON.stringify([W,H,dpr,backgroundVersion,p.night,weather.status,reduced,moving?t:null,moving?weatherPhase:null,clouds]);
+    return JSON.stringify([W,H,dpr,backgroundVersion,p.night,weather.status,reduced,clouds]);
   }
   function paintLife(t){
     visibleBanners=[];if(reduced)t=0;
@@ -876,9 +875,9 @@
     // moved a device pixel, under a second at their drift, so a reused mirror
     // is never more than that behind the sky above it.
     // Meteors, sky visitors and nest birds are the visitors painted above before the mirror is taken.
-    const nextReflection=reflectionInputs(paintEvents.some(e=>e.type==='meteor'||e.type==='bird'||(airborne.has(e.type)&&!waterEvents.has(e.type))),weather,weatherPhase,t);
-    if(nextReflection!==reflectionKey||p!==reflectionPalette){
-    reflectionKey=nextReflection;reflectionPalette=p;reflectionVersion++;
+    const nextReflection=reflectionInputs(paintEvents.some(e=>e.type==='meteor'||e.type==='bird'||(airborne.has(e.type)&&!waterEvents.has(e.type))),weather);
+    if(nextReflection===null||nextReflection!==reflectionKey||p!==reflectionPalette){
+    reflectionKey=nextReflection;reflectionPalette=p;waterDistortion.changed();
     const reflectionHeight=Math.max(1,Math.floor(geometry.waterTop*dpr));
     if(skyReflection.width!==front.width)skyReflection.width=front.width;
     if(skyReflection.height!==reflectionHeight)skyReflection.height=reflectionHeight;
@@ -937,7 +936,7 @@
       reflectedSky.addColorStop(0,p.sky[2]);reflectedSky.addColorStop(1,p.sky[0]);
       g.globalAlpha=p.night*.18;g.fillStyle=reflectedSky;g.fillRect(0,geometry.waterTop,W,H*.12);
     }
-    paintHorizonReflection(reflectionCanvas,t,1,reflectionVersion);
+    paintHorizonReflection(reflectionCanvas,t,1);
     const reflection=point(sky.sun.azimuth,0).x;
     if(geometry.sunReflection(sky.sun))for(let i=0;i<24;i++){
       const wave=geometry.ripple(i,t,wind),y=geometry.waterTop+5+i*H*.0035,w=(5+i*1.9)*wave.width;
@@ -1545,15 +1544,21 @@
     if(globalThis.LandscapeMood){nextSeason=LandscapeMood.season(nextSky.date,location).name;nextPalette=LandscapeMood.palette(nextPalette,nextSky.date,location);}
     apply(()=>{
       sky=nextSky;p=nextPalette;sceneSeason=nextSeason;
-      document.documentElement.dataset.sceneSeason=sceneSeason;syncScene(Date.now());updateChrome();
+      // Until the opening paint begins, nothing reads the scene's visitors,
+      // and the first sync works out the whole UTC day's plan, about 60 ms at
+      // 4x CPU. The opening paint does it in a task of its own once the board
+      // shows, instead of inside the boot or a refresh owed to it (#2456).
+      document.documentElement.dataset.sceneSeason=sceneSeason;if(!openingPaint||openingPaint.painting)syncScene(Date.now());updateChrome();
       document.documentElement.style.setProperty('--scene-tint',p.tint);
       document.documentElement.dataset.scenePeriod=sky.period;
     });
     const entry=LandscapeMood.messageEntry(nextSky.date,{...location,sunAltitude:nextSky.sun.altitude},T.random(sceneSeed,'hourly-text',Math.floor(+nextSky.date/3600000)));
     apply(()=>{currentEntry=entry;status.textContent=entry.text+(entry.author==='Human'?' · Human written':'');});
   }
+  // A refresh owed to the opening paint leaves the scene unsynced (#2456), so
+  // a paint that runs before that opening paint syncs first, as the refresh did.
   function paintScene(){
-    paintBackground();syncScene(Date.now());paintLife(world.elapsed);
+    syncScene(Date.now());paintBackground();paintLife(world.elapsed);
   }
   // During the opening task a refresh computes the scene but owes its paint.
   // Opening used to paint the whole landscape two or three times in the same
@@ -1593,7 +1598,7 @@
     nextPaint+=1000/30;
     if(nextPaint<=now)nextPaint=now+1000/30;
     last=now;syncScene(Date.now());
-    if(lastCitySlot!==cityLightsShown())paintBackground();
+    if(lastCitySlot!==sceneSnapshot.windowsSlot){lastCitySlot=sceneSnapshot.windowsSlot;if(cityLightsShown())paintBackground();}
     paintLife(world.elapsed);
   }
   function scenePose(e,firework=false){return reduced?{...e,age:firework===true?(e.type==='festival'?e.duration:Math.min(e.duration,60))*.5:e.duration*.5,...(firework===true?{fireworkDeckAge:e.duration*.5,fireworkActive:e.age<(e.type==='festival'?e.duration:60)}:{})}:e;}
@@ -1647,7 +1652,7 @@
     // barge crossing, without turning reduced motion into continuous animation.
     const before=JSON.stringify([(reduced?visits.forPaint(world.events,geometry,true,{membershipOnly:true}):world.events).map(e=>[e.id,e.type==='festival'&&e.age<e.duration]),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
     syncScene(Date.now());
-    if(lastCitySlot!==cityLightsShown())paintBackground();
+    if(lastCitySlot!==sceneSnapshot.windowsSlot){lastCitySlot=sceneSnapshot.windowsSlot;if(cityLightsShown())paintBackground();}
     const after=JSON.stringify([(reduced?visits.forPaint(world.events,geometry,true,{membershipOnly:true}):world.events).map(e=>[e.id,e.type==='festival'&&e.age<e.duration]),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
     if(reduced&&before!==after)paintLife(world.elapsed);
   }
@@ -1871,7 +1876,8 @@
     requestAnimationFrame(()=>setTimeout(()=>{
       if(!openingPaint?.due||document.hidden){finishOpening();return;}
       // The opening paint runs as separate tasks, so a tap waits for one step
-      // rather than the whole landscape (#2430): the background first, then a
+      // rather than the whole landscape (#2430): the day's plan first (#2456),
+      // then the background, then a
       // first use of the water's GPU mirror off screen and the walkers' painted
       // lifetimes, then the life and the reveal. The scenery canvas stays
       // hidden until that last step, so no frame shows a partly painted
@@ -1881,28 +1887,33 @@
       // whole, under the old life, until the last step. Hiding it blinked out
       // the sun, skyline and clock tower for a frame or two (#2430 review B1).
       openingPaint.painting=true;openingPaint.due=false;
-      const shown=back.style.visibility!=='hidden';
-      // Not redundant: the scene was computed at boot, and the background reads
-      // light states that must match this later instant.
-      syncScene(Date.now());paintBackground();if(!shown)back.style.visibility='hidden';
-      const painted=sky;
+      // The day's plan is worked out here, alone, so a tap waits for it or for
+      // one paint step, never both (#2456). The boot only computed the sky.
+      syncScene(Date.now());
       openingStep(()=>{
-        // Only preparation: whatever happens here, the last step still runs.
-        try{
-          if(!reduced&&!document.hidden)waterDistortion.warm(skyCity);
-          // Walkers' painted lifetimes are worked out once and kept for the life step.
-          visits.forPaint(world.events,geometry,reduced,{poseOther:scenePose});
-        }finally{
-          openingStep(()=>{
-            if(document.hidden){finishOpening();return;}
-            // A refresh owed meanwhile is computed now, and a newer sky repaints
-            // the background in this same step, so the reveal is never stale.
-            if(openingPaint?.due)computeScene();
-            if(sky!==painted)paintBackground();
-            syncScene(Date.now());paintLife(world.elapsed);back.style.visibility='';
-            finishOpening();
-          });
-        }
+        const shown=back.style.visibility!=='hidden';
+        // Not redundant: the background reads light states that must match this
+        // later instant. The plan is already worked out, so this sync is cheap.
+        syncScene(Date.now());paintBackground();if(!shown)back.style.visibility='hidden';
+        const painted=sky;
+        openingStep(()=>{
+          // Only preparation: whatever happens here, the last step still runs.
+          try{
+            if(!reduced&&!document.hidden)waterDistortion.warm(skyCity);
+            // Walkers' painted lifetimes are worked out once and kept for the life step.
+            visits.forPaint(world.events,geometry,reduced,{poseOther:scenePose});
+          }finally{
+            openingStep(()=>{
+              if(document.hidden){finishOpening();return;}
+              // A refresh owed meanwhile is computed now, and a newer sky repaints
+              // the background in this same step, so the reveal is never stale.
+              if(openingPaint?.due)computeScene();
+              if(sky!==painted)paintBackground();
+              syncScene(Date.now());paintLife(world.elapsed);back.style.visibility='';
+              finishOpening();
+            });
+          }
+        });
       });
     }));
   };
