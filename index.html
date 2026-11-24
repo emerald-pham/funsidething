@@ -189,6 +189,19 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
    (#2461): the app's dimmed not-now look, as on .siderail.disabled, for a
    moment, with no motion, so it reads the same with reduced motion. */
 .btn.held{opacity:.5}
+/* A key can hold a press inside a row that is already dimmed: d on the
+   candidate's Done in its rail, or on the dotted task's Done at a check-in.
+   Hover brightens the row for a mouse or touch press, but nothing did for a
+   key, so the two dims multiplied to a quarter and the label all but vanished
+   (#2467 review). The row comes up for the moment instead, at once, so the
+   held button keeps the same half-strength look whatever pressed it. */
+:is(.siderail,.actionrow,.btnwrap).disabled:has(.btn.held){opacity:1;transition:none}
+/* Opacity fades a button's focus ring with it, to under 3:1 against the
+   panel (#2467 review). A held button with keyboard focus stays opaque and
+   lays the scan panel's own surface over its fill and label at half
+   strength, which paints the same dimmed look inside a full-strength ring. */
+.btn.held:focus-visible{opacity:1;position:relative}
+.btn.held:focus-visible::after{content:"";position:absolute;inset:-1px;border-radius:inherit;background:color-mix(in srgb,var(--panel) 97%,var(--scene-tint,var(--panel)));opacity:.5;pointer-events:none}
 .btn.sm{padding:6px 12px;font-size:13px}   /* the siderail size — every action beside a card uses it */
 .btn.dislodge{background:var(--danger)}
 .btn.worked{background:var(--cant)}

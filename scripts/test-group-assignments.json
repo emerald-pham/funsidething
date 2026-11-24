@@ -546,6 +546,16 @@
   ],
   "environmentSkips": [
     {
+      "root": "Scanner browser: a keyboard-held press shows at half strength in a normal row, the dimmed side rail and the dimmed check-in row in both themes in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "Scanner browser: a keyboard-focused held button keeps its focus ring at full strength while it looks dimmed, in both themes in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
       "root": "RISK idle scenery mirror browser: at tablet and short-landscape sizes frames with unchanged inputs reuse the mirror and a changed scene rebuilds it, and under reduced motion a daylight light slot repaints the life without rebuilding it, each matching a fresh paint, in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
