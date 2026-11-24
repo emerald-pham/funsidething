@@ -43126,22 +43126,57 @@ test('Changelog #2426: one bullet says two devices saving at the same moment no 
  assert.doesNotMatch(bullets[0],/permission|revision|transaction|Firestore/i,'it says what the person sees, not how it works');
 });
 
-test('Changelog #2461: one bullet says a scanner press held for being too soon now dims its button instead of doing nothing, and Help says so',async t=>{
+test('Changelog #2461: one bullet says a scanner press held for being too soon now dims its button instead of doing nothing, one when that moment starts and one that it is shorter, and Help says so',async t=>{
  const notes=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
  assert.ok(notes.includes('<h3>November 23, 2026</h3>')&&notes.indexOf('<h3>November 23, 2026</h3>')<notes.indexOf('<h3>November 22, 2026</h3>'),'the newest release comes first');
  const release=notes.split('<h3>November 23, 2026</h3>')[1]?.split('</ul>')[0]||'';
- const bullets=release.split('<li>').slice(1).filter(item=>/too soon after a new task/.test(item));
- assert.equal(bullets.length,1,'one bullet covers the change: '+release);
- assert.match(bullets[0],/its button dims for a moment/);
- assert.match(bullets[0],/instead of doing nothing/);
- assert.match(bullets[0],/starts when the new task shows on the screen/,'and says when the moment starts');
- assert.match(bullets[0],/half as long as before/,'and that it is shorter, so a quick deliberate press counts');
- assert.doesNotMatch(bullets[0],/timeStamp|requestAnimationFrame|guard|paint/i,'it says what the person sees, not how it works');
+ const items=release.split('<li>').slice(1);
+ // #2455 review: one feature per bullet (the dim, when the moment starts, its length).
+ const one=(pattern,label)=>{const found=items.filter(item=>pattern.test(item));assert.equal(found.length,1,label+' has exactly one bullet: '+release);return found[0];};
+ const dim=one(/its button dims for a moment/,'the dim');
+ assert.match(dim,/too soon after a new task appears/);
+ assert.match(dim,/instead of doing nothing/);
+ assert.doesNotMatch(dim,/starts when the new task shows|half as long/,'the dim’s bullet is about the dim alone');
+ const timing=one(/starts when the new task shows on the screen/,'when the moment starts');
+ assert.match(timing,/timed to when you pressed/);
+ const shorter=one(/half as long as before/,'the shorter moment');
+ assert.match(shorter,/a quick press you meant counts/);
+ assert.match(shorter,/A second press very soon after one that counted is still held, so a double tap answers only once/,'with the hold on a quick second press');
+ for(const bullet of [dim,timing,shorter])
+  assert.doesNotMatch(bullet,/timeStamp|requestAnimationFrame|guard|paint/i,'it says what the person sees, not how it works');
  const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();
  const answer=app.shim.document.getElementById('modalRoot').innerHTML.match(/<dt>Why didn’t my second tap count\?<\/dt><dd>(.*?)<\/dd>/)?.[1]??'';
  assert.match(answer,/after a new task appears on the screen/);
  assert.match(answer,/that button dims briefly to show it/);
+ assert.match(answer,/A second press very soon after one that counted is held the same way, so a quick double tap answers only once/,'Help explains the hold on a quick second press');
  assert.match(answer,/For a moment after Return as candidate closes the editor, every tap, click and key press is ignored, wherever it lands/,'the #221 pause is still explained');
+});
+
+// #2455 review: the November 23 changelog has one feature per bullet: the
+// scenery's lighter frames apart from its later opening plan, the add box that
+// empties at once apart from the save after the frame, and the ranks that
+// catch up after an Add, import, Done, Dot or Delete. Help says the same.
+test('Changelog #2455: the November 23 notes give the lighter scenery, its later opening plan, the add box ready at once and the ranks after an Add or Delete a bullet each, and Help says so',async t=>{
+ const notes=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ const release=notes.split('<h3>November 23, 2026</h3>')[1]?.split('</ul>')[0]||'',items=release.split('<li>').slice(1);
+ const one=(pattern,label)=>{const found=items.filter(item=>pattern.test(item));assert.equal(found.length,1,label+' has exactly one bullet: '+release);return found[0];};
+ const frames=one(/scenery now does much less work/,'the lighter scenery');
+ assert.doesNotMatch(frames,/when the app opens/i,'the lighter scenery’s bullet is about that alone');
+ assert.match(one(/visitors are now worked out just after your board appears/,'the later opening plan'),/The scenery looks the same/);
+ const saved=one(/saved on this device right after it shows/,'the Add’s later save');
+ assert.doesNotMatch(saved,/add box/,'the save’s bullet no longer says the box waits for it');
+ const box=one(/add box is now empty and ready for your next task as soon as the task you added shows/,'the add box');
+ assert.match(box,/its text comes back in the box so you can try again/,'with what a failed save does');
+ const ranks=one(/ranks now also catch up in short steps just after you add, import, finish, dot or delete a task/,'the ranks after other actions');
+ assert.match(ranks,/A task you just added shows its rank a moment later/);
+ for(const bullet of [frames,box,ranks])assert.doesNotMatch(bullet,/frame|sampl|debounce|mirror|reflection/i,'it says what the person sees, not how it works');
+ const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();
+ const help=app.shim.document.getElementById('modalRoot').innerHTML,answer=question=>help.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.match(answer('Can I keep tapping while the rank column catches up?'),/It also catches up that way just after you add, import, finish, dot or delete a task, and a task you just added shows its rank once it does\./);
+ const add=answer('Why does Add turn green?');
+ assert.match(add,/Add resets the draft as soon as the task shows, keeping sticky context defaults/);
+ assert.match(add,/If the save then fails, the draft comes back for retry, unless you have typed or reset it since/);
+ assert.match(answer('Why does the scenery fill in after the board opens?'),/only the sky is worked out at once\. The scene is drawn after the board appears and responds, its visitors worked out first/);
 });
 
 test('Help answers how the steady scanner, backup list, Debug log link and rank column now behave',async t=>{
@@ -44523,7 +44558,9 @@ test('RISK freeze and startup guidance: the November 20 changelog has one bullet
  assert.equal(bullets.length,5,'and no other bullet on November 20: '+JSON.stringify(bullets));
  const scenery=markup.split('<dt>Why does the scenery fill in after the board opens?</dt><dd>')[1]?.split('</dd>')[0]||'';
  assert.match(scenery,/A board that is showing accepts typing and taps while the landscape draws in short steps\./,'Help says the board takes input while the landscape draws in steps');
- for(const kept of [/^When the app opens, the scene is worked out straight away/,/the background shows the scene’s sky colour as soon as it is known\./,/normal motion starts moving once the first scene is drawn/,
+ // #2456: only the sky is worked out straight away now; the day's visitors follow the board.
+ assert.match(scenery,/^When the app opens, only the sky is worked out at once\. The scene is drawn after the board appears and responds, its visitors worked out first\./,'Help says when the day’s visitors are worked out');
+ for(const kept of [/the background shows the scene’s sky colour as soon as it is known\./,/normal motion starts moving once the first scene is drawn/,
   /While the app stays open, minute and weather updates also let typing and scrolling that is already waiting go first, then change the sky, its colours and the hourly message together\./])
   assert.match(scenery,kept,'Help keeps its released scenery wording');
  assert.ok(scenery.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the scenery answer stays within the 130-word limit');
