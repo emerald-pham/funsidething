@@ -990,9 +990,22 @@ function pJudged(a, b){ // one Yes/No preference uses the same BETA performance 
 /* Monte-Carlo rank distributions over a set of items with {id, mu, sigma}.
    Returns Map id -> {hist:Float32Array(n) of P(rank=i+1), cdf, topK, n} */
 function rankStats(items, S, reusable=null){
+  const sampler=rankSampler(items,S,reusable);
+  sampler.step();
+  return sampler.result();
+}
+/* #2459: rankStats in parts. step(draws) samples at most about `draws` ratings
+   (each sample draws one per task, and each task's finishing pass reads one
+   value per task) and says whether it is done; result() is then exactly what
+   rankStats returns, so a sampling run in parts gives the same ranks as one
+   run whole from the same random draws. An answer's catch-up samples the
+   large board in several tasks this way (answerCatchUp), so the next tap need
+   not wait for all of it. The shared Box-Muller spare is read and handed back
+   around each part, as gauss() would. */
+function rankSampler(items, S, reusable=null){
   const n = items.length;
   const out = new Map();
-  if(n === 0) return out;
+  if(n === 0) return {step:()=>true,result:()=>out};
   S = S || 250;
   const ratings=items.map(normalizeRating);
   // #2313: two n-long arrays per task is about 1.6 MB per answer on a 447-task
@@ -1003,49 +1016,63 @@ function rankStats(items, S, reusable=null){
   const buffers=(i,key)=>earlier?.[i]?.[key]?.length===n?earlier[i][key]:null;
   const hists = items.map((_,i)=> buffers(i,"hist")?.fill(0) || new Float32Array(n));
   let idx = new Int32Array(n), merged = new Int32Array(n); const score = new Float64Array(n);
-  // The hot loop keeps the same Box–Muller draws and shared spare, without
-  // repeated global lookups for every sample. Resolve this invocation's Math
-  // methods (and their receiver) so seeded callers retain the exact stream.
-  const inlineGaussian=gauss===rankGaussian, sampleGaussian=gauss;
-  const random=Math.random.bind(Math),sqrt=Math.sqrt.bind(Math),log=Math.log.bind(Math),sin=Math.sin.bind(Math),cos=Math.cos.bind(Math),pi=Math.PI;
-  let spare=_spare;
-  for(let s=0; s<S; s++){
-    for(let i=0;i<n;i++){
-      let normal;
-      if(!inlineGaussian)normal=sampleGaussian();
-      else if(spare!==null){normal=spare;spare=null;}
-      else{
-        let u=0,v=0;while(u===0)u=random();while(v===0)v=random();
-        const m=sqrt(-2*log(u));spare=m*sin(2*pi*v);normal=m*cos(2*pi*v);
+  let s=0,finished=0;
+  function sample(until){
+    // The hot loop keeps the same Box–Muller draws and shared spare, without
+    // repeated global lookups for every sample. Resolve this invocation's Math
+    // methods (and their receiver) so seeded callers retain the exact stream.
+    const inlineGaussian=gauss===rankGaussian, sampleGaussian=gauss;
+    const random=Math.random.bind(Math),sqrt=Math.sqrt.bind(Math),log=Math.log.bind(Math),sin=Math.sin.bind(Math),cos=Math.cos.bind(Math),pi=Math.PI;
+    let spare=_spare;
+    for(; s<until; s++){
+      for(let i=0;i<n;i++){
+        let normal;
+        if(!inlineGaussian)normal=sampleGaussian();
+        else if(spare!==null){normal=spare;spare=null;}
+        else{
+          let u=0,v=0;while(u===0)u=random();while(v===0)v=random();
+          const m=sqrt(-2*log(u));spare=m*sin(2*pi*v);normal=m*cos(2*pi*v);
+        }
+        score[i] = ratings[i].mu + ratings[i].sigma*normal; idx[i]=i;
       }
-      score[i] = ratings[i].mu + ratings[i].sigma*normal; idx[i]=i;
-    }
-    // #2313: a descending stable merge, the order sort() gave with score[b]-score[a].
-    // A comparator boxed each difference, about 10 MB of garbage per answer.
-    for(let width=1;width<n;width*=2){
-      for(let start=0;start<n;start+=2*width){
-        const mid=start+width<n?start+width:n, end=start+2*width<n?start+2*width:n;
-        let left=start,right=mid,out=start;
-        while(left<mid&&right<end) merged[out++]=score[idx[right]]-score[idx[left]]>0?idx[right++]:idx[left++];
-        while(left<mid) merged[out++]=idx[left++];
-        while(right<end) merged[out++]=idx[right++];
+      // #2313: a descending stable merge, the order sort() gave with score[b]-score[a].
+      // A comparator boxed each difference, about 10 MB of garbage per answer.
+      for(let width=1;width<n;width*=2){
+        for(let start=0;start<n;start+=2*width){
+          const mid=start+width<n?start+width:n, end=start+2*width<n?start+2*width:n;
+          let left=start,right=mid,out=start;
+          while(left<mid&&right<end) merged[out++]=score[idx[right]]-score[idx[left]]>0?idx[right++]:idx[left++];
+          while(left<mid) merged[out++]=idx[left++];
+          while(right<end) merged[out++]=idx[right++];
+        }
+        const swapped=idx; idx=merged; merged=swapped;
       }
-      const swapped=idx; idx=merged; merged=swapped;
+      for(let r=0;r<n;r++) hists[idx[r]][r]++;
     }
-    for(let r=0;r<n;r++) hists[idx[r]][r]++;
+    if(inlineGaussian)_spare=spare;
   }
-  if(inlineGaussian)_spare=spare;
-  const min=Math.min.bind(Math);
-  for(let i=0;i<n;i++){
-    const h = hists[i]; const cdf = buffers(i,"cdf") || new Float32Array(n); let acc=0;
-    for(let r=0;r<n;r++){ h[r]/=S; acc+=h[r]; cdf[r]=min(1,acc); }
-    // "arcane" stopping stat: smallest K (≥2) with P(rank ≤ K) ≥ 1 − 1/K
-    let topK = n;
-    if(n === 1){ topK = 1; }
-    else { for(let k=2;k<=n;k++){ if(cdf[k-1] >= 1 - 1/k){ topK = k; break; } } }
-    out.set(items[i].id, {hist:h, cdf, topK, n});
+  function finish(until){
+    const min=Math.min.bind(Math);
+    for(; finished<until; finished++){
+      const i=finished;
+      const h = hists[i]; const cdf = buffers(i,"cdf") || new Float32Array(n); let acc=0;
+      for(let r=0;r<n;r++){ h[r]/=S; acc+=h[r]; cdf[r]=min(1,acc); }
+      // "arcane" stopping stat: smallest K (≥2) with P(rank ≤ K) ≥ 1 − 1/K
+      let topK = n;
+      if(n === 1){ topK = 1; }
+      else { for(let k=2;k<=n;k++){ if(cdf[k-1] >= 1 - 1/k){ topK = k; break; } } }
+      out.set(items[i].id, {hist:h, cdf, topK, n});
+    }
   }
-  return out;
+  return {
+    step(draws=Infinity){
+      const rows=Math.max(1,Math.floor(draws/n));
+      if(s<S){sample(Math.min(S,s+rows));return false;}
+      finish(Math.min(n,finished+rows));
+      return finished===n;
+    },
+    result(){ if(s<S)sample(S); if(finished<n)finish(n); return out; }
+  };
 }
 // Thompson sampling: draw one plausible strength per item, take the max
 function thompsonPick(items){
@@ -1218,6 +1245,9 @@ window.refreshScannerDeviceRecoveryHold=async()=>{
   renderSync();return deviceRecoveryCloudHold;
 };
 let rankCache = new Map();     // id -> {hist,cdf,topK,n}
+// #2459: the ranks rankCache replaced last, whose arrays an answer's sampling
+// in parts writes into while rankCache is still shown (recomputeRanks).
+let rankSpare = null;
 let sparkCache = new Map();    // id:WxH -> memoized sparkline {svg,area,line}; cleared whenever rankCache changes
 let undoStack = [];
 let chanceGeneration = 0; // local provenance: only deliberate scan/day boundaries advance it
@@ -11471,13 +11501,26 @@ function decisionsPerMinute(){
 }
 // #2407: an answer's catch-up passes the unfinished ratings and sample count
 // it captured when the answer was given.
-function recomputeRanks(items=null,samples=state.settings.samples){
+// #2459: parts, an answer's catch-up's own record, samples one part of at most
+// RANK_PART_DRAWS draws a call and returns false until the last, which
+// installs the ranks; one run whole is the same sampling from the same draws
+// (rankSampler). Until then the board keeps its earlier ranks: the parts
+// write into the arrays of the ranks before those (rankSpare), never into
+// ones a draw of the list can read.
+function recomputeRanks(items=null,samples=state.settings.samples,parts=null){
   // An answer still catching up samples its ranks first, as it did in its
   // tap, so the random draws keep their order. Inside a catch-up step this
   // does nothing.
   answerCatchUp.flush();
+  if(parts){
+    parts.sampler??=rankSampler(items,samples,rankSpare);
+    if(!parts.sampler.step(RANK_PART_DRAWS))return false;
+    rankSpare=rankCache;rankCache=parts.sampler.result();sparkCache.clear();
+    return true;
+  }
   rankCache = rankStats(items||openTasks().map(t=>({id:t.id, mu:t.mu, sigma:t.sigma})), samples, rankCache);
   sparkCache.clear();
+  return true;
 }
 function chainStart(){ return state.chain.length === 0; }
 // An empty chain waits for Start (#2300). A candidate stored there belongs to an
@@ -11924,6 +11967,7 @@ function recordDecisionTime(){
    queue is sync work, so the Settled signal (#2378) waits for it, and the
    board is marked unsaved before the paint, so nothing shows it saved or
    synced before the save and the Cloud acknowledgement happen. */
+const RANK_PART_DRAWS=16384;
 const answerCatchUp=(()=>{
   const queue=[];let timer=null,work=null,running=false,chainedWeights=null;
   // Behind an answer still queued, the weight cache the next answer's History
@@ -11936,14 +11980,25 @@ const answerCatchUp=(()=>{
     if(before&&queue.length)before.weights=CHAINED;
     return {kind,at:Date.now(),ids:[...new Set(ids)],id:null,before,after:null,frame:null,steps:null};
   }
+  /* #2459: the rank sampling runs in parts (recomputeRanks with parts), one
+     part a task, instead of whole in one task: about 112,000 draws on the
+     large board, a 60-80 ms task the next tap had to wait for. Each part puts
+     this step back first in the answer's queue; a flush runs the rest at
+     once. History's weights are the ones its first part found, as they were
+     when it all ran in one step. */
   function ratings(answer){
     const {before,after}=answer;
-    chanceDisplayWeightCache=before.weights===CHAINED?chainedWeights:before.weights;
-    const stats=chanceDisplayStats("chance",state,false,before);
-    const observation={kind:answer.kind,at:answer.at,ids:answer.ids,basis:ratingObservationBasis(stats,before),
-      before:new Map(answer.ids.map(id=>{const t=before.observed.get(id);return [id,t?ratingObservationValues(t,stats,before):null];}))};
-    if(answer.id)observation.id=answer.id;
-    recomputeRanks(after.open,after.samples);
+    if(!answer.ranking){
+      chanceDisplayWeightCache=before.weights===CHAINED?chainedWeights:before.weights;
+      const stats=chanceDisplayStats("chance",state,false,before);
+      const observation={kind:answer.kind,at:answer.at,ids:answer.ids,basis:ratingObservationBasis(stats,before),
+        before:new Map(answer.ids.map(id=>{const t=before.observed.get(id);return [id,t?ratingObservationValues(t,stats,before):null];}))};
+      if(answer.id)observation.id=answer.id;
+      answer.ranking={observation,weights:chanceDisplayWeightCache};
+    }
+    const {observation,weights}=answer.ranking;
+    if(recomputeRanks(after.open,after.samples,answer.ranking)===false){answer.steps.unshift(ratings);return;}
+    chanceDisplayWeightCache=weights;
     finishRatingObservation(observation,false,after);
     chainedWeights=chanceDisplayWeightCache;
   }

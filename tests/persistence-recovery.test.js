@@ -39,6 +39,7 @@ import { benchmarkEdit } from "./shared.js";
 import { woopFields2421, woopBoard2421, woopSnapshot2421 } from "./shared.js"; // #2421 saved WOOP data
 import { decisionMixedActionsApp146 } from "./shared.js"; // #2435: every kind of recorded choice, for the check before a change record
 import v8 from "node:v8"; // #2435 review: a collection, to show a replaced board's decision data is let go
+import { mulberry32 } from "./shared.js"; // #2459: one random stream for two devices' rank sampling
 
 test('RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap',async t=>{
  if(process.env.CHAIN_RECOVERY_MEMORY_CHILD!=='1'){
@@ -20655,4 +20656,69 @@ test('RISK full copy readback: a full copy on the large board reads each of its 
  assert.deepEqual(chunks.filter(path=>!reads.has(path)),[],'every chunk is read back');
  assert.deepEqual(own.filter(([,n])=>n>3).map(([path,n])=>path.split('/').at(-1)+':'+n),[],'no chunk is read back more than three times: the listing, the seal and the publication');
  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','and sync ends synced');
+});
+
+// #2459: an answer's rank sampling (the list's ranks and History's Top x)
+// runs after the answer's paint (#2407), and on the large board it was one
+// 60-80 ms task: 447 tasks times 250 samples, about 112,000 draws, so a tap in
+// that time waited for all of it. Counted, never timed: the draws (calls to
+// the page's random source) each task after the tap makes, on the clock's own
+// timers. RANK_TASK_DRAWS2459 is about what an 80-task board samples at once.
+const RANK_TASK_DRAWS2459=20000;
+function drawsPerTask2459(device){
+ const {ctx}=device,tasks=[];
+ vm.runInContext('(()=>{const random=Math.random;globalThis.__draws2459=0;Math.random=function(){globalThis.__draws2459++;return random.call(Math);};})()',ctx);
+ const draws=()=>vm.runInContext('__draws2459',ctx),schedule=ctx.setTimeout;
+ ctx.setTimeout=(fn,ms,...args)=>schedule((...given)=>{const from=draws();try{return fn(...given);}finally{tasks.push(draws()-from);}},ms,...args);
+ return {tasks,draws};
+}
+test('RISK rank work per answer: a Yes on the large board samples its ranks in tasks of a bounded number of draws, and still samples every open task 250 times',{timeout:300000},async t=>{
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,open=ctx.state.tasks.filter(task=>!task.done).length,samples=ctx.state.settings.samples;
+ const counted=drawsPerTask2459(device),ranks=()=>vm.runInContext('rankCache',ctx),before=ranks();
+ const fromTap=counted.draws();
+ device.tap('yes');
+ const inTap=counted.draws()-fromTap;
+ await clock.advance(1500);
+ const total=counted.draws()-fromTap,largest=Math.max(0,...counted.tasks);
+ t.diagnostic(JSON.stringify({open,samples,inTap,total,largest,tasks:counted.tasks.filter(n=>n>0)}));
+ assert.ok(open>400,'positive control: the large board');
+ assert.ok(total>=open*samples,'positive control: the Yes samples every open task '+samples+' times: '+total+' draws');
+ assert.notEqual(ranks(),before,'positive control: and replaces the ranks it found');
+ assert.equal(ranks().size,open,'with a rank for every open task');
+ assert.ok(inTap<=RANK_TASK_DRAWS2459,'the tap itself samples no ranks: '+inTap+' draws');
+ assert.ok(largest<=RANK_TASK_DRAWS2459,'no task after the tap draws more than '+RANK_TASK_DRAWS2459+': the largest drew '+largest);
+});
+// #2459: ranks sampled in parts after a Yes are exactly the ranks one whole
+// sampling of the same open tasks gives from the same random draws. The page
+// draws from a seeded stream whose position can be put back: right after the
+// Yes, one whole sampling of the open tasks is taken from it, the stream is
+// put back, and the answer's catch-up then samples in parts on the clock. The
+// tap itself draws nothing (the test above).
+test('RISK rank work per answer: ranks sampled in parts after a Yes on the large board equal one whole sampling of the same tasks from the same draws, and History records their Top x',{timeout:300000},async t=>{
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,signedIn:false,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,run=source=>vm.runInContext(source,ctx);
+ const ranksOf=source=>JSON.parse(run(`JSON.stringify([...(${source})].map(([id,rank])=>[id,rank.topK,rank.n,Array.from(rank.hist),Array.from(rank.cdf)]))`));
+ // mulberry32 with its state in view, so the stream can be put back.
+ run(`globalThis.__stream2459={a:2459};Math.random=function(){let t=(__stream2459.a=(__stream2459.a+0x6D2B79F5)>>>0);
+  t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};_spare=null`);
+ const answered=device.tap('yes');
+ const at=run('JSON.stringify([__stream2459.a,_spare])');
+ const expected=ranksOf('rankStats(openTasks().map(t=>({id:t.id,mu:t.mu,sigma:t.sigma})),state.settings.samples)');
+ assert.notEqual(run('__stream2459.a'),JSON.parse(at)[0],'positive control: the whole sampling drew from the stream');
+ run(`(()=>{const [a,spare]=${at};__stream2459.a=a;_spare=spare;})()`);
+ await clock.advance(1500);
+ const actual=ranksOf('rankCache');
+ assert.equal(actual.length,447,'positive control: a rank for every open task');
+ assert.ok(new Set(actual.map(([,topK])=>topK)).size>1,'positive control: the ranks tell tasks apart');
+ // Compared as text: a diff of 447 ranks of 447 places each is too large to print.
+ const differing=actual.filter((rank,index)=>JSON.stringify(rank)!==JSON.stringify(expected[index])).map(([id])=>id);
+ assert.equal(actual.length,expected.length,'the parts rank as many tasks as the whole sampling');
+ assert.deepEqual(differing.slice(0,5),[],'the parts give exactly the whole sampling’s ranks: '+differing.length+' tasks differ');
+ const after=ctx.state.tasks.find(task=>task.id===answered).ratingHistory.at(-1).after;
+ assert.equal(after.topK,expected.find(([id])=>id===answered)[1],'History records the Top x of those ranks');
 });
