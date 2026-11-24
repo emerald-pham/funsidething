@@ -35703,9 +35703,12 @@ test('RISK held decision keys: Yes No and Cant repeats cannot judge or skip repl
  }
 });
 
-// The owner set the window at 200 ms. The clock is the page's own, held still so
-// the boundary is exact; a real timer could not land on either side reliably.
-test('RISK press guard: Yes No Cant Postpone and Done inside 200 ms of a new task are dropped and just after it are accepted',async t=>{
+// The owner set the window at 200 ms after the task was drawn (#2312). #2461
+// (coordinator decision) holds every press until the new task paints, which is
+// where a double tap's second tap lands, and then only a 100 ms grace. The
+// clock is the page's own, held still so the boundary is exact; a real timer
+// could not land on either side reliably.
+test('RISK press guard: Yes No Cant Postpone and Done before a new task paints or within 100 ms of it are dropped and just after it are accepted',async t=>{
  for(const [name,press] of [
  ['the Yes key',({shim})=>shim.document.dispatchEvent({type:'keydown',key:'y',repeat:false})],
  ['the No key',({shim})=>shim.document.dispatchEvent({type:'keydown',key:'n',repeat:false})],
@@ -35720,14 +35723,20 @@ test('RISK press guard: Yes No Cant Postpone and Done inside 200 ms of a new tas
   ctx.state.settings.showPostpone=true;
   ctx.addTask('Dotted task',true);for(const title of ['Second','Third','Fourth','Fifth','Sixth'])ctx.addTask(title,false);ctx.render();
   let clock=50000;ctx.performance={now:()=>clock};
+  // #2461: the window runs from the frame that paints the new task, held here too.
+  const frames=[];ctx.requestAnimationFrame=fn=>{frames.push(fn);return frames.length;};
   const undo=()=>vm.runInContext('undoStack.length',ctx);
   // An answer draws a new task at this clock.
   ctx.onAction('no',{dataset:{candidate:ctx.state.candidateId,benchmark:ctx.state.chain.at(-1)}});
   const drawn=ctx.state.candidateId,before=undo();assert.ok(drawn,'a new task is showing');
-  clock+=199;press(app);
-  assert.equal(undo(),before,`${name} at 199 ms is dropped`);assert.equal(ctx.state.candidateId,drawn);
+  // Its frame waits 300 ms behind other work: the old task is still on the screen.
+  clock+=300;press(app);
+  assert.equal(undo(),before,`${name} before the new task paints is dropped`);assert.equal(ctx.state.candidateId,drawn);
+  for(const frame of frames.splice(0))frame(clock);   // now it paints
+  clock+=99;press(app);
+  assert.equal(undo(),before,`${name} 99 ms after it paints is dropped`);assert.equal(ctx.state.candidateId,drawn);
   clock+=2;press(app);
-  assert.equal(undo(),before+1,`${name} at 201 ms is accepted`);
+  assert.equal(undo(),before+1,`${name} 101 ms after it paints is accepted`);
  }
 });
 
@@ -42942,6 +42951,24 @@ test('Changelog #2426: one bullet says two devices saving at the same moment no 
  assert.match(bullets[0],/combines the other’s changes with its own and saves again by itself, instead of showing a sync error until Retry sync/);
  assert.match(bullets[0],/app copy from before this update/,'the limit stays in the bullet');
  assert.doesNotMatch(bullets[0],/permission|revision|transaction|Firestore/i,'it says what the person sees, not how it works');
+});
+
+test('Changelog #2461: one bullet says a scanner press held for being too soon now dims its button instead of doing nothing, and Help says so',async t=>{
+ const notes=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ assert.ok(notes.includes('<h3>November 23, 2026</h3>')&&notes.indexOf('<h3>November 23, 2026</h3>')<notes.indexOf('<h3>November 22, 2026</h3>'),'the newest release comes first');
+ const release=notes.split('<h3>November 23, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ const bullets=release.split('<li>').slice(1).filter(item=>/too soon after a new task/.test(item));
+ assert.equal(bullets.length,1,'one bullet covers the change: '+release);
+ assert.match(bullets[0],/its button dims for a moment/);
+ assert.match(bullets[0],/instead of doing nothing/);
+ assert.match(bullets[0],/starts when the new task shows on the screen/,'and says when the moment starts');
+ assert.match(bullets[0],/half as long as before/,'and that it is shorter, so a quick deliberate press counts');
+ assert.doesNotMatch(bullets[0],/timeStamp|requestAnimationFrame|guard|paint/i,'it says what the person sees, not how it works');
+ const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();
+ const answer=app.shim.document.getElementById('modalRoot').innerHTML.match(/<dt>Why didn’t my second tap count\?<\/dt><dd>(.*?)<\/dd>/)?.[1]??'';
+ assert.match(answer,/after a new task appears on the screen/);
+ assert.match(answer,/that button dims briefly to show it/);
+ assert.match(answer,/For a moment after Return as candidate closes the editor, every tap, click and key press is ignored, wherever it lands/,'the #221 pause is still explained');
 });
 
 test('Help answers how the steady scanner, backup list, Debug log link and rank column now behave',async t=>{
