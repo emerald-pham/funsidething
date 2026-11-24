@@ -185,6 +185,10 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
    Layouts that must share a narrow row still override it with min-width:0. */
 .btn{border-radius:8px;border:1px solid transparent;padding:8px 16px;font-weight:700;font-size:14px;color:#fff;box-shadow:0 1px 2px rgba(20,24,48,.15);min-inline-size:6em;text-align:center}
 .btn:active{transform:translateY(1px)}
+/* A press the scanner held because the task under it had only just appeared
+   (#2461): the app's dimmed not-now look, as on .siderail.disabled, for a
+   moment, with no motion, so it reads the same with reduced motion. */
+.btn.held{opacity:.5}
 .btn.sm{padding:6px 12px;font-size:13px}   /* the siderail size — every action beside a card uses it */
 .btn.dislodge{background:var(--danger)}
 .btn.worked{background:var(--cant)}
@@ -11848,18 +11852,69 @@ function maybeIntervene(){
 // Yes, No and Can't stay put, so the second tap of a double tap lands on the
 // button of the candidate that just replaced the one answered. WebKit touch
 // reports detail:1 for both taps, so time decides.
-// It is timed on this device from when these tasks were drawn here: presentedAt
-// syncs, and another device's faster clock would put it in this device's future.
+// It is timed on this device's clock: presentedAt syncs, and another device's
+// faster clock would put it in this device's future.
+// #2461: it is timed as the person sees it, from when these tasks first painted
+// to when they pressed. A frame can wait behind a save, a scenery frame or an
+// answer's catch-up, so the guard starts at the frame, not when the panel was
+// drawn; until that frame every press is too soon. The press is timed by its
+// event's own timeStamp, so a long task between the press and its handler
+// never counts against the person.
 const TASK_PRESS_GUARD_MS=200;
 // Every button that acts on a task the scanner just drew. Removing a dot can also
 // shift the cards, so a second tap can land on a different button of the next task.
 const SCANNER_TASK_ACTIONS=new Set(["yes","no","cant","postpone","cand-done","bench-done","bench-cant","bench-postpone","dislodge","worked","cand-worked","delete-task"]);
-let tasksOnScreen=null,tasksOnScreenSince=-Infinity;
+let tasksOnScreen=null,tasksOnScreenSince=-Infinity,tasksOnScreenFrame=0;
 function noteTasksOnScreen(){
   const shown=state.candidateId+"|"+(state.chain.at(-1)??"");
-  if(shown!==tasksOnScreen){tasksOnScreen=shown;tasksOnScreenSince=performance.now();}
+  if(shown===tasksOnScreen)return;
+  tasksOnScreen=shown;
+  if(typeof requestAnimationFrame!=="function"){tasksOnScreenSince=performance.now();return;}
+  // A frame's callbacks run just before it paints, after any scenery drawn
+  // in it, so the clock read there is the latest a page can read before the
+  // paint without waiting past it. A hidden page paints no frame and takes no
+  // presses; its first frame back is when these tasks appear.
+  tasksOnScreenSince=Infinity;
+  const frame=++tasksOnScreenFrame;
+  requestAnimationFrame(()=>{if(frame===tasksOnScreenFrame)tasksOnScreenSince=performance.now();});
 }
-function answerBeforeCandidateCouldBeRead(){return performance.now()-tasksOnScreenSince<=TASK_PRESS_GUARD_MS;}
+// When the person pressed, on the clock the guard reads. A browser stamps each
+// event on that clock; a stamp that is missing or not on it (an old engine's
+// wall-clock time) falls back to now.
+function pressedAt(event){
+  const at=event?.timeStamp,now=performance.now();
+  return typeof at==="number"&&at>0&&at<=now?at:now;
+}
+function answerBeforeCandidateCouldBeRead(at=performance.now()){return at-tasksOnScreenSince<=TASK_PRESS_GUARD_MS;}
+// #2461: a held press is never silent. Its button takes the app's dimmed,
+// not-now look for a moment, so the person looks before pressing again. It is
+// no prompt and records nothing. The answer's catch-up can draw the panel again
+// meanwhile, so the new panel's same button is dimmed for the rest of it.
+const HELD_PRESS_SHOW_MS=450;
+let heldPress=null;
+function heldPressButton(act,id){
+  const scan=document.getElementById("scan");
+  if(!id)return scan?.querySelector?.('[data-act="'+act+'"]')||null;
+  return [...(scan?.querySelectorAll?.('[data-act="'+act+'"]')||[])].find(button=>button.dataset?.id===id)||null;
+}
+function showHeldPress(button){
+  if(!heldPress||!button?.classList)return;
+  heldPress.button?.classList?.remove("held");
+  heldPress.button=button;button.classList.add("held");
+}
+function acknowledgeHeldPress(act,pressed){
+  if(heldPress){clearTimeout(heldPress.timer);heldPress.button?.classList?.remove("held");}
+  const id=pressed?.dataset?.id||null;
+  heldPress={act,id,button:null,until:performance.now()+HELD_PRESS_SHOW_MS,timer:0};
+  const current=heldPress;
+  current.timer=setTimeout(()=>{if(heldPress!==current)return;current.button?.classList?.remove("held");heldPress=null;},HELD_PRESS_SHOW_MS);
+  showHeldPress(pressed&&pressed.isConnected!==false?pressed:heldPressButton(act,id));
+}
+function keepHeldPressShown(){
+  if(!heldPress)return;
+  if(performance.now()>=heldPress.until){heldPress.button?.classList?.remove("held");return;}
+  showHeldPress(heldPressButton(heldPress.act,heldPress.id));
+}
 // #221: Return as candidate closes the editor over the scan panel, All Tasks and
 // the header, often with the same candidate and benchmark still showing. What a
 // second tap or keypress lands on then depends on how far the editor was
@@ -16007,6 +16062,7 @@ function renderScan(){
   el.innerHTML = html;
   trackChainTrail(el);
   noteTasksOnScreen();
+  keepHeldPressShown();
 }
 
 // The trail is refitted when its width or text size changes, so rotation or a
@@ -22396,7 +22452,7 @@ document.addEventListener("click", e=>{
   if(!el) return;
   // The second physical click can land on the replacement card at the same spot.
   if(e.detail>1 && ["cand-done","bench-done","done-task"].includes(el.dataset.act)) return;
-  if(SCANNER_TASK_ACTIONS.has(el.dataset.act)&&answerBeforeCandidateCouldBeRead())return;
+  if(SCANNER_TASK_ACTIONS.has(el.dataset.act)&&answerBeforeCandidateCouldBeRead(pressedAt(e))){acknowledgeHeldPress(el.dataset.act,el);return;}
   onAction(el.dataset.act, el);
 });
 document.addEventListener("change", e=>{
@@ -22544,7 +22600,11 @@ document.addEventListener("keydown", e=>{
   const k=e.key.toLowerCase();
   const plainEditUndo=!e.ctrlKey&&!e.metaKey&&!e.altKey&&!t?.isContentEditable;
   // One held decision key must not answer for the next card dealt by commit().
-  if(["y","n","c","d"].includes(k)&&answerBeforeCandidateCouldBeRead()) return;
+  if(["y","n","c","d"].includes(k)&&answerBeforeCandidateCouldBeRead(pressedAt(e))){
+    // A held key shows on the button it presses; a held repeat adds nothing.
+    if(!e.repeat)acknowledgeHeldPress({y:"yes",n:"no",c:"cant"}[k]??(!state.interventionActive&&state.mode==="scan"&&offeredCandidateId()?"cand-done":"bench-done"));
+    return;
+  }
   if(k==="y"&&!e.repeat&&!state.interventionActive&&offeredCandidateId()) TaskActionOwner.perform({type:"decision",decision:"yes"});   // dot it
   else if(k==="n"&&!e.repeat&&!state.interventionActive&&offeredCandidateId()) TaskActionOwner.perform({type:"decision",decision:"no"});
   else if(k==="c"&&!e.repeat&&!state.interventionActive&&offeredCandidateId()) TaskActionOwner.perform({type:"decision",decision:"cant"});

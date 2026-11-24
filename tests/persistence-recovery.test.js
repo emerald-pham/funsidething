@@ -20570,3 +20570,131 @@ test('RISK decision evidence replay: on a board with no account the incremental 
  assert.ok(twin.apps[0].ctx.state.decisionEvents.every(event=>event.account===null),'positive control: its decisions name no account');
  assert.ok(twin.fast.settle>=8,'positive control: its answers replay their own decision alone: '+JSON.stringify(twin.fast));
 });
+
+// ---------- #2461: the scanner's press guard, timed from the person's press ----------
+// #2312's guard stops the second tap of a double tap answering the candidate
+// that just replaced the one answered. #2461 times it as the person sees it:
+// from when the new candidate was first painted to when they pressed (the
+// event's own time), on this device's clock. These use #2408's answering
+// device. Frames are the test's: the page asks for one and it is painted when
+// the test says, so a frame held behind a long task can be shown. A press is
+// a click or key event stamped with the time it was made and handled when the
+// test dispatches it, later if a long task held it.
+function pressGuard2461(device){
+ const {ctx,shim}=device,frames=[],scan=shim.document.getElementById('scan');
+ const now=()=>vm.runInContext('performance.now()',ctx);
+ ctx.requestAnimationFrame=fn=>{frames.push(fn);return frames.length;};
+ // The scan panel's buttons as the page holds them: drawing the panel again
+ // makes new ones, and each keeps the classes the page gives it.
+ let drawn=null,buttons=new Map();
+ const button=act=>{
+  if(scan.innerHTML!==drawn){drawn=scan.innerHTML;buttons=new Map();}
+  if(!buttons.has(act)){
+   const markup=scannerControl2406(scan.innerHTML,act),classes=new Set(markup.classes);
+   const el={dataset:{...markup.dataset},isConnected:true,classList:{add:name=>{classes.add(name);},remove:name=>{classes.delete(name);},
+    contains:name=>classes.has(name),toggle:(name,force=!classes.has(name))=>{if(force)classes.add(name);else classes.delete(name);return force;}}};
+   el.closest=()=>el;el.matches=()=>false;buttons.set(act,el);
+  }
+  return buttons.get(act);
+ };
+ scan.querySelector=selector=>{const act=/data-act="([^"]+)"/.exec(selector)?.[1];return act&&markupButtons(scan.innerHTML).some(control=>control.dataset.act===act)?button(act):null;};
+ return {now,button,
+  paint(){const due=frames.splice(0),at=now();for(const fn of due)fn(at);},
+  press(act,{at=now()}={}){const target=button(act);shim.document.dispatchEvent({type:'click',detail:1,isTrusted:true,timeStamp:at,target});return target;},
+  key(key,{at=now()}={}){shim.document.dispatchEvent({type:'keydown',key,repeat:false,timeStamp:at,target:null});},
+ };
+}
+// What a test compares: the board as it would be saved, and the answered state.
+const answeredState2461=ctx=>({chain:[...ctx.state.chain],candidate:ctx.state.candidateId,decisions:ctx.state.decisionEvents.length,payload:ctx.cloudPayload()});
+
+test('RISK scanner press guard: on the large board, a press within the guard of the new candidate first painting, by touch click or by key, is held with a visible acknowledgement on its button and changes nothing, though the frame waited behind a long task',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,guard=pressGuard2461(device);
+ guard.paint();await clock.advance(1000);
+ const first=ctx.state.candidateId;
+ guard.press('yes');
+ assert.ok(ctx.state.chain.includes(first),'positive control: the first Yes, long after its candidate painted, answers it');
+ const next=ctx.state.candidateId;assert.ok(next&&next!==first,'positive control: a new candidate is drawn');
+ // The frame that shows it waits behind 150 ms of other work.
+ await clock.advance(150);
+ guard.paint();
+ // 100 ms after it painted, 250 ms after the panel was drawn.
+ await clock.advance(100);
+ const shown=answeredState2461(ctx);
+ const yes=guard.press('yes');
+ assert.deepEqual(answeredState2461(ctx),shown,'a Yes 100 ms after the new candidate painted is held: nothing is answered or changed');
+ assert.ok(yes.classList.contains('held'),'and Yes shows that it was held');
+ guard.key('n');
+ assert.deepEqual(answeredState2461(ctx),shown,'the n key at the same moment is held too');
+ assert.ok(guard.button('no').classList.contains('held'),'and No shows that it was held');
+ // The acknowledgement is brief.
+ await clock.advance(1000);
+ assert.ok(!guard.button('yes').classList.contains('held')&&!guard.button('no').classList.contains('held'),'a moment later neither shows it');
+ assert.deepEqual(answeredState2461(ctx),shown,'and the held presses changed nothing later');
+});
+
+test('RISK scanner press guard: on the large board, a press made more than the guard after the new candidate painted counts exactly once though a long task held its handler, by touch click and by key, and one made before the frame paints is held however long the frame waits',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,guard=pressGuard2461(device);
+ guard.paint();await clock.advance(1000);
+ guard.press('yes');
+ const second=ctx.state.candidateId;
+ // The frame that would show the new candidate waits behind 300 ms of work,
+ // longer than the guard: the old card is still on the screen.
+ await clock.advance(300);
+ const unpainted=answeredState2461(ctx);
+ const early=guard.press('yes');
+ assert.deepEqual(answeredState2461(ctx),unpainted,'a Yes before the new candidate has painted is held, 300 ms after the panel was drawn');
+ assert.ok(early.classList.contains('held'),'and shows that it was held');
+ guard.paint();const painted=guard.now();
+ // Pressed 250 ms after the paint; its handler waits 300 ms more behind a long task.
+ await clock.advance(550);
+ const before=answeredState2461(ctx);
+ const late=guard.press('yes',{at:painted+250});
+ assert.ok(!late.classList.contains('held'),'a Yes pressed 250 ms after its candidate painted is not held, though handled 550 ms after the paint');
+ assert.deepEqual([...ctx.state.chain],[...before.chain,second],'it answers that candidate: Yes adds it to the chain once');
+ assert.equal(ctx.state.decisionEvents.length,before.decisions+1,'one decision is recorded');
+ const third=ctx.state.candidateId;assert.ok(third&&third!==second,'positive control: the next candidate is drawn');
+ guard.paint();const shownAt=guard.now();
+ await clock.advance(600);
+ const beforeKey=answeredState2461(ctx);
+ guard.key('n',{at:shownAt+250});
+ assert.equal(ctx.state.considered[third],'no','the n key pressed 250 ms after the next candidate painted answers it, though handled 600 ms after the paint');
+ assert.equal(ctx.state.decisionEvents.length,beforeKey.decisions+1,'with one decision');
+ assert.deepEqual([...ctx.state.chain],beforeKey.chain,'and No leaves the chain as it was');
+});
+
+test('RISK scanner press guard: signed in on the large board, a held Yes reaches neither the device save nor the cloud, and the next Yes after the guard does',{timeout:600000},async t=>{
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock,counters}=device,guard=pressGuard2461(device);
+ guard.paint();await clock.advance(1000);
+ const first=ctx.state.candidateId;
+ guard.press('yes');
+ const second=ctx.state.candidateId;
+ // The board already holds older answers about it; only a new one would be the held Yes.
+ const earlier=[...decisionsAbout2417(ctx.state,[second])];
+ guard.paint();await clock.advance(100);
+ const shown=answeredState2461(ctx);
+ assert.ok(guard.press('yes').classList.contains('held'),'a Yes 100 ms after the new candidate painted is held and shows it');
+ assert.deepEqual(answeredState2461(ctx),shown,'and changes nothing on the board');
+ await clock.settle();
+ const commits=counters.commits.map(commit=>JSON.parse(commit.payload)),uploads=counters.uploads.map(upload=>JSON.parse(upload.payload));
+ assert.ok(commits.some(board=>decisionsAbout2417(board,[first]).length),'positive control: the first Yes reached a device save');
+ for(const board of commits)assert.deepEqual(decisionsAbout2417(board,[second]),earlier,'no device save holds a new answer about the candidate the held Yes landed on');
+ for(const board of uploads)assert.deepEqual(decisionsAbout2417(board,[second]),earlier,'no full copy uploaded holds one');
+ const cloud=(await device.cloud()).board;
+ assert.ok(decisionsAbout2417(cloud,[first]).length,'positive control: the cloud holds the first Yes');
+ assert.deepEqual(decisionsAbout2417(cloud,[second]),earlier,'the cloud holds no new answer about it');
+ assert.deepEqual([...decisionsAbout2417(ctx.state,[second])],earlier,'nor does this device');
+ assert.equal(ctx.state.candidateId,second,'it is still the candidate');
+ guard.press('yes');
+ assert.ok(ctx.state.chain.includes(second),'a Yes after the guard answers it');
+ await clock.settle();
+ assert.ok(decisionsAbout2417((await device.cloud()).board,[second]).length>earlier.length,'and reaches the cloud');
+});
