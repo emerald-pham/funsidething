@@ -92,6 +92,8 @@
     if(keepsSun()&&timeline.sunComputations()-keptSunComputations>=60)keepSun();
   }
   let rooftopRoofs=[],rooftopParty=null,clocktowerVisit=null,partyTimer=0;
+  // The lake mirror is rebuilt only when what it reflects changes (#2456).
+  let backgroundVersion=0,reflectionKey=null,reflectionPalette=null,reflectionVersion=0;
   let sceneSeason=S.readSceneSeason(sceneStorage)||LandscapeMood.season(new Date(),globalThis.LivingLocation?.current()).name,treeOrigins=[];
   let W=0,H=0,hy=0,dpr=1,frame=0,last=0,nextPaint=0,sky,p,world={elapsed:0,events:[]};
   let skyTimer=0,resizeTimer=0,refreshPaint=null,yieldChannel=null,returnFocus=null;
@@ -139,7 +141,7 @@
   function composite(name){const c=layers[name];if(c)g.drawImage(c,0,c.top,c.width/dpr,c.height/dpr);}
   function createWaterDistortion(){
     const canvas=document.createElement('canvas');
-    let gl=null,ready=false,unavailable=false,program,texture,position,time,size;
+    let gl=null,ready=false,unavailable=false,program,texture,position,time,size,uploaded=null;
     canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();ready=false;});
     canvas.addEventListener('webglcontextrestored',()=>{ready=false;});
     function initialize(){
@@ -189,17 +191,19 @@
       gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true);
       gl.uniform1i(gl.getUniformLocation(program,'image'),0);
       time=gl.getUniformLocation(program,'time');size=gl.getUniformLocation(program,'size');
-      ready=true;return true;
+      uploaded=null;ready=true;return true;
     }
-    return {render(source,t,wind,frozen,width,height){
+    // `version` names the mirror's content: an unchanged mirror keeps the
+    // texture already on the GPU, and only the ripple time moves (#2456).
+    // Uploading the canvas again cost a full read of it on every frame.
+    return {render(source,t,wind,frozen,width,height,version=null){
       // Reduced motion and unavailable/lost GPU contexts retain a complete,
       // undistorted mirror. No rows, meshes, or extra water strokes are drawn.
       if(frozen||unavailable||gl?.isContextLost())return source;
       if(!ready&&!initialize()){unavailable=true;return source;}
-      if(canvas.width!==source.width)canvas.width=source.width;
-      if(canvas.height!==source.height)canvas.height=source.height;
+      if(canvas.width!==source.width||canvas.height!==source.height){canvas.width=source.width;canvas.height=source.height;uploaded=null;}
       gl.viewport(0,0,canvas.width,canvas.height);
-      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,source);
+      if(version===null||version!==uploaded){gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,source);uploaded=version;}
       gl.uniform1f(time,t*Math.max(.35,Number(wind)||1));gl.uniform2f(size,width,height);
       gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
       return canvas;
@@ -213,9 +217,9 @@
     }};
   }
   const waterDistortion=createWaterDistortion();
-  function paintHorizonReflection(source,t,opacity=1){
+  function paintHorizonReflection(source,t,opacity=1,version=null){
     const surface=geometry.reflectionSurface(p.night);
-    source=waterDistortion.render(source,t,wind,reduced,W,geometry.waterTop);
+    source=waterDistortion.render(source,t,wind,reduced,W,geometry.waterTop,version);
     // A continuous pixel displacement bends local patches without introducing
     // strip boundaries, lowering resolution, or swaying the lake as one sheet.
     g.save();g.globalAlpha=opacity;
@@ -386,7 +390,13 @@
     ellipse(ctx,q.x-3,q.y+4,3,2,'rgba(119,133,132,.16)');ellipse(ctx,q.x+5,q.y-4,2,3,'rgba(119,133,132,.15)');
     ctx.restore();
   }
+  // The window-light slot only shows where lights can: lit and unlit windows
+  // look the same in daylight, and garden and patio lights show only after
+  // sunset. In daylight a new slot then repaints nothing (#2456), and a
+  // background just painted is current, so the next frame does not repaint it.
+  function cityLightsShown(){return p.night>.2||sky.sun.altitude<0?sceneSnapshot.windowsSlot:'unlit';}
   function paintBackground(){
+    backgroundVersion++;lastCitySlot=cityLightsShown();
     treeOrigins=[];
     b=base;
     const gradient=b.createLinearGradient(0,0,0,hy+H*.12);
@@ -805,6 +815,27 @@
       g.restore();
     }
   }
+  // Everything the lake mirror shows, as one comparable value. A visitor,
+  // firework, party or weather in the sky above the water changes every frame,
+  // so its frame time is part of the value; seasonal particles too, once one
+  // is inside the reflected part of the sky. Rows above that part never reach
+  // the water, so a cloud entirely above it does not count.
+  function reflectionInputs(skyVisitor,weather,weatherPhase,t){
+    const surface=geometry.reflectionSurface(p.night);
+    // The lake is clipped between the waterline and the far shore; the blur,
+    // the ripples and antialiasing reach a few pixels past it.
+    let shore=geometry.waterTop;for(let x=0;x<=W;x+=12)shore=Math.max(shore,far(x));shore=Math.max(shore,far(W));
+    const reflectedTop=2*surface.axisY-shore-8;
+    const moving=skyVisitor||world.events.some(e=>e.type==='fireworks'||e.type==='festival')
+      ||(rooftopParty?.active&&p.night>.12)||!!clocktowerVisit?.active||weather.intensity>0
+      ||(!reduced&&LandscapeSeasonal.particles(world.elapsed,sceneSeason,treeOrigins,geometry,W,H,weather).some(particle=>Math.min(particle.y,particle.y2??particle.y)-8<geometry.waterTop));
+    const clouds=sceneSnapshot.clouds.map(pose=>{
+      const size=(W<600?18:27)+pose.size*30,y=25+pose.y*hy;
+      if(y+size*.5<reflectedTop)return '';
+      return Math.round((reduced?(rand(pose.index+71)*1.2-.1)*W:pose.x*W)*dpr);
+    });
+    return JSON.stringify([W,H,dpr,backgroundVersion,p.night,weather.status,reduced,moving?t:null,moving?weatherPhase:null,clouds]);
+  }
   function paintLife(t){
     visibleBanners=[];if(reduced)t=0;
     const paintEvents=visits.forPaint(world.events,geometry,reduced,{poseOther:scenePose});
@@ -837,6 +868,17 @@
     for(const e of paintEvents)if(e.type==='bird')paintEvent(e,t,'sky');
     paintRooftopParty();
     paintClocktowerVisit();
+    // The mirror copies the city, the sky painted so far this frame and the
+    // weather, then blurs and fades it in several full-canvas passes, about
+    // half of each frame's work (#2456). Rebuilt only when one of those inputs
+    // changes, a frame with nothing new to reflect reuses it while the ripples
+    // and everything else still move every frame. Clouds count once they have
+    // moved a device pixel, under a second at their drift, so a reused mirror
+    // is never more than that behind the sky above it.
+    // Meteors, sky visitors and nest birds are the visitors painted above before the mirror is taken.
+    const nextReflection=reflectionInputs(paintEvents.some(e=>e.type==='meteor'||e.type==='bird'||(airborne.has(e.type)&&!waterEvents.has(e.type))),weather,weatherPhase,t);
+    if(nextReflection!==reflectionKey||p!==reflectionPalette){
+    reflectionKey=nextReflection;reflectionPalette=p;reflectionVersion++;
     const reflectionHeight=Math.max(1,Math.floor(geometry.waterTop*dpr));
     if(skyReflection.width!==front.width)skyReflection.width=front.width;
     if(skyReflection.height!==reflectionHeight)skyReflection.height=reflectionHeight;
@@ -887,6 +929,7 @@
     }
     mirror.fillStyle=contact;mirror.fillRect(0,0,W,geometry.waterTop);
     mirror.globalCompositeOperation='source-over';
+    }
     const lakeContact=Math.floor(geometry.waterTop*dpr)/dpr-1/dpr;
     g.save();path(g,far);g.lineTo(W,lakeContact);g.lineTo(0,lakeContact);g.closePath();g.clip();
     if(p.night>.05){
@@ -894,7 +937,7 @@
       reflectedSky.addColorStop(0,p.sky[2]);reflectedSky.addColorStop(1,p.sky[0]);
       g.globalAlpha=p.night*.18;g.fillStyle=reflectedSky;g.fillRect(0,geometry.waterTop,W,H*.12);
     }
-    paintHorizonReflection(reflectionCanvas,t,1);
+    paintHorizonReflection(reflectionCanvas,t,1,reflectionVersion);
     const reflection=point(sky.sun.azimuth,0).x;
     if(geometry.sunReflection(sky.sun))for(let i=0;i<24;i++){
       const wave=geometry.ripple(i,t,wind),y=geometry.waterTop+5+i*H*.0035,w=(5+i*1.9)*wave.width;
@@ -1550,7 +1593,7 @@
     nextPaint+=1000/30;
     if(nextPaint<=now)nextPaint=now+1000/30;
     last=now;syncScene(Date.now());
-    if(lastCitySlot!==sceneSnapshot.windowsSlot){lastCitySlot=sceneSnapshot.windowsSlot;paintBackground();}
+    if(lastCitySlot!==cityLightsShown())paintBackground();
     paintLife(world.elapsed);
   }
   function scenePose(e,firework=false){return reduced?{...e,age:firework===true?(e.type==='festival'?e.duration:Math.min(e.duration,60))*.5:e.duration*.5,...(firework===true?{fireworkDeckAge:e.duration*.5,fireworkActive:e.age<(e.type==='festival'?e.duration:60)}:{})}:e;}
@@ -1604,7 +1647,7 @@
     // barge crossing, without turning reduced motion into continuous animation.
     const before=JSON.stringify([(reduced?visits.forPaint(world.events,geometry,true,{membershipOnly:true}):world.events).map(e=>[e.id,e.type==='festival'&&e.age<e.duration]),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
     syncScene(Date.now());
-    if(lastCitySlot!==sceneSnapshot.windowsSlot){lastCitySlot=sceneSnapshot.windowsSlot;paintBackground();}
+    if(lastCitySlot!==cityLightsShown())paintBackground();
     const after=JSON.stringify([(reduced?visits.forPaint(world.events,geometry,true,{membershipOnly:true}):world.events).map(e=>[e.id,e.type==='festival'&&e.age<e.duration]),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
     if(reduced&&before!==after)paintLife(world.elapsed);
   }
