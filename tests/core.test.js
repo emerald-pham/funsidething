@@ -14192,6 +14192,33 @@ test("UI: the benchmark's d/⌫ keyhints hide when a candidate is showing", asyn
     "candidate's Done should show d keyhint");
 });
 
+// #2460 review: the dotted task's Done and Delete tooltips still named d and the
+// Delete key while a candidate showed, though those keys act on the candidate.
+// A tooltip names a key only on the card that answers it, and the candidate's
+// Worked on it explains itself like the dotted task's.
+test("UI: action tooltips name a key only on the card that answers it, and both Worked on it buttons have one", async () => {
+  const titleOf = (html, act) => (html.match(new RegExp('<button[^>]*data-act="'+act+'"[^>]*>')) || [''])[0].match(/title="([^"]*)"/)?.[1];
+  const benchDelete = html => (benchAction(html).match(/<button[^>]*data-act="delete-task"[^>]*>/) || [''])[0].match(/title="([^"]*)"/)?.[1];
+  const { ctx, shim } = await loadApp({ seed: 260 });
+  addTaskAged(ctx, "Oldest", 900000);
+  addTaskAged(ctx, "Newer", 1000);
+  ctx.addTask("Third task", true);
+  ctx.render();
+  const both = shim.elements.get("scan").innerHTML;
+  assert.ok(both.includes('data-act="cand-done"'), "a candidate is showing");
+  assert.ok(!/\(d\)/.test(titleOf(both, "bench-done")), `the dotted task's Done doesn't name d: ${titleOf(both, "bench-done")}`);
+  assert.ok(!/Delete key/.test(benchDelete(both)), `the dotted task's Delete doesn't name the Delete key: ${benchDelete(both)}`);
+  assert.match(titleOf(both, "cand-done"), /\(d\)/, "the candidate's Done names d");
+  const candRail = (both.match(/<div class="siderail[^"]*">[\s\S]*?<\/div>/) || [''])[0];
+  assert.match((candRail.match(/<button[^>]*data-act="delete-task"[^>]*>/) || [''])[0], /title="[^"]*Delete key/, "the candidate's Delete names the Delete key");
+  assert.ok(titleOf(both, "cand-worked"), "the candidate's Worked on it has a tooltip");
+  ctx.onAction("start-working", {});
+  ctx.render();
+  const alone = shim.elements.get("scan").innerHTML;
+  assert.match(titleOf(alone, "bench-done"), /\(d\)/, "with no candidate the dotted task's Done names d");
+  assert.match(benchDelete(alone), /Delete key/, "with no candidate the dotted task's Delete names the Delete key");
+});
+
 test("UI: benchmark's action row is full opacity in work mode (not greyed)", async () => {
   const { ctx, shim } = await loadApp({ seed: 261 });
   ctx.addTask("Task", true);
@@ -16569,7 +16596,15 @@ test('RISK opening board presentation: shared markup retains released cards cont
  // the key doesn't act on, so the released buttons without a hint gain one.
  const HINT_KEYS={'✓ Done':'d','Edit':'e','Worked on it':'w','Delete':'⌫'};
  const releasedWith2460Hints=markup=>markup.replace(/(<button class="btn sm [^"]*" data-act="(?:bench-done|cand-done|edit|worked|cand-worked|delete-task)"[^>]*>)(✓ Done|Edit|Worked on it|Delete)<\/button>/g,(_,open,label)=>open+label+'<span class="keyhint unheard" aria-hidden="true">'+HINT_KEYS[label]+'</span></button>');
- for(const id of ['ctxPanel','scan','listBody','histPanel','listEligibilityRow','listTagRow'])assert.equal(current.shim.document.getElementById(id).innerHTML,releasedWith2460Hints(releasedWith221Pills(old.shim.document.getElementById(id).innerHTML)),id+' keeps the released markup after sharing its pure formatter');
+ // The #2460 review also changed tooltips: while a candidate shows, the dotted
+ // task's Done and Delete stop naming d and the Delete key (they act on the
+ // candidate), and the candidate's Worked on it gains the dotted task's tooltip.
+ const releasedWith2460Titles=markup=>{
+  const withCandidate=markup.includes('data-act="cand-done"');
+  return markup.replace(/<div class="actionrow[^"]*">[\s\S]*?<\/div>/,row=>withCandidate?row.replace(' title="Done — cross it off (d)"',' title="Done — cross it off"').replace(' title="Delete this task entirely (Delete key)"',' title="Delete this task entirely"'):row)
+   .replace(/(<button class="btn sm worked" data-act="cand-worked" data-id="[^"]*")>/,'$1 title="Started it, crossing it off, back to the bottom of the list (rule 7)">');
+ };
+ for(const id of ['ctxPanel','scan','listBody','histPanel','listEligibilityRow','listTagRow'])assert.equal(current.shim.document.getElementById(id).innerHTML,releasedWith2460Titles(releasedWith2460Hints(releasedWith221Pills(old.shim.document.getElementById(id).innerHTML))),id+' keeps the released markup after sharing its pure formatter');
  for(const app of [old,current]){app.ctx.state.chain=[];app.ctx.state.settings.skipOldestFirstDot=false;app.ctx.renderList();}
  assert.equal(current.shim.document.getElementById('listBody').innerHTML,old.shim.document.getElementById('listBody').innerHTML,'the shared row facts retain next-dot placement');
  const before=JSON.stringify(current.ctx.state),keys=[SYNC_STORE_KEY,LOCAL_HEAD_KEY,LOCAL_BACKUPS_KEY],stored=keys.map(key=>current.shim.localStorage.getItem(key));
@@ -24043,8 +24078,9 @@ test('RISK steady scanner browser: the actions under the dotted task and the can
      const finish=page.locator('[data-act="start-working"]');
      if(spec.touch===false)await finish.click();else await finish.tap();
      await page.waitForFunction(()=>state.mode==='work'&&!document.querySelector('.card.cand'),null,{timeout:10000});
+     const benchListens={};
      for(const theme of ['light','dark']){
-      const seen=await setTheme(theme),before=candidateListens[theme],tl=`${label} ${theme}, dotted task listening`;
+      const seen=benchListens[theme]=await setTheme(theme),before=candidateListens[theme],tl=`${label} ${theme}, dotted task listening`;
       assert.deepEqual(STEADY_SHARED_ACTIONS.map(([name,benchAct])=>[name,shownHints(by(seen.bench,benchAct))]),[['Done','d'],['Edit','e'],['Worked on it','w'],['Delete','⌫']],`${tl}: every hint is on the dotted task`);
       for(const [name,benchAct,candAct] of STEADY_SHARED_ACTIONS){
        sameLook(`${tl}: ${name} keeps its width when its hint moves to the dotted task`,by(seen.bench,benchAct),by(before.bench,benchAct));
@@ -24053,6 +24089,7 @@ test('RISK steady scanner browser: the actions under the dotted task and the can
       checkRow(`${tl}: dotted task's row`,seen.bench);
       assert.equal(seen.bench.opacity,1,`${tl}: the dotted task's row is at full strength once scanning stops`);
      }
+     assert.notEqual(benchListens.light.paint,benchListens.dark.paint,`${label}: with the dotted task listening, the scanner pane paints differently by day and night: ${benchListens.light.paint}`);
      assert.deepEqual(errors,[],`${label}: no page errors`);
     }catch(error){failures.push(error.message.split('\n')[0]);}finally{await context.close();}
    }
