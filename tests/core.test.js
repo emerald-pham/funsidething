@@ -7275,6 +7275,269 @@ test('RISK opening scenery browser: a seeded board takes trusted typing and a fr
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
 
+// #2456: after opening, every scenery frame rebuilt its whole water reflection
+// (the full-canvas copy, blur and mirror passes and the GPU texture upload)
+// even when nothing it reflects had changed, about 25 ms of each frame at 4x
+// CPU. Frames must keep drawing the ambient motion, but a frame whose reflected
+// sky, city and weather are unchanged reuses the reflection, and a changed
+// scene rebuilds it. With every visitor, weather and ambience rate at zero the
+// sky holds only the drifting clouds. Work is counted per painted frame, never
+// timed: a painted frame is one full clear of the visible life canvas, and a
+// rebuild is any draw onto another canvas (the reflection buffers, the city
+// copy, the background) or a WebGL texture upload. Frozen page time holds
+// every input still, and a later frozen instant moves the clouds; flowing page
+// time lets only the clouds drift.
+test('RISK idle scenery browser: frames whose reflected scene is unchanged keep drawing the ambient motion without rebuilding the reflection, and a changed scene rebuilds it, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=12,INSTANT=Date.parse('2026-11-19T17:00:00Z'),SHORT=30,LONG=120;
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('idle-'+i,'Idle board task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true}));
+ const rates=fs.readFileSync(path.join(__dirname,'SPAWN_RATES.md'),'utf8').replace(/^\| ([a-z-]+) \| [\d.]+ \|$/gm,'| $1 | 0 |');
+ assert.match(rates,/^\| balloon \| 0 \|$/m,'fixture: every spawn rate is set to zero');
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   const device=async()=>{
+    const context=await browser.newContext({viewport:{width:390,height:844},timezoneId:'America/New_York',serviceWorkers:'block',reducedMotion:'no-preference'});
+    await context.route('**/*',route=>{
+     const url=new URL(route.request().url());if(url.origin!==origin)return route.abort();
+     if(url.pathname.endsWith('/SPAWN_RATES.md'))return route.fulfill({status:200,contentType:'text/markdown',body:rates});
+     return route.continue();
+    });
+    await context.addInitScript(({board})=>{
+     Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'normal',savedAt:Date.parse('2026-11-18T12:00:00Z')}));
+     if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+     // frames: painted life frames; rebuilt: frames with any rebuild; passes: rebuild draws.
+     const idle=window.__idle={frames:0,rebuilt:0,passes:0,lifeOps:0,current:0};
+     const life=()=>document.querySelector('#landscape [data-life]');
+     const rebuild=()=>{idle.passes++;if(idle.current===0&&idle.frames>0)idle.rebuilt++;idle.current++;};
+     const context2d=CanvasRenderingContext2D.prototype;
+     for(const method of ['clearRect','fillRect','drawImage','putImageData','fill','stroke']){
+      const original=context2d[method];
+      context2d[method]=function(...args){
+       const canvas=this.canvas,front=life();
+       if(front&&canvas===front){
+        if(method==='clearRect'&&args[0]===0&&args[1]===0&&args[2]>=front.clientWidth&&args[3]>=front.clientHeight){idle.frames++;idle.current=0;}
+        else idle.lifeOps++;
+       }else if(front&&canvas&&canvas.width>1&&canvas.height>1)rebuild();
+       return original.apply(this,args);
+      };
+     }
+     for(const gl of [globalThis.WebGLRenderingContext,globalThis.WebGL2RenderingContext])if(gl){
+      const upload=gl.prototype.texImage2D;
+      gl.prototype.texImage2D=function(...args){if(life())rebuild();return upload.apply(this,args);};
+     }
+    },{board});
+    return context;
+   };
+   const open=async(context,clock)=>{
+    const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+    await clock(page);
+    await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&getComputedStyle(document.querySelector('#landscape [data-scenery]')).visibility==='visible'&&window.__idle.frames>=10,null,{timeout:30000,polling:100});
+    return {page,errors};
+   };
+   const count=page=>page.evaluate(()=>({frames:__idle.frames,rebuilt:__idle.rebuilt,passes:__idle.passes,lifeOps:__idle.lifeOps}));
+   const over=async(page,frames)=>{
+    const before=await count(page);
+    await page.waitForFunction(target=>window.__idle.frames>=target,before.frames+frames,{timeout:60000,polling:100});
+    const after=await count(page);
+    return Object.fromEntries(Object.keys(after).map(key=>[key,after[key]-before[key]]));
+   };
+   const lifePixels=page=>page.evaluate(()=>document.querySelector('#landscape [data-life]').toDataURL());
+   // Frozen page time: nothing the reflection shows can change between frames.
+   {
+    const context=await device();
+    try{
+     const {page,errors}=await open(context,page=>page.clock.setFixedTime(new Date(INSTANT)));
+     const short=await over(page,SHORT),still=await lifePixels(page),long=await over(page,LONG),later=await lifePixels(page);
+     // Five seconds later the clouds over the lake have moved a few pixels,
+     // inside the same window-light slot, so the background is not repainted
+     // and every rebuild draw is the reflection's.
+     await page.clock.setFixedTime(new Date(INSTANT+5000));
+     const changed=await over(page,5);
+     const label=`${engineName}/frozen`;observed.push({label,short,long,changed});
+     // Fixture preconditions: the loop really paints frames with ambient drawing in them.
+     assert.ok(short.frames>=SHORT&&long.frames>=LONG,`${label}: the animation loop painted the counted frames ${JSON.stringify({short,long})}`);
+     assert.ok(long.lifeOps>=long.frames,`${label}: each frame still draws the ambient scene ${JSON.stringify(long)}`);
+     assert.equal(later,still,`${label}: frames with unchanged inputs paint the identical scene`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+     // Behavior under test.
+     if(long.rebuilt>1||long.passes>short.passes+20)failures.push(`${label}: ${long.rebuilt} of ${long.frames} frames with unchanged inputs rebuilt the reflection (${long.passes} rebuild draws; ${short.passes} over ${short.frames} frames)`);
+     if(changed.rebuilt<1||changed.passes>100)failures.push(`${label}: a changed scene did not rebuild the reflection ${JSON.stringify(changed)}`);
+    }finally{await context.close();}
+   }
+   // Flowing page time: only the clouds drift, at under a pixel a second.
+   {
+    const context=await device();
+    try{
+     const {page,errors}=await open(context,page=>page.clock.install({time:new Date(INSTANT)}));
+     const drift=await over(page,LONG);
+     const label=`${engineName}/drifting`;observed.push({label,drift});
+     assert.ok(drift.lifeOps>=drift.frames,`${label}: each frame still draws the ambient scene ${JSON.stringify(drift)}`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+     if(drift.rebuilt*4>drift.frames)failures.push(`${label}: ${drift.rebuilt} of ${drift.frames} frames rebuilt the reflection while only the clouds drifted`);
+    }finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
+// #2456: the background (sky, city and its window lights) was repainted at
+// every 7.5-second window-light slot, about 20 ms at 4x CPU, and once more on
+// the first frame after opening. Lit and unlit windows look the same in
+// daylight and garden and patio lights show only after sunset, so in daylight
+// a new slot has nothing to show: the background stays as painted, and it
+// matches a fresh device painting that same instant. At night a new slot
+// repaints the lit windows. Draws onto the background canvas are counted per
+// painted frame under frozen page time, never timed.
+test('RISK idle scenery lights browser: in daylight a new window-light slot and the first frames after opening leave the background as painted, matching a fresh paint at that instant, while at night a new slot repaints it, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=12,DAY=Date.parse('2026-11-19T17:00:00Z'),NIGHT=Date.parse('2026-11-20T03:00:00Z');
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('lights-'+i,'Lights board task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true}));
+ const rates=fs.readFileSync(path.join(__dirname,'SPAWN_RATES.md'),'utf8').replace(/^\| ([a-z-]+) \| [\d.]+ \|$/gm,'| $1 | 0 |');
+ const digest=value=>createHash('sha256').update(value).digest('hex').slice(0,16);
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  const contexts=[];
+  try{
+   // Opens a frozen page at `at` and returns it once the scenery shows and has painted 10 frames.
+   const open=async at=>{
+    const context=await browser.newContext({viewport:{width:390,height:844},timezoneId:'America/New_York',serviceWorkers:'block',reducedMotion:'no-preference'});contexts.push(context);
+    await context.route('**/*',route=>{
+     const url=new URL(route.request().url());if(url.origin!==origin)return route.abort();
+     if(url.pathname.endsWith('/SPAWN_RATES.md'))return route.fulfill({status:200,contentType:'text/markdown',body:rates});
+     return route.continue();
+    });
+    await context.addInitScript(({board})=>{
+     Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'normal',savedAt:Date.parse('2026-11-18T12:00:00Z')}));
+     if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+     // paints: whole background paints, each starting with the sky filling the canvas.
+     const lights=window.__lights={frames:0,backOps:0,paints:0};
+     const context2d=CanvasRenderingContext2D.prototype;
+     for(const method of ['clearRect','fillRect','drawImage','putImageData','fill','stroke']){
+      const original=context2d[method];
+      context2d[method]=function(...args){
+       const front=document.querySelector('#landscape [data-life]'),back=document.querySelector('#landscape [data-scenery]');
+       if(front&&this.canvas===front&&method==='clearRect'&&args[0]===0&&args[1]===0&&args[2]>=front.clientWidth&&args[3]>=front.clientHeight)lights.frames++;
+       else if(back&&this.canvas===back){lights.backOps++;if(method==='fillRect'&&args[0]===0&&args[1]===0&&args[2]>=back.clientWidth&&args[3]>=back.clientHeight)lights.paints++;}
+       return original.apply(this,args);
+      };
+     }
+    },{board});
+    const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+    await page.clock.setFixedTime(new Date(at));
+    await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&getComputedStyle(document.querySelector('#landscape [data-scenery]')).visibility==='visible'&&window.__lights.frames>=1,null,{timeout:30000,polling:100});
+    return {page,errors};
+   };
+   const over=async(page,frames)=>{
+    const before=await page.evaluate(()=>({...__lights}));
+    await page.waitForFunction(target=>window.__lights.frames>=target,before.frames+frames,{timeout:60000,polling:100});
+    const after=await page.evaluate(()=>({...__lights}));
+    return {frames:after.frames-before.frames,backOps:after.backOps-before.backOps,paints:after.paints};
+   };
+   const background=async page=>digest(await page.evaluate(()=>document.querySelector('#landscape [data-scenery]').toDataURL()));
+   for(const [period,at] of [['day',DAY],['night',NIGHT]]){
+    const label=`${engineName}/${period}`;
+    // The first instant sits early in one 7.5-second slot and the second in the next, in the same minute.
+    const {page,errors}=await open(at+1000);
+    const opening=await over(page,10);
+    await page.clock.setFixedTime(new Date(at+8000));
+    const slot=await over(page,10),shown=await background(page);
+    const fresh=await open(at+8000),expected=await background(fresh.page);
+    const scene=await page.evaluate(()=>document.documentElement.dataset.scenePeriod);
+    observed.push({label,scene,opening,slot,matches:shown===expected});
+    assert.deepEqual([...errors,...fresh.errors],[],`${label}: no page errors`);
+    assert.equal(scene,period==='day'?'day':'night',`${label}: fixture shows the intended period`);
+    if(opening.paints!==1)failures.push(`${label}: opening and its first frames painted the background ${opening.paints} times, not once`);
+    if(period==='day'&&slot.backOps>0)failures.push(`${label}: a daylight window-light slot repainted the background (${slot.backOps} draws)`);
+    if(period==='night'&&slot.backOps===0)failures.push(`${label}: a night window-light slot did not repaint the lit windows`);
+    if(shown!==expected)failures.push(`${label}: after the new slot the background differs from a fresh paint at that instant`);
+   }
+  }finally{for(const context of contexts)await context.close();await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
+// #2456: the scenery's boot task worked out the day's scene plan (every
+// arrival opportunity of the UTC day and their admission), about 60 ms of a
+// 125 ms task at 4x CPU, while the app was still opening its board, even on a
+// warm relaunch that keeps the day's sun. The plan must wait until the board
+// shows and then run as a task of its own, with no scenery paint in it, before
+// the scenery first paints. The plan's work is counted where it draws each
+// arrival's type, LandscapeConfig.pickEvent; a microtask queued at the first
+// draw of a task closes that task's count. Only ordering and counts are
+// asserted, never elapsed time.
+test('RISK opening scenery plan task browser: the scenery boot works out no day plan, and the plan runs after the board shows as its own task with no scenery paint, in Chromium and WebKit under both motion choices',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=12;
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('plan-task-'+i,'Plan task board task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true}));
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const motion of ['normal','reduced']){
+    const label=`${engineName}/${motion}`,context=await browser.newContext({viewport:{width:390,height:844},timezoneId:'America/New_York',serviceWorkers:'block',reducedMotion:motion==='reduced'?'reduce':'no-preference'});
+    try{
+     await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+     await context.addInitScript(({board,motion,ROWS})=>{
+      Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+      localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:motion,savedAt:Date.parse('2026-11-18T12:00:00Z')}));
+      if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+      const plan=window.__planTask={draws:0,boot:null,tasks:[],painted:false};
+      const ready=()=>document.documentElement.dataset.appReady==='true'&&document.querySelectorAll('#listBody [data-row]').length===ROWS;
+      let task=null;
+      let config;Object.defineProperty(globalThis,'LandscapeConfig',{configurable:true,enumerable:true,get:()=>config,set(value){
+       // The configuration is frozen, so the page sees a copy whose pickEvent counts.
+       const pick=value.pickEvent;config=Object.freeze({...value,pickEvent(...args){
+        plan.draws++;
+        if(!task){task={draws:0,paintsBefore:plan.paints||0,ready:ready(),afterBoot:plan.boot!==null&&plan.boot.closed};plan.tasks.push(task);queueMicrotask(()=>{task.paintsAfter=plan.paints||0;task=null;});}
+        task.draws++;return pick.apply(value,args);
+       }});
+      }});
+      // The scenery boot sizes its canvases; a microtask then closes the boot's count.
+      const width=Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype,'width');
+      Object.defineProperty(HTMLCanvasElement.prototype,'width',{configurable:true,enumerable:width.enumerable,get(){return width.get.call(this);},set(value){
+       if(!plan.boot&&this.closest?.('#landscape')){plan.boot={drawsBefore:plan.draws,closed:false};queueMicrotask(()=>{plan.boot.draws=plan.draws-plan.boot.drawsBefore;plan.boot.closed=true;});}
+       width.set.call(this,value);
+      }});
+      const context2d=CanvasRenderingContext2D.prototype;
+      for(const method of ['clearRect','fillRect','fill','stroke','drawImage','putImageData']){
+       const original=context2d[method];
+       context2d[method]=function(...args){if(this.canvas?.closest?.('#landscape'))plan.paints=(plan.paints||0)+1;return original.apply(this,args);};
+      }
+     },{board,motion,ROWS});
+     const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+     await page.waitForFunction(()=>getComputedStyle(document.querySelector('#landscape [data-scenery]')).visibility==='visible'&&window.__planTask.paints>0,null,{timeout:30000,polling:100});
+     const result=await page.evaluate(()=>window.__planTask);
+     const plans=result.tasks.filter(task=>task.draws>=100);
+     observed.push({label,boot:result.boot,tasks:result.tasks.map(task=>({...task}))});
+     // Fixture preconditions: the boot was seen and a day plan was worked out.
+     assert.ok(result.boot?.closed,`${label}: the scenery boot was observed`);
+     assert.ok(plans.length>=1,`${label}: a day plan was worked out (${JSON.stringify(result.tasks)})`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+     // Behavior under test.
+     if(result.boot.draws>0)failures.push(`${label}: the scenery boot task worked out ${result.boot.draws} draws of the day plan`);
+     const first=plans[0];
+     if(!first.ready||!first.afterBoot)failures.push(`${label}: the day plan ran before the board showed ${JSON.stringify(first)}`);
+     if(first.paintsAfter!==first.paintsBefore)failures.push(`${label}: the day plan's task also painted scenery ${JSON.stringify(first)}`);
+     if(first.paintsBefore>0)failures.push(`${label}: the scenery painted before its day plan ${JSON.stringify(first)}`);
+    }finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
 // #2430: every opening worked out the day's plan from the sun's position at
 // each minute of the UTC day, about 210 ms of astronomy at 4x CPU, before the
 // scenery could paint. A warm relaunch on the same day in the same place must
@@ -36224,6 +36487,8 @@ test('RISK Add draft durable reset: pending repeated Add and newer edits or rese
   if(next==='account'){ctx.state.syncAccount='other-private-owner';}
   if(next==='same-after-reset'){input.value='';ctx.clearQuickAddDraft();input.value='Private pending Add';shim.document.dispatchEvent({type:'input',target:input});}
   if(next==='same-after-edit'){input.value='Different task';shim.document.dispatchEvent({type:'input',target:input});input.value='Private pending Add';shim.document.dispatchEvent({type:'input',target:input});}
+  // #2457: the Add's save starts once the frame that draws the task has run.
+  while(!release)await new Promise(resolve=>setImmediate(resolve));
   release(true);await saving;await repeated;
   assert.equal(input.value,next==='newer'?'Newer task draft':next==='reset'?'':'Private pending Add','confirmation cannot clear a later edit/reset or another owner draft');
  }
