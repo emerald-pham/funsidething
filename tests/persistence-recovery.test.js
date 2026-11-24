@@ -16161,6 +16161,9 @@ function answerClock2408(ctx,counters){
    ctx.setTimeout=(fn,ms,...args)=>{const id={answerClock2408:++serial};timers.set(id,{at:now+Math.max(0,Number(ms)||0),serial,fn:()=>fn(...args)});return id;};
    ctx.clearTimeout=id=>{timers.delete(id);};
    ctx.performance={now:()=>base+now};ctx.__answerClockNow2408=()=>start+now;
+   // #2461: frames run on this clock too, one every 16 ms, since the press
+   // guard is timed from the frame that paints a new candidate.
+   ctx.requestAnimationFrame=fn=>ctx.setTimeout(()=>fn(base+now),16);
    vm.runInContext('Date.now=()=>__answerClockNow2408()',ctx);
   },
   sleep(ms){return new Promise(resolve=>ctx.setTimeout(resolve,ms));},
