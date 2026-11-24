@@ -16564,7 +16564,12 @@ test('RISK opening board presentation: shared markup retains released cards cont
  // Everything else keeps the released markup byte for byte.
  const releasedWith221Pills=markup=>markup.replace(/<button class="crumb" data-act="reveal" (data-id="[^"]*")([^>]*?) title="([^"]*)">/g,'<button class="crumb" data-act="edit" $1$2 title="$3" aria-label="Open $3 to edit it">');
  assert.match(old.shim.document.getElementById('scan').innerHTML,/<button class="crumb" data-act="reveal"/,'the released scan panel has a trail pill to compare');
- for(const id of ['ctxPanel','scan','listBody','histPanel','listEligibilityRow','listTagRow'])assert.equal(current.shim.document.getElementById(id).innerHTML,releasedWith221Pills(old.shim.document.getElementById(id).innerHTML),id+' keeps the released markup after sharing its pure formatter');
+ // #2460 deliberately changed one more: every Done, Edit, Worked on it and Delete
+ // beside a card keeps its key hint's space, hidden and aria-hidden on the card
+ // the key doesn't act on, so the released buttons without a hint gain one.
+ const HINT_KEYS={'✓ Done':'d','Edit':'e','Worked on it':'w','Delete':'⌫'};
+ const releasedWith2460Hints=markup=>markup.replace(/(<button class="btn sm [^"]*" data-act="(?:bench-done|cand-done|edit|worked|cand-worked|delete-task)"[^>]*>)(✓ Done|Edit|Worked on it|Delete)<\/button>/g,(_,open,label)=>open+label+'<span class="keyhint unheard" aria-hidden="true">'+HINT_KEYS[label]+'</span></button>');
+ for(const id of ['ctxPanel','scan','listBody','histPanel','listEligibilityRow','listTagRow'])assert.equal(current.shim.document.getElementById(id).innerHTML,releasedWith2460Hints(releasedWith221Pills(old.shim.document.getElementById(id).innerHTML)),id+' keeps the released markup after sharing its pure formatter');
  for(const app of [old,current]){app.ctx.state.chain=[];app.ctx.state.settings.skipOldestFirstDot=false;app.ctx.renderList();}
  assert.equal(current.shim.document.getElementById('listBody').innerHTML,old.shim.document.getElementById('listBody').innerHTML,'the shared row facts retain next-dot placement');
  const before=JSON.stringify(current.ctx.state),keys=[SYNC_STORE_KEY,LOCAL_HEAD_KEY,LOCAL_BACKUPS_KEY],stored=keys.map(key=>current.shim.localStorage.getItem(key));

@@ -24872,5 +24872,26 @@
       "command": "COMPATIBILITY_BASE_SHA=6fd49455e19aa979def1ab105a0068fb1936c1dc node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <git-common-dir>/agent-test-runs/issue-2453 --purpose preimplementation-red -- npm run test:compatibility",
       "failure": "Record 5d43c6c7 on 6fd49455 before the test change: # tests 30, # pass 28, # fail 2, # skipped 0. Subtest 6fd4945 of the #2436 case failed 'one acknowledged revision behind: it reads the head alone' with expected 2, actual 3; the floor subtest 7b9c92a passed."
     }
+  },
+  {
+    "baseCommit": "2d87e4397d62685e04cf67de698f67496520eb0b",
+    "weakenedTestLines": [
+      "tests/core.test.js:-for(const id of ['ctxPanel','scan','listBody','histPanel','listEligibilityRow','listTagRow'])assert.equal(current.shim.document.getElementById(id).innerHTML,releasedWith221Pills(old.shim.document.getElementById(id).innerHTML),id+' keeps the released markup after sharing its pure formatter');"
+    ],
+    "reason": "#2460 deliberately changes the scanner markup: every Done, Edit, Worked on it and Delete beside the dotted task or the candidate now always carries its key hint, hidden (visibility:hidden, aria-hidden) on the card the key does not act on, so a button keeps its width when the keys move between cards. The released-markup case compares the scan panel byte for byte with release 6c67fb0c, whose buttons on the non-listening card had no hint span at all, so it failed on exactly those added spans. The line now maps the released markup through one more named deliberate change, as it already does for #221's chain pills.",
+    "previousBehavior": "The scan panel had to equal release 6c67fb0c's markup after only the #221 pill rewrite, so a button on the card that is not listening for d, e, w or ⌫ had to render without any keyhint span.",
+    "intendedBehavior": "The scan panel equals the released markup after the #221 pill rewrite and the #2460 rewrite, which inserts <span class=\"keyhint unheard\" aria-hidden=\"true\">KEY</span> only into a Done, Edit, Worked on it or Delete button (.btn.sm, its existing data-act) that the release rendered with no hint. Every other byte, including visible hints, bindings, titles, aria-labels, order and classes, must still match the release.",
+    "replacementTests": [
+      "RISK steady scanner browser: the actions under the dotted task and the candidate match in size type and colour whichever card the key hints sit on, share one alignment and keep Delete last, across phone enlarged short-landscape tablet and desktop views in day and night with web fonts and blocked in Chromium and WebKit"
+    ],
+    "preservedCoverage": [
+      "ctxPanel, listBody, histPanel and the list filter rows are unaffected by the rewrite (they hold no .btn.sm action buttons) and still must match the release byte for byte.",
+      "The rewrite cannot hide a visible-hint regression: a button that had a visible hint in the release is not matched (its label is followed by a span, not </button>), so a lost or moved visible hint still fails.",
+      "The markup tests on visible hints (benchmark d/⌫ absent while a candidate shows, present otherwise, one offered Edit e hint) run unchanged, and the new browser RISK test asserts the hidden hints are not shown and are aria-hidden."
+    ],
+    "redEvidence": {
+      "command": "CHAIN_NATIVE_PORT=8962 node --test tests/core.test.js",
+      "failure": "Full core run on the #2460 implementation (commit f7347133) before this test edit: tests 2981, pass 2886, fail 2. 'RISK opening board presentation: shared markup retains released cards contexts task rows and history' failed 'scan keeps the released markup after sharing its pure formatter' (strictEqual) on the added hidden hint spans. The other failure, the PWA cache contract, came from editing index.html for a sensitivity mutant while that run was in progress and passes alone."
+    }
   }
 ]
