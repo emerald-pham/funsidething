@@ -24104,7 +24104,7 @@ test('RISK steady scanner browser: the actions under the dotted task and the can
 // kept one line, and the dotted task's row gained a line at 375 px with
 // Postpone. A hint now draws inside the button's own padding: shown, hidden or
 // absent, it never adds width, and the label stays centred clear of it.
-test('RISK steady scanner browser: a key hint never widens an action beside a card and its label sits centred clear of the hint, so the candidate\'s row keeps one line on 412 to 430 px phones and the dotted task\'s Delete is never alone at 375 px with Postpone, with web fonts and blocked in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+test("RISK steady scanner browser: a key hint never widens an action beside a card and its label sits centred clear of the hint, so the candidate's row keeps one line on 412 to 430 px phones and the dotted task's Delete is never alone at 375 px with Postpone, with web fonts and blocked in Chromium and WebKit",{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[];
  const readActions=page=>page.evaluate(()=>{
   const rowAfter=selector=>{
