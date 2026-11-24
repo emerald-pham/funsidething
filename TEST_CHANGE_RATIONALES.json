@@ -24895,5 +24895,31 @@
       "command": "node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <scratchpad>/evidence/2457 --purpose preimplementation-red --summary -- node --max-old-space-size=8192 --test --test-reporter=tap --test-name-pattern=\"2278: Apply of the intact previous source succeeds when publishing|RISK add saves once\" tests/core.test.js tests/persistence-recovery.test.js",
       "failure": "Record 2026-11-24T01-58-21-898Z-a650819c on 90dd6074, whose Add save waited on an unref'd timer: 'RISK cloud source recovery #2278: Apply of the intact previous source succeeds when publishing the large board...' was cancelled with 'Promise resolution is still pending but the event loop has already resolved' at its setup Add, and the core and persistence-recovery group runs cancelled every later root the same way. Under recoveryReadClock187, 'RISK recovery read minute: changed accounts or drafts revoke a delayed source preview' was cancelled the same way on 046c3b76 (core group run 2457-core-2)."
     }
+  },
+  {
+    "baseCommit": "2d87e4397d62685e04cf67de698f67496520eb0b",
+    "weakenedTestLines": [
+      "tests/core.test.js:-assert.equal(undo(),before+1,`${name} at 201 ms is accepted`);",
+      "tests/core.test.js:-assert.equal(undo(),before,`${name} at 199 ms is dropped`);assert.equal(ctx.state.candidateId,drawn);",
+      "tests/core.test.js:-clock+=199;press(app);",
+      "tests/core.test.js:-test('RISK press guard: Yes No Cant Postpone and Done inside 200 ms of a new task are dropped and just after it are accepted',async t=>{",
+      "tests/shared.js:-requestAnimationFrame: (fn) => schedule(fn, 0),"
+    ],
+    "reason": "#2461 (coordinator decision recorded on the issue): the scanner's press guard held deliberate presses people made once they could see the new card, so presses did not register. The guard now holds every press made before the new card paints, which is where a double tap's second tap lands (100 to 150 ms after the first), and after the paint only a 100 ms grace instead of the 200 ms #2312 set from when the panel was drawn. The #2312 boundary test pinned 199 ms dropped and 201 ms accepted from the draw, which the narrower window after paint no longer holds. The shared.js line is #2457's, already explained by its own entry; it is listed here only because one entry must cover every weakened line in this branch's diff against the base.",
+    "previousBehavior": "A press on Yes, No, Can't, Postpone or Done (click or y/n/c/d key) was dropped silently while the handler ran within 200 ms of the scan panel being drawn, and accepted at 201 ms, whether or not the new task had painted.",
+    "intendedBehavior": "A press is timed by its event's own timeStamp. Every press before the frame that paints the new task is held; after the paint a press within 100 ms is held and one later is accepted. A held press dims its button for a moment and changes nothing. If no frame comes within a second the grace is timed from the draw instead. #221's 200 ms pause after Return as candidate is unchanged.",
+    "replacementTests": [
+      "RISK press guard: Yes No Cant Postpone and Done before a new task paints or within 100 ms of it are dropped and just after it are accepted",
+      "RISK scanner press guard: on the large board, a deliberate Yes or n key 150 ms after the new candidate painted answers it, while one 50 ms after is held"
+    ],
+    "preservedCoverage": [
+      "The renamed boundary test keeps all ten inputs (the y, n, c and d keys and clicks on yes, no, cant, postpone, cand-done and bench-done) and an exact held-clock boundary on both sides, now 99 ms held and 101 ms accepted after the paint, and adds a press 300 ms after the draw but before the paint, which is held.",
+      "Double-tap protection: the steady scanner browser tests (two touch taps 60 and 120 ms apart, a mouse double click, two key presses, and a double tap on Postpone or Done) in Chromium and WebKit, and the #2461 large-board tests that hold a press before the paint and within the grace.",
+      "#221's pause after Return as candidate keeps TASK_PRESS_GUARD_MS (200 ms) and its UI #221 tests are unchanged and green."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <scratchpad>/evidence/2461 --purpose green --summary -- node --test --test-name-pattern=\"RISK scanner press guard|RISK press guard: Yes No Cant|UI #221: the second tap|UI #221: for a moment\" tests/persistence-recovery.test.js tests/core.test.js",
+      "failure": "Record 2026-11-24T04-24-44-647Z-b04c025b on a8d4ef67 with the 100 ms grace applied: 'RISK press guard: Yes No Cant Postpone and Done inside 200 ms of a new task are dropped and just after it are accepted' failed with 'the Yes key at 199 ms is dropped' (the press was accepted), while every UI #221 test and every #2461 test passed. The new test 'a deliberate Yes or n key 150 ms after the new candidate painted answers it' had failed first on a8d4ef67 (record 2026-11-24T04-24-23-140Z-a44b6d43: 'a Yes 150 ms after the new candidate painted is not held')."
+    }
   }
 ]
