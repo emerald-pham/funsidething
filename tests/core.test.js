@@ -16633,6 +16633,30 @@ test('RISK saved view invisible active scanner: a running scan retains scanner a
  }
 });
 
+// #2460 specialist B1: the saved view keeps classes but never data-* attributes,
+// so a rule that sizes the action rows by data-act styled the live buttons and
+// not their saved copies. With the rows' text enlarged on a phone, or the
+// wider tablet hints, the saved scanner came out up to 117 px shorter and the
+// page jumped as the board loaded.
+const SAVED_VIEW_ENLARGED_ROWS='.actionrow .btn.sm,.siderail .btn.sm{font-size:26px!important}.actionrow .keyhint,.siderail .keyhint,.actionrow .btn.sm::before,.siderail .btn.sm::before{font-size:15px!important}';
+test('RISK saved view invisible active scanner: the action rows keep their live geometry and the scanner its height in the saved view with the rows at 200% text on a phone and at tablet and desktop width',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [name,viewport,initStyle] of [['375 px phone, rows at 200% text',{width:375,height:812},SAVED_VIEW_ENLARGED_ROWS],['768 px tablet',{width:768,height:1024},''],['1100 px desktop',{width:1100,height:1000},'']]){
+  const view=await invisibleSavedViewBrowser('light',false,false,viewport,true,{initStyle,actionRows:true});
+  try{
+   assert.ok(view.before.geometry.separators>0,`${name}: positive control: the scan shows the dotted task and the candidate`);
+   assert.equal(view.early.settled,false,`${name}: the local read is still pending`);
+   assert.ok(view.before.actionRows.length>=8,`${name}: positive control: both action rows are measured live: ${view.before.actionRows.length}`);
+   const live=view.before.geometry.scan.height,saved=view.early.geometry.scan?.height;
+   assert.ok(Math.abs(saved-live)<=1,`${name}: the saved scanner is as tall as the live one: ${saved?.toFixed(1)} vs ${live.toFixed(1)} px`);
+   assert.equal(view.early.actionRows.length,view.before.actionRows.length,`${name}: the saved view keeps every action`);
+   view.before.actionRows.forEach((r,i)=>{const e=view.early.actionRows[i];for(const key of ['x','y','width','height'])assert.ok(Math.abs(e[key]-r[key])<=1,`${name}: action ${i} ${key} in the saved view matches live: ${e[key].toFixed(1)} vs ${r[key].toFixed(1)} px`);});
+   assert.deepEqual(view.errors,[],`${name}: no page errors`);
+  }catch(error){failures.push(error.message.split('\n')[0]);}finally{await view.browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
 test('RISK saved view invisible large window: a tall viewport retains all visible rows with bounded projection work',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const view=await invisibleSavedViewBrowser('light',false,false,{width:1280,height:2160});
  try{
