@@ -35421,9 +35421,12 @@ test('RISK press guard: Yes No Cant Postpone and Done inside 200 ms of a new tas
   ctx.state.settings.showPostpone=true;
   ctx.addTask('Dotted task',true);for(const title of ['Second','Third','Fourth','Fifth','Sixth'])ctx.addTask(title,false);ctx.render();
   let clock=50000;ctx.performance={now:()=>clock};
+  // #2461: the window runs from the frame that paints the new task, held here too.
+  const frames=[];ctx.requestAnimationFrame=fn=>{frames.push(fn);return frames.length;};
   const undo=()=>vm.runInContext('undoStack.length',ctx);
   // An answer draws a new task at this clock.
   ctx.onAction('no',{dataset:{candidate:ctx.state.candidateId,benchmark:ctx.state.chain.at(-1)}});
+  for(const frame of frames.splice(0))frame(clock);   // and it paints at once
   const drawn=ctx.state.candidateId,before=undo();assert.ok(drawn,'a new task is showing');
   clock+=199;press(app);
   assert.equal(undo(),before,`${name} at 199 ms is dropped`);assert.equal(ctx.state.candidateId,drawn);
