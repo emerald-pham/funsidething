@@ -20570,3 +20570,53 @@ test('RISK decision evidence replay: on a board with no account the incremental 
  assert.ok(twin.apps[0].ctx.state.decisionEvents.every(event=>event.account===null),'positive control: its decisions name no account');
  assert.ok(twin.fast.settle>=8,'positive control: its answers replay their own decision alone: '+JSON.stringify(twin.fast));
 });
+
+// #2459: the board a Yes after an Add leaves, on the large board with sync on.
+// A Start records its pass's draw (the chance weights of every task then on
+// the board) as the pass's scan-mode choice. A task added later joins that
+// draw the first time a draw scores it, with a frozen weight of its own,
+// which the recorded draw never held. Counted, never timed.
+async function yesAfterAdd2459(t,label){
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock,counters,shim}=device;
+ shim.document.getElementById('addInput').value=label;
+ ctx.onAction('add',{});
+ const added=ctx.state.tasks.find(task=>task.title===label);
+ assert.ok(added,'positive control: the Add is taken');
+ await clock.settle();
+ assert.ok(counters.uploads.at(-1)?.payload.includes(added.id),'positive control: the Add went up by the full copy');
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','positive control: the Add is synced');
+ const before={records:recordsWritten2417(device),uploads:counters.uploads.length};
+ const candidate=device.tap('yes');
+ assert.equal(ctx.state.chain.at(-1),candidate,'positive control: the Yes is taken');
+ assert.ok(Object.hasOwn(ctx.state.chance.weights,added.id),'positive control: the added task has joined the pass’s draw');
+ return {device,added,candidate,before};
+}
+test('RISK change records: after an Add in a Started pass, a Yes still syncs: the added task’s frozen chance weight does not make the board’s decisions fail their check',{timeout:300000},async t=>{
+ const {device,added,candidate}=await yesAfterAdd2459(t,'Added before the Yes 2459 sync');
+ const {ctx,clock,shim}=device;
+ await clock.settle();
+ assert.equal(ctx.window.CloudSync.errorCode??null,null,'sync reports no error');
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','sync ends synced');
+ const cloud=await device.cloud();
+ assert.ok(cloud.board.chain.includes(candidate),'the cloud copy holds the Yes');
+ assert.ok(cloud.board.tasks.some(task=>task.id===added.id),'and the added task');
+ assert.equal(cloud.board.chance.weights[added.id],ctx.state.chance.weights[added.id],'and the added task’s frozen weight in the pass’s draw');
+});
+// #2459: the Yes's change record carries the parts of the board the Yes
+// touched. Where the added task first joined the pass's draw in the Yes's own
+// draw, the Yes touched the whole draw (about 98 KB on the large board, over
+// the 64 KB a record may carry), so it went as a full copy at once instead.
+test('RISK change records: a Yes right after an Add on the large board goes as a change record, not a full copy',{timeout:300000},async t=>{
+ const {device,before}=await yesAfterAdd2459(t,'Added before the Yes 2459 record');
+ const {clock,counters}=device;
+ await clock.advance(1500);
+ const sent={records:recordsWritten2417(device)-before.records,uploads:counters.uploads.length-before.uploads};
+ t.diagnostic(JSON.stringify(sent));
+ assert.equal(sent.records,1,'the Yes goes as a change record');
+ assert.equal(sent.uploads,0,'and asks for no full copy at once');
+ await clock.settle();
+ assert.equal(device.shim.document.getElementById('syncBtn').textContent,'☁ synced','and sync ends synced');
+});

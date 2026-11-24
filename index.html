@@ -11614,6 +11614,20 @@ function halvingOrder(tasks){
   }
   return ordered;
 }
+/* #2459: every task in the pool joins the pass's draw as the change that put
+   it there commits (an Add, a mark expiring, a context shown), with the
+   frozen weight the next draw would give it (chanceScore, squaredScore and
+   halvingOrder all write chanceWeight against the draw's opponents for a task
+   without a valid weight). The weight is the same: a pool task's rating
+   cannot move before a draw offers it. Joined inside the next draw instead,
+   it made that draw's answer change the whole draw, about 98 KB on the large
+   board, more than a change record carries, so the first Yes after an Add went
+   as a full copy at once. */
+function joinPassDraw(tasks){
+  const c=state.chance;
+  if(!["squared","halving","chance"].includes(state.scanMode)||!c||!c.weights||typeof c.weights!=="object"||Array.isArray(c.weights))return;
+  for(const t of tasks)if(!Object.hasOwn(c.weights,t.id)||!Number.isFinite(c.weights[t.id])||c.weights[t.id]<0)c.weights[t.id]=chanceWeight(t,c.opponents);
+}
 function candidateOrder(tasks){
   if(state.scanMode === "halving")return halvingOrder(tasks);
   if(state.scanMode === "squared"){
@@ -11802,6 +11816,7 @@ function ensureCandidate(){
     return;
   }
   const p = pool();
+  joinPassDraw(p);
   const cur = state.candidateId ? taskById(state.candidateId) : null;
   const valid = cur && p.some(t=>t.id===cur.id);
   if(!valid){
@@ -15089,7 +15104,8 @@ function applyDecisionPassBase(board,winner){
   const rootTask=winner.root.value[0];
   const before=JSON.stringify([board.passId,board.passStartedAt,board.chain,board.mode,board.scanMode,board.chance,board.candidateId,board.interventionActive]);
   board.passId=winner.root.target.id;board.passStartedAt=winner.root.at;board.chain=[rootTask];board.mode="scan";
-  board.scanMode=winner.mode.value.mode;board.chance=winner.mode.value.chance===null?null:JSON.parse(JSON.stringify(winner.mode.value.chance));
+  // #2459: keeps the draw's joined weights where the board holds that draw (chosenDraw).
+  board.scanMode=winner.mode.value.mode;board.chance=winner.mode.value.chance===null?null:chosenDraw(board,winner.mode.value.chance);
   board.candidateId=null;board.interventionActive=false;
   if(board===state)chanceGeneration++;
   return before!==JSON.stringify([board.passId,board.passStartedAt,board.chain,board.mode,board.scanMode,board.chance,board.candidateId,board.interventionActive]);
@@ -15219,12 +15235,32 @@ function applyCurrentChoicePassMode(board,winner){
   board.mode=winner.value;board.candidateId=null;board.interventionActive=false;
   return true;
 }
+/* #2459: a task added during a pass joins the pass's draw the first time a
+   draw scores it, with a frozen weight of its own (frozenChanceWeight). The
+   draw that the pass's Start or scan-mode choice recorded never held it. A
+   replay writes the recorded draw; on a board that already holds that same
+   draw (seed, time, opponents and every recorded weight) it keeps the joined
+   weights, which are no decision. Dropping them left the board unlike its
+   own replay, so after an Add in a Started pass the decision-evidence check
+   (decisionProjectionIssue) held every full copy and change record with
+   unprojectable-decision-evidence, and each answer's replay reset the draw
+   and its candidate. A draw that differs in anything else is written as
+   recorded, as before. */
+function chosenDraw(board,chance){
+  const draw=JSON.parse(JSON.stringify(chance)),held=board?.chance;
+  const plain=value=>!!value&&typeof value==="object"&&!Array.isArray(value);
+  if(!plain(draw)||!plain(held)||!plain(draw.weights)||!plain(held.weights)||Object.keys(held).sort().join()!==Object.keys(draw).sort().join()
+    ||held.seed!==draw.seed||held.at!==draw.at||JSON.stringify(held.opponents)!==JSON.stringify(draw.opponents))return draw;
+  for(const [id,weight] of Object.entries(draw.weights))if(!Object.hasOwn(held.weights,id)||held.weights[id]!==weight)return draw;
+  for(const [id,weight] of Object.entries(held.weights))if(!Object.hasOwn(draw.weights,id)&&Number.isFinite(weight)&&weight>=0)draw.weights[id]=weight;
+  return draw;
+}
 function applyCurrentChoicePassScanMode(board,winner){
   if(!winner.after.present)return false;
-  const next=winner.value,modeChanged=board.scanMode!==next.mode;
-  const drawChanged=JSON.stringify(board.chance??null)!==JSON.stringify(next.chance);
+  const next=winner.value,modeChanged=board.scanMode!==next.mode,chance=next.chance===null?null:chosenDraw(board,next.chance);
+  const drawChanged=JSON.stringify(board.chance??null)!==JSON.stringify(chance);
   if(!modeChanged&&!drawChanged)return false;
-  board.scanMode=next.mode;board.chance=next.chance===null?null:JSON.parse(JSON.stringify(next.chance));
+  board.scanMode=next.mode;board.chance=chance;
   board.candidateId=null;board.interventionActive=false;
   if(board===state)chanceGeneration++;
   return true;
