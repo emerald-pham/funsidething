@@ -42926,6 +42926,7 @@ test('Changelog #2461: one bullet says a scanner press held for being too soon n
  assert.match(bullets[0],/its button dims for a moment/);
  assert.match(bullets[0],/instead of doing nothing/);
  assert.match(bullets[0],/starts when the new task shows on the screen/,'and says when the moment starts');
+ assert.match(bullets[0],/half as long as before/,'and that it is shorter, so a quick deliberate press counts');
  assert.doesNotMatch(bullets[0],/timeStamp|requestAnimationFrame|guard|paint/i,'it says what the person sees, not how it works');
  const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();
  const answer=app.shim.document.getElementById('modalRoot').innerHTML.match(/<dt>Why didn’t my second tap count\?<\/dt><dd>(.*?)<\/dd>/)?.[1]??'';
