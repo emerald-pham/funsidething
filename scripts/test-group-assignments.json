@@ -546,6 +546,11 @@
   ],
   "environmentSkips": [
     {
+      "root": "RISK idle scenery mirror browser: at tablet and short-landscape sizes frames with unchanged inputs reuse the mirror and a changed scene rebuilds it, and under reduced motion a daylight light slot repaints the life without rebuilding it, each matching a fresh paint, in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
       "root": "RISK opening scenery unsynced paint browser: a resize after the board shows and before the opening paint syncs the scene and paints the background without errors, then the opening finishes, in Chromium and WebKit under both motion choices",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."

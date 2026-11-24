@@ -394,7 +394,10 @@
   // look the same in daylight, and garden and patio lights show only after
   // sunset. In daylight a new slot then repaints nothing (#2456), and a
   // background just painted is current, so the next frame does not repaint it.
-  function cityLightsShown(){return p.night>.2||sky.sun.altitude<0;}
+  // The thresholds paintBackground lights them by.
+  function windowLightsShown(){return p.night>.2;}
+  function afterSunset(){return sky.sun.altitude<0;}
+  function cityLightsShown(){return windowLightsShown()||afterSunset();}
   function paintBackground(){
     backgroundVersion++;lastCitySlot=sceneSnapshot.windowsSlot;
     treeOrigins=[];
@@ -461,19 +464,19 @@
         const behindTower=xx+1.6>W*.71-12&&xx<W*.71+12&&yy+2.7>hy-91;
         const covered=buildings.slice(i+1).some(other=>xx+1.6>other.x&&xx<other.x+other.bw&&yy+2.7>other.y-12);
         if(xx+1.6<W&&!behindTower&&!covered)cityLights.visible.push(lightIndex);
-        b.fillStyle=night>.2 && cityLights.windows[lightIndex]?`rgba(255,220,153,${night*.8})`:'rgba(225,239,232,.22)';b.fillRect(xx,yy,1.6,2.7);
+        b.fillStyle=windowLightsShown() && cityLights.windows[lightIndex]?`rgba(255,220,153,${night*.8})`:'rgba(225,239,232,.22)';b.fillRect(xx,yy,1.6,2.7);
       }
       if(gardens.has(i)){
         const garden=gardens.get(i);
         const deckWidth=Math.max(3,bw*.72),deckX=x+(bw-deckWidth)/2,deckY=y-1.8;
         b.fillStyle=S.mixHex(p.hill,p.front,.42);b.fillRect(deckX,deckY,deckWidth,1.8);
         line(b,deckX,deckY,deckX+deckWidth,deckY,S.mixHex(p.front,p.sky[2],.36),.55);
-        if(sky.sun.altitude<0)for(let pot=0;pot<2;pot++){
+        if(afterSunset())for(let pot=0;pot<2;pot++){
           const px=deckX+deckWidth*(.23+pot*.52);
           b.fillStyle=S.mixHex(p.far,p.hill,.38+rand(i+pot+1100)*.2);b.fillRect(px,deckY-1,Math.max(1,deckWidth*.18),1.1);
           ellipse(b,px+deckWidth*.08,deckY-1.2,.8,.65,S.mixHex(p.far,p.front,.28));
         }
-        if(sky.sun.altitude<0&&night>.12&&gardenLights.lit[garden.index])for(let light=0;light<garden.lights;light++)
+        if(afterSunset()&&night>.12&&gardenLights.lit[garden.index])for(let light=0;light<garden.lights;light++)
           ellipse(b,deckX+deckWidth*(.44+light*.22),deckY-1.1,.55,.55,`rgba(255,228,157,${night*.92})`);
       }
       if(patios.has(i))paintRooftopPatio(b,patios.get(i));
@@ -820,6 +823,11 @@
   // above the water changes every frame, and so do seasonal particles once one
   // is inside the reflected part of the sky. Rows above that part never reach
   // the water, so a cloud entirely above it does not count.
+  // Where a drifting cloud is painted, and so what the mirror reflects of it.
+  // Reduced motion holds each cloud at a place of its own instead of drifting.
+  function cloudPlacement(pose){
+    return {size:(W<600?18:27)+pose.size*30,y:25+pose.y*hy,x:reduced?(rand(pose.index+71)*1.2-.1)*W:pose.x*W};
+  }
   function reflectionInputs(skyVisitor,weather){
     const surface=geometry.reflectionSurface(p.night);
     // The lake is clipped between the waterline and the far shore; the blur,
@@ -829,9 +837,9 @@
     if(skyVisitor||world.events.some(e=>e.type==='fireworks'||e.type==='festival')||(rooftopParty?.active&&p.night>.12)||clocktowerVisit?.active||weather.intensity>0
       ||(!reduced&&LandscapeSeasonal.particles(world.elapsed,sceneSeason,treeOrigins,geometry,W,H,weather).some(particle=>Math.min(particle.y,particle.y2??particle.y)-8<geometry.waterTop)))return null;
     const clouds=sceneSnapshot.clouds.map(pose=>{
-      const size=(W<600?18:27)+pose.size*30,y=25+pose.y*hy;
+      const {x,y,size}=cloudPlacement(pose);
       if(y+size*.5<reflectedTop)return '';
-      return Math.round((reduced?(rand(pose.index+71)*1.2-.1)*W:pose.x*W)*dpr);
+      return Math.round(x*dpr);
     });
     return JSON.stringify([W,H,dpr,backgroundVersion,p.night,weather.status,reduced,clouds]);
   }
@@ -854,9 +862,8 @@
     // Persistent drift guarantees life even between scheduled arrivals. In reduced
     // motion these exact same shapes are drawn once, with no animation loop.
     for(const pose of sceneSnapshot.clouds){
-      const size=(W<600?18:27)+pose.size*30;
-      const x=reduced?(rand(pose.index+71)*1.2-.1)*W:pose.x*W;
-      cloud(x,25+pose.y*hy,size,pose.opacity,weather);
+      const {x,y,size}=cloudPlacement(pose);
+      cloud(x,y,size,pose.opacity,weather);
     }
     // Paint moving sky visitors once, then collect every visible layer above
     // the horizon. New visitors and weather can enter the lake without a

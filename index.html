@@ -11846,7 +11846,8 @@ function halvingOrder(tasks){
 function joinPassDraw(tasks){
   const c=state.chance;
   if(!["squared","halving","chance"].includes(state.scanMode)||!c||!c.weights||typeof c.weights!=="object"||Array.isArray(c.weights))return;
-  for(const t of tasks)if(!Object.hasOwn(c.weights,t.id)||!Number.isFinite(c.weights[t.id])||c.weights[t.id]<0)c.weights[t.id]=chanceWeight(t,c.opponents);
+  // A valid frozen weight stays as it is; any other is worked out (frozenChanceWeight).
+  for(const t of tasks)c.weights[t.id]=frozenChanceWeight(t,c);
 }
 function candidateOrder(tasks){
   if(state.scanMode === "halving")return halvingOrder(tasks);
@@ -12145,8 +12146,11 @@ function heldPressButton(act,id){
   if(!id)return scan?.querySelector?.('[data-act="'+act+'"]')||null;
   return [...(scan?.querySelectorAll?.('[data-act="'+act+'"]')||[])].find(button=>button.dataset?.id===id)||null;
 }
+// A target that cannot take a class (an old engine's or a partial element)
+// is still held; only its dim is skipped.
+const canDim=button=>typeof button?.classList?.add==="function"&&typeof button.classList.remove==="function";
 function showHeldPress(button){
-  if(!heldPress||!button?.classList)return;
+  if(!heldPress||!canDim(button))return;
   heldPress.button?.classList?.remove("held");
   heldPress.button=button;button.classList.add("held");
 }

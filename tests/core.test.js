@@ -7422,6 +7422,110 @@ test('RISK idle scenery browser: frames whose reflected scene is unchanged keep 
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
 
+// #2456 review: the lake mirror's inputs (reflectionInputs) depend on the
+// canvas size and pixel ratio and have their own reduced-motion branches (the
+// still clouds' places, no seasonal particles). At a tablet and a short
+// landscape size in normal motion, frames with unchanged inputs reuse the
+// mirror and a changed scene rebuilds it; under reduced motion a daylight
+// window-light slot repaints only the life, reusing the mirror. Each painted
+// life then matches a fresh device painting the same instant at that size.
+// Counted per painted frame under frozen page time, never timed; every
+// visitor, weather and ambience rate is zero, as in the idle scenery test.
+test('RISK idle scenery mirror browser: at tablet and short-landscape sizes frames with unchanged inputs reuse the mirror and a changed scene rebuilds it, and under reduced motion a daylight light slot repaints the life without rebuilding it, each matching a fresh paint, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=12,INSTANT=Date.parse('2026-11-19T17:00:00Z');
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('mirror-'+i,'Mirror board task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true}));
+ const rates=fs.readFileSync(path.join(__dirname,'SPAWN_RATES.md'),'utf8').replace(/^\| ([a-z-]+) \| [\d.]+ \|$/gm,'| $1 | 0 |');
+ const digest=value=>createHash('sha256').update(value).digest('hex').slice(0,16);
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  const contexts=[];
+  try{
+   const open=async({viewport,motion,at,scale=1})=>{
+    const context=await browser.newContext({viewport,deviceScaleFactor:scale,timezoneId:'America/New_York',serviceWorkers:'block',reducedMotion:motion==='reduced'?'reduce':'no-preference'});contexts.push(context);
+    await context.route('**/*',route=>{
+     const url=new URL(route.request().url());if(url.origin!==origin)return route.abort();
+     if(url.pathname.endsWith('/SPAWN_RATES.md'))return route.fulfill({status:200,contentType:'text/markdown',body:rates});
+     return route.continue();
+    });
+    await context.addInitScript(({board,motion})=>{
+     Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:motion,savedAt:Date.parse('2026-11-18T12:00:00Z')}));
+     if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+     // frames: painted life frames; passes: draws onto any other canvas (the mirror's buffers, the city copy, the background) and texture uploads.
+     const mirror=window.__mirror={frames:0,passes:0};
+     const life=()=>document.querySelector('#landscape [data-life]');
+     const context2d=CanvasRenderingContext2D.prototype;
+     for(const method of ['clearRect','fillRect','drawImage','putImageData','fill','stroke']){
+      const original=context2d[method];
+      context2d[method]=function(...args){
+       const canvas=this.canvas,front=life();
+       if(front&&canvas===front){if(method==='clearRect'&&args[0]===0&&args[1]===0&&args[2]>=front.clientWidth&&args[3]>=front.clientHeight)mirror.frames++;}
+       else if(front&&canvas&&canvas.width>1&&canvas.height>1)mirror.passes++;
+       return original.apply(this,args);
+      };
+     }
+     for(const gl of [globalThis.WebGLRenderingContext,globalThis.WebGL2RenderingContext])if(gl){
+      const upload=gl.prototype.texImage2D;
+      gl.prototype.texImage2D=function(...args){if(life())mirror.passes++;return upload.apply(this,args);};
+     }
+    },{board,motion});
+    const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+    await page.clock.setFixedTime(new Date(at));
+    await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&getComputedStyle(document.querySelector('#landscape [data-scenery]')).visibility==='visible'&&window.__mirror.frames>=1,null,{timeout:30000,polling:100});
+    return {page,errors};
+   };
+   const count=page=>page.evaluate(()=>({...window.__mirror}));
+   const until=async(page,frames)=>{
+    const before=await count(page);
+    await page.waitForFunction(target=>window.__mirror.frames>=target,before.frames+frames,{timeout:60000,polling:100});
+    const after=await count(page);return {frames:after.frames-before.frames,passes:after.passes-before.passes};
+   };
+   const lifePixels=async page=>digest(await page.evaluate(()=>document.querySelector('#landscape [data-life]').toDataURL()));
+   for(const [size,viewport,scale] of [['tablet',{width:768,height:1024},2],['short landscape',{width:844,height:390},3]]){
+    const label=`${engineName}/${size}/normal`;
+    const {page,errors}=await open({viewport,motion:'normal',at:INSTANT,scale});
+    await until(page,10);
+    const idle=await until(page,60),shown=await lifePixels(page);
+    const fresh=await open({viewport,motion:'normal',at:INSTANT,scale});await until(fresh.page,10);
+    const expected=await lifePixels(fresh.page);
+    // Five seconds later the clouds over the lake have moved.
+    await page.clock.setFixedTime(new Date(INSTANT+5000));
+    const changed=await until(page,5);
+    const dims=await page.evaluate(()=>{const c=document.querySelector('#landscape [data-life]');return {width:c.width,height:c.height,cssWidth:c.clientWidth};});
+    observed.push({label,dims,idle,changed,matches:shown===expected});
+    assert.deepEqual([...errors,...fresh.errors],[],`${label}: no page errors`);
+    assert.ok(idle.frames>=60,`${label}: fixture: the loop painted the counted frames ${JSON.stringify(idle)}`);
+    assert.ok(dims.width>dims.cssWidth,`${label}: fixture: the canvas is drawn at a pixel ratio above 1 ${JSON.stringify(dims)}`);
+    if(idle.passes>20)failures.push(`${label}: frames with unchanged inputs rebuilt the mirror (${idle.passes} rebuild draws over ${idle.frames} frames)`);
+    if(changed.passes<1)failures.push(`${label}: a changed scene did not rebuild the mirror ${JSON.stringify(changed)}`);
+    if(shown!==expected)failures.push(`${label}: the painted life differs from a fresh paint at the same instant and size`);
+   }
+   for(const [size,viewport] of [['phone',{width:390,height:844}],['tablet',{width:768,height:1024}]]){
+    const label=`${engineName}/${size}/reduced`;
+    // Early in one 7.5-second window-light slot, then in the next, in daylight.
+    const {page,errors}=await open({viewport,motion:'reduced',at:INSTANT+1000});
+    const before=await count(page);
+    await page.clock.setFixedTime(new Date(INSTANT+8000));
+    // The reduced-motion timer runs once a second.
+    const slot=await until(page,1),shown=await lifePixels(page);
+    const fresh=await open({viewport,motion:'reduced',at:INSTANT+8000}),expected=await lifePixels(fresh.page);
+    const period=await page.evaluate(()=>document.documentElement.dataset.scenePeriod);
+    observed.push({label,period,opening:before,slot,matches:shown===expected});
+    assert.deepEqual([...errors,...fresh.errors],[],`${label}: no page errors`);
+    assert.equal(period,'day',`${label}: fixture: daylight`);
+    assert.equal(before.frames,1,`${label}: fixture: reduced motion painted the life once at opening ${JSON.stringify(before)}`);
+    if(slot.passes>0)failures.push(`${label}: a daylight light slot rebuilt the mirror or background (${slot.passes} draws)`);
+    if(shown!==expected)failures.push(`${label}: the repainted life differs from a fresh paint at that instant`);
+   }
+  }finally{for(const context of contexts)await context.close();await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
 // #2456: the background (sky, city and its window lights) was repainted at
 // every 7.5-second window-light slot, about 20 ms at 4x CPU, and once more on
 // the first frame after opening. Lit and unlit windows look the same in
