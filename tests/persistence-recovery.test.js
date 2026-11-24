@@ -20780,7 +20780,7 @@ test('RISK scanner press guard: on the large board, a press within the guard of 
  assert.deepEqual(answeredState2461(ctx),shown,'the n key at the same moment is held too');
  assert.ok(guard.button('no').classList.contains('held'),'and No shows that it was held');
  // The acknowledgement is brief.
- await clock.advance(1000);
+ guard.paint();await clock.advance(1000);
  assert.ok(!guard.button('yes').classList.contains('held')&&!guard.button('no').classList.contains('held'),'a moment later neither shows it');
  assert.deepEqual(answeredState2461(ctx),shown,'and the held presses changed nothing later');
 });
@@ -20848,6 +20848,28 @@ test('RISK scanner press guard: on the large board, a deliberate Yes or n key 15
  await clock.advance(150);
  guard.key('n');
  assert.equal(ctx.state.considered[third],'no','the n key 150 ms after the next candidate painted answers it');
+});
+
+// Measured on #2461: a held press followed by a 0.5 s device save had its dim
+// time run out before any frame painted it.
+test('RISK scanner press guard: a held press stays dimmed until a frame has shown it for a moment, however long the work after it blocks the frames',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,guard=pressGuard2461(device);
+ guard.paint();await clock.advance(1000);
+ guard.press('yes');
+ await clock.advance(100);guard.paint();await clock.advance(50);
+ const shown=answeredState2461(ctx);
+ assert.ok(guard.press('yes').classList.contains('held'),'positive control: a Yes 50 ms after the new candidate painted is held and dims');
+ // No frame paints for the next 600 ms: other work holds the page.
+ await clock.advance(600);
+ assert.ok(guard.button('yes').classList.contains('held'),'Yes is still dimmed when the next frame comes, 600 ms later');
+ guard.paint();await clock.advance(200);
+ assert.ok(guard.button('yes').classList.contains('held'),'and stays dimmed 200 ms after that frame');
+ guard.paint();await clock.advance(400);
+ assert.ok(!guard.button('yes').classList.contains('held'),'then the dim ends');
+ assert.deepEqual(answeredState2461(ctx),shown,'and the held press changed nothing');
 });
 
 // A page that is never given a frame must not hold every press for good.

@@ -12067,12 +12067,18 @@ function showHeldPress(button){
   heldPress.button?.classList?.remove("held");
   heldPress.button=button;button.classList.add("held");
 }
+// Its moment is counted from the first frame after the press: a save or other
+// long task right after it would otherwise use up the moment before any frame
+// showed the dim. A page with no frames ends it after the same wait as the guard.
 function acknowledgeHeldPress(act,pressed){
   if(heldPress){clearTimeout(heldPress.timer);heldPress.button?.classList?.remove("held");}
   const id=pressed?.dataset?.id||null;
-  heldPress={act,id,button:null,until:performance.now()+HELD_PRESS_SHOW_MS,timer:0};
+  heldPress={act,id,button:null,until:Infinity,timer:0};
   const current=heldPress;
-  current.timer=setTimeout(()=>{if(heldPress!==current)return;current.button?.classList?.remove("held");heldPress=null;},HELD_PRESS_SHOW_MS);
+  const end=()=>{if(heldPress!==current)return;current.button?.classList?.remove("held");heldPress=null;};
+  const count=()=>{if(heldPress!==current||current.until!==Infinity)return;current.until=performance.now()+HELD_PRESS_SHOW_MS;clearTimeout(current.timer);current.timer=setTimeout(end,HELD_PRESS_SHOW_MS);};
+  if(typeof requestAnimationFrame==="function"){requestAnimationFrame(count);current.timer=setTimeout(count,TASKS_ON_SCREEN_FRAME_WAIT_MS);}
+  else count();
   showHeldPress(pressed&&pressed.isConnected!==false?pressed:heldPressButton(act,id));
 }
 function keepHeldPressShown(){
