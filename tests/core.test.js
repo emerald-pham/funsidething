@@ -24098,6 +24098,109 @@ test('RISK steady scanner browser: the actions under the dotted task and the can
  assert.deepEqual(failures,[]);
 });
 
+// #2460 review B1: a hint that kept its width while hidden made the candidate's
+// Worked on it 13 px wider than on the released build, so on 407-432 px phones
+// the candidate's row broke 3 + 1 with Delete alone where the released build
+// kept one line, and the dotted task's row gained a line at 375 px with
+// Postpone. A hint now draws inside the button's own padding: shown, hidden or
+// absent, it never adds width, and the label stays centred clear of it.
+test('RISK steady scanner browser: a key hint never widens an action beside a card and its label sits centred clear of the hint, so the candidate\'s row keeps one line on 412 to 430 px phones and the dotted task\'s Delete is never alone at 375 px with Postpone, with web fonts and blocked in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ const readActions=page=>page.evaluate(()=>{
+  const rowAfter=selector=>{
+   const row=document.querySelector(selector)?.nextElementSibling;if(!row)return null;
+   return [...row.children].filter(el=>el.matches('button')).map(el=>{
+    const s=getComputedStyle(el),r=el.getBoundingClientRect();
+    const inner={left:r.left+parseFloat(s.borderLeftWidth),right:r.right-parseFloat(s.borderRightWidth)};
+    // The label is the button's own text, outside any hint.
+    const range=document.createRange(),rects=[];
+    const walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT,{acceptNode:n=>n.parentElement.closest('.keyhint')||!n.textContent.trim()?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT});
+    for(let n;(n=walker.nextNode());){range.selectNodeContents(n);rects.push(...[...range.getClientRects()].filter(b=>b.width>0));}
+    const label={left:Math.min(...rects.map(b=>b.left)),right:Math.max(...rects.map(b=>b.right)),top:Math.min(...rects.map(b=>b.top)),bottom:Math.max(...rects.map(b=>b.bottom))};
+    const hints=[...el.querySelectorAll('.keyhint')].map(h=>{const b=h.getBoundingClientRect();return {text:h.textContent,left:b.left,right:b.right,top:b.top,bottom:b.bottom};});
+    // The same button with its hint taken out, then put back as it was.
+    let bare=r.width;
+    if(el.querySelector('.keyhint')){
+     const taken=[...el.querySelectorAll('.keyhint')].map(h=>[h,h.parentNode,h.nextSibling]);
+     taken.forEach(([h])=>h.remove());bare=el.getBoundingClientRect().width;
+     taken.reverse().forEach(([h,parent,next])=>parent.insertBefore(h,next));
+    }
+    return {act:el.dataset.act,width:r.width,bare,top:r.top,left:r.left,inner,label,hints};
+   });
+  };
+  return {bench:rowAfter('.card.bench'),cand:rowAfter('.card.cand')};
+ });
+ const lines=row=>{const tops=[...new Set(row.map(b=>Math.round(b.top)))].sort((a,b)=>a-b);return tops.map(t=>row.filter(b=>Math.abs(Math.round(b.top)-t)<=1).sort((a,b)=>a.left-b.left).map(b=>b.act));};
+ const checkActions=(label,row)=>{
+  for(const b of row){
+   const bl=`${label}: ${b.act}`;
+   assert.ok(Math.abs(b.width-b.bare)<=0.5,`${bl}: its key hint adds no width: ${b.width.toFixed(1)} px with it, ${b.bare.toFixed(1)} px without`);
+   const leftInset=b.label.left-b.inner.left,rightInset=b.inner.right-b.label.right;
+   assert.ok(Math.abs(leftInset-rightInset)<=1,`${bl}: its label is centred: ${leftInset.toFixed(1)} px from the left, ${rightInset.toFixed(1)} px from the right`);
+   for(const h of b.hints){
+    const apart=h.left>=b.label.right||h.right<=b.label.left||h.top>=b.label.bottom||h.bottom<=b.label.top;
+    assert.ok(apart,`${bl}: its ${h.text} hint (${h.left.toFixed(1)}-${h.right.toFixed(1)}) stays clear of its label (${b.label.left.toFixed(1)}-${b.label.right.toFixed(1)})`);
+    assert.ok(h.left>=b.inner.left-0.5&&h.right<=b.inner.right+0.5,`${bl}: its ${h.text} hint stays inside the button`);
+   }
+  }
+ };
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const spec of [
+    {name:'small phone with enlarged text and Postpone',width:320,height:568,enlarged:true,showPostpone:true},
+    {name:'common phone',width:375,height:812},
+    {name:'common phone with Postpone',width:375,height:812,showPostpone:true,benchNoLoneDelete:true},
+    {name:'412 px phone',width:412,height:915,candOneLine:true},
+    {name:'414 px phone',width:414,height:896,candOneLine:true},
+    {name:'428 px phone',width:428,height:926,candOneLine:true},
+    {name:'430 px phone',width:430,height:932,candOneLine:true},
+    {name:'large phone at 200% text with Postpone',width:430,height:932,enlarged:true,doubleText:true,showPostpone:true},
+    {name:'desktop with Postpone',width:1000,height:900,touch:false,showPostpone:true},
+   ])for(const webFonts of [true,false]){
+    const label=`${engineName} ${spec.name} ${webFonts?'with web fonts':'fonts blocked'}`;
+    const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard(spec),spec);
+    try{
+     if(webFonts){
+      await context.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//,route=>route.continue());
+      await page.reload({waitUntil:'domcontentloaded'});
+      await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]'),null,{timeout:60000});
+     }
+     if(spec.enlarged)await page.addStyleTag({content:spec.doubleText?STEADY_DOUBLE_TEXT:STEADY_ENLARGED_TEXT});
+     await page.waitForFunction(()=>!!document.querySelector('.card.bench')&&!!document.querySelector('.card.cand')&&!!document.querySelector('[data-act="cand-worked"]'),null,{timeout:15000});
+     await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(80);
+     const loadedFonts=await page.evaluate(()=>[...document.fonts].filter(face=>face.status==='loaded').length);
+     if(webFonts)assert.ok(loadedFonts>0,`${label}: positive control: the web fonts loaded, which needs the network`);
+     else assert.equal(loadedFonts,0,`${label}: positive control: no web font loaded`);
+     const seen=await readActions(page),tl=`${label}, candidate listening`;
+     assert.ok(seen.bench&&seen.cand,`${tl}: both cards show their actions`);
+     assert.ok(seen.cand.some(b=>b.hints.length)&&seen.bench.some(b=>b.hints.length),`${tl}: positive control: both rows carry key hints`);
+     const benchLines=lines(seen.bench),candLines=lines(seen.cand);
+     if(spec.candOneLine)assert.equal(candLines.length,1,`${tl}: the candidate's actions share one line, as on the released build: ${JSON.stringify(candLines)}`);
+     // With the fallback fonts the released build already wraps this row 3 + 3 + 1
+     // at 375 px (its second line needs 322.5 of 321 px with no hint at all), so
+     // there it may take no more lines than that build's three.
+     if(spec.benchNoLoneDelete&&webFonts){
+      assert.ok(benchLines.length<=2,`${tl}: the dotted task's row takes no more lines than the released build's two: ${JSON.stringify(benchLines)}`);
+      assert.ok(!benchLines.some(line=>line.length===1&&line[0]==='delete-task'),`${tl}: Delete is not alone on a line under the dotted task: ${JSON.stringify(benchLines)}`);
+     }
+     if(spec.benchNoLoneDelete&&!webFonts)assert.ok(benchLines.length<=3,`${tl}: the dotted task's row takes no more lines than the released build's three: ${JSON.stringify(benchLines)}`);
+     checkActions(`${tl}: dotted task's row`,seen.bench);checkActions(`${tl}: candidate's row`,seen.cand);
+     // done adding for now: every hint moves to the dotted task.
+     await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
+     const finish=page.locator('[data-act="start-working"]');
+     if(spec.touch===false)await finish.click();else await finish.tap();
+     await page.waitForFunction(()=>state.mode==='work'&&!document.querySelector('.card.cand'),null,{timeout:10000});
+     const after=await readActions(page);
+     checkActions(`${label}, dotted task listening: dotted task's row`,after.bench);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(error.message.split('\n')[0]);}finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
 // When the next title is as long as the last, a second tap lands on the button
 // of the next candidate before anyone could have read it, so a physical press
 // inside 200 ms of the new task appearing is dropped.
