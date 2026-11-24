@@ -253,6 +253,16 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
 .btn.sm[data-act="edit"]:has(> .keyhint)::before{content:"e";content:"e"/""}
 .btn.sm[data-act$="worked"]:has(> .keyhint)::before{content:"w";content:"w"/""}
 .btn.sm[data-act="delete-task"]:has(> .keyhint)::before{content:"\232B";content:"\232B"/""}
+/* From 768px the rows have width to spare, and at DPR 1 a 7.5px ⌫ is a smudge,
+   so the hints there match the choices': 10px, 5px after the label, at least
+   2px from the edge (#2460 review B3). The 5px box and the margins that cancel
+   it work as above; only Worked on it's w, wider than 5px, widens its button
+   (by about 7px, the same under both cards). */
+@media (min-width:768px){
+  .btn.sm .keyhint,.btn.sm:has(> .keyhint)::before{font-size:10px;min-inline-size:5px}
+  .btn.sm .keyhint{margin-inline:5px -10px}
+  .btn.sm:has(> .keyhint)::before{margin-inline-end:-5px}
+}
 /* A hint on the card the key doesn't act on isn't seen or read (#2460). */
 .keyhint.unheard{visibility:hidden}
 .sparkbox{display:flex;align-items:center;gap:8px;margin-left:auto}

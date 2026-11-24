@@ -24138,7 +24138,7 @@ test("RISK steady scanner browser: a key hint never widens an action beside a ca
  const checkActions=(label,row,normalText)=>{
   for(const b of row){
    const bl=`${label}: ${b.act}`;
-   if(normalText){
+   if(normalText==='phone'){
     assert.ok(Math.abs(b.width-b.bare)<=0.5,`${bl}: its key hint adds no width: ${b.width.toFixed(1)} px with it, ${b.bare.toFixed(1)} px without`);
     assert.ok(Math.abs(b.height-b.bareHeight)<=0.5,`${bl}: its key hint adds no height: ${b.height.toFixed(1)} px with it, ${b.bareHeight.toFixed(1)} px without`);
    }
@@ -24154,11 +24154,15 @@ test("RISK steady scanner browser: a key hint never widens an action beside a ca
  // Review B2: a hint flush with the button's edge sat 1.7 px from "Delete" and
  // 14 px from "Edit". Every hint beside a card follows its label by one gap, as
  // the Yes, No and Can't hints do.
- const sameGap=(label,...rows)=>{
+ // Review B3: from 768 px the rows have room to spare, so the hints there
+ // take the choices' 5 px gap (and their size, checked below) rather than
+ // the phone's 2 px.
+ const sameGap=(label,wide,...rows)=>{
   const gaps=rows.flat().flatMap(b=>b.hints.map(h=>({at:b.act+' '+h.text,gap:h.left-b.label.right})));
   assert.ok(gaps.length>0,`${label}: positive control: there are hints to compare`);
   const sizes=gaps.map(g=>g.gap);
   assert.ok(Math.max(...sizes)-Math.min(...sizes)<=1&&Math.min(...sizes)>=1.5,`${label}: every hint follows its label by one gap of at least 1.5 px: ${gaps.map(g=>g.at+' '+g.gap.toFixed(1)).join(', ')}`);
+  if(wide)assert.ok(sizes.every(g=>Math.abs(g-5)<=1),`${label}: at tablet and desktop width every hint follows its label by the choices' 5 px: ${gaps.map(g=>g.at+' '+g.gap.toFixed(1)).join(', ')}`);
  };
  // Text enlarged where the padding stays put (review B2, independent review):
  // a platform text scale multiplies every font size, the hints' included, and
@@ -24195,6 +24199,8 @@ test("RISK steady scanner browser: a key hint never widens an action beside a ca
     {name:'common phone with a 16 px minimum font size and Postpone',width:375,height:812,minimum:16,showPostpone:true},
     {name:'desktop with a 16 px minimum font size',width:1000,height:900,touch:false,minimum:16,showPostpone:true},
     {name:'desktop with Postpone',width:1000,height:900,touch:false,showPostpone:true},
+    {name:'tablet portrait with Postpone',width:768,height:1024,showPostpone:true},
+    {name:'desktop at DPR 1 with Postpone',width:1280,height:800,touch:false,dpr:1,showPostpone:true},
     // Chrome's own setting, which raises font sizes but not the em lengths
     // sized from them, as a modelled minimum does.
     ...(engineName==='chromium'?[
@@ -24204,6 +24210,7 @@ test("RISK steady scanner browser: a key hint never widens an action beside a ca
    ])for(const webFonts of [true,false]){
     const label=`${engineName} ${spec.name} ${webFonts?'with web fonts':'fonts blocked'}`;
     let profile=null,host=browser;
+    if(spec.dpr)host={newContext:options=>browser.newContext({...options,deviceScaleFactor:spec.dpr})};
     if(spec.chromeMinimum){
      profile=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'hint-minimum-font-2460-'));
      fs.mkdirSync(path.join(profile,'Default'));
@@ -24220,7 +24227,7 @@ test("RISK steady scanner browser: a key hint never widens an action beside a ca
      }
      await page.waitForFunction(()=>!!document.querySelector('.card.bench')&&!!document.querySelector('.card.cand')&&!!document.querySelector('[data-act="cand-worked"]'),null,{timeout:15000});
      await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(80);
-     const normalText=!spec.scale&&!spec.minimum&&!spec.chromeMinimum;
+     const wide=spec.width>=768,normalText=!spec.scale&&!spec.minimum&&!spec.chromeMinimum&&(wide?'wide':'phone');
      if(spec.scale||spec.minimum){await enlargeRowText(page,spec);await page.waitForTimeout(80);}
      if(spec.chromeMinimum)assert.equal(await page.evaluate(()=>getComputedStyle(document.querySelector('.card.cand + * .keyhint')).fontSize),spec.chromeMinimum+'px',`${label}: positive control: Chrome raised the hint to its minimum font size`);
      const loadedFonts=await page.evaluate(()=>[...document.fonts].filter(face=>face.status==='loaded').length);
@@ -24239,7 +24246,13 @@ test("RISK steady scanner browser: a key hint never widens an action beside a ca
       assert.ok(!benchLines.some(line=>line.length===1&&line[0]==='delete-task'),`${tl}: Delete is not alone on a line under the dotted task: ${JSON.stringify(benchLines)}`);
      }
      if(spec.benchNoLoneDelete&&!webFonts)assert.ok(benchLines.length<=3,`${tl}: the dotted task's row takes no more lines than the released build's three: ${JSON.stringify(benchLines)}`);
-     sameGap(tl,seen.bench,seen.cand);
+     sameGap(tl,wide,seen.bench,seen.cand);
+     if(normalText==='wide'){
+      assert.equal(benchLines.length,1,`${tl}: the dotted task's actions share one line: ${JSON.stringify(benchLines)}`);
+      assert.equal(candLines.length,1,`${tl}: the candidate's actions share one line: ${JSON.stringify(candLines)}`);
+      const sizes=await page.evaluate(()=>({choice:getComputedStyle(document.querySelector('.decide .keyhint')).fontSize,card:[...document.querySelectorAll('.siderail .keyhint,.actionrow .keyhint')].map(h=>getComputedStyle(h).fontSize)}));
+      assert.ok(sizes.card.length&&sizes.card.every(size=>size===sizes.choice),`${tl}: card hints are the choices' ${sizes.choice}: ${sizes.card.join(', ')}`);
+     }
      checkActions(`${tl}: dotted task's row`,seen.bench,normalText);checkActions(`${tl}: candidate's row`,seen.cand,normalText);
      // done adding for now: every hint moves to the dotted task.
      await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
@@ -24248,7 +24261,7 @@ test("RISK steady scanner browser: a key hint never widens an action beside a ca
      await page.waitForFunction(()=>state.mode==='work'&&!document.querySelector('.card.cand'),null,{timeout:10000});
      const after=await readActions(page);
      checkActions(`${label}, dotted task listening: dotted task's row`,after.bench,normalText);
-     sameGap(`${label}, dotted task listening`,after.bench);
+     sameGap(`${label}, dotted task listening`,wide,after.bench);
      assert.deepEqual(errors,[],`${label}: no page errors`);
     }catch(error){failures.push(error.message.split('\n')[0]);}finally{await context.close();if(profile)fs.rmSync(profile,{recursive:true,force:true});}
    }
