@@ -20668,6 +20668,26 @@ test('RISK scanner press guard: on the large board, a press made more than the g
  assert.deepEqual([...ctx.state.chain],beforeKey.chain,'and No leaves the chain as it was');
 });
 
+// A page that is never given a frame must not hold every press for good.
+test('RISK scanner press guard: when no frame ever comes to paint the new candidate, a press a moment later still counts, and one within the guard of the panel being drawn is still held',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,guard=pressGuard2461(device);
+ guard.paint();await clock.advance(1000);
+ guard.press('yes');
+ const second=ctx.state.candidateId;
+ await clock.advance(100);
+ const drawn=answeredState2461(ctx);
+ assert.ok(guard.press('yes').classList.contains('held'),'positive control: a Yes 100 ms after the panel was drawn is held');
+ assert.deepEqual(answeredState2461(ctx),drawn,'and changes nothing');
+ // No frame is painted from here on.
+ await clock.advance(1500);
+ const before=answeredState2461(ctx);
+ assert.ok(!guard.press('yes').classList.contains('held'),'a Yes 1.6 s after the panel was drawn is not held, though no frame came');
+ assert.deepEqual([...ctx.state.chain],[...before.chain,second],'and answers the candidate shown');
+});
+
 test('RISK scanner press guard: signed in on the large board, a held Yes reaches neither the device save nor the cloud, and the next Yes after the guard does',{timeout:600000},async t=>{
  const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
  const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});

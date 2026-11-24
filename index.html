@@ -11865,6 +11865,7 @@ const TASK_PRESS_GUARD_MS=200;
 // shift the cards, so a second tap can land on a different button of the next task.
 const SCANNER_TASK_ACTIONS=new Set(["yes","no","cant","postpone","cand-done","bench-done","bench-cant","bench-postpone","dislodge","worked","cand-worked","delete-task"]);
 let tasksOnScreen=null,tasksOnScreenSince=-Infinity,tasksOnScreenFrame=0;
+const TASKS_ON_SCREEN_FRAME_WAIT_MS=1000;
 function noteTasksOnScreen(){
   const shown=state.candidateId+"|"+(state.chain.at(-1)??"");
   if(shown===tasksOnScreen)return;
@@ -11875,8 +11876,11 @@ function noteTasksOnScreen(){
   // paint without waiting past it. A hidden page paints no frame and takes no
   // presses; its first frame back is when these tasks appear.
   tasksOnScreenSince=Infinity;
-  const frame=++tasksOnScreenFrame;
+  const frame=++tasksOnScreenFrame,drawnAt=performance.now();
   requestAnimationFrame(()=>{if(frame===tasksOnScreenFrame)tasksOnScreenSince=performance.now();});
+  // A page that is never given a frame must not hold every press for good:
+  // after a second it is timed from when the panel was drawn, as before #2461.
+  setTimeout(()=>{if(frame===tasksOnScreenFrame&&tasksOnScreenSince===Infinity)tasksOnScreenSince=drawnAt;},TASKS_ON_SCREEN_FRAME_WAIT_MS);
 }
 // When the person pressed, on the clock the guard reads. A browser stamps each
 // event on that clock; a stamp that is missing or not on it (an old engine's
