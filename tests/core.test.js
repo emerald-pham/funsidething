@@ -36484,6 +36484,8 @@ test('RISK Add draft durable reset: pending repeated Add and newer edits or rese
   if(next==='account'){ctx.state.syncAccount='other-private-owner';}
   if(next==='same-after-reset'){input.value='';ctx.clearQuickAddDraft();input.value='Private pending Add';shim.document.dispatchEvent({type:'input',target:input});}
   if(next==='same-after-edit'){input.value='Different task';shim.document.dispatchEvent({type:'input',target:input});input.value='Private pending Add';shim.document.dispatchEvent({type:'input',target:input});}
+  // #2457: the Add's save starts once the frame that draws the task has run.
+  while(!release)await new Promise(resolve=>setImmediate(resolve));
   release(true);await saving;await repeated;
   assert.equal(input.value,next==='newer'?'Newer task draft':next==='reset'?'':'Private pending Add','confirmation cannot clear a later edit/reset or another owner draft');
  }
