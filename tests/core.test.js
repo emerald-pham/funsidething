@@ -36698,6 +36698,28 @@ test('RISK Add draft durable reset: failed device save retains draft and retry d
  shim.localStorage.setItem=original;await ctx.onAction('add',{});assert.equal(input.value,'');assert.equal(doc.getElementById('addButton').classList.contains('yes'),false);assert.equal(ctx.state.tasks.filter(t=>t.title==='Private durable Add').length,1,'retry saves the accepted task, never creates a duplicate');
 });
 
+// #2467 review N1: Help says a failed save brings the draft back "unless you
+// have typed or reset it since". The box empties in the Add's tap (#2457), so
+// what is in it when the save fails is the person's: a newer draft stays, a
+// reset box stays empty, and another owner's box never shows the old owner's
+// draft. The save fails as a real device write does, after the tap.
+test('RISK Add draft durable reset: a failed device save keeps a newer draft, leaves a reset box empty and never shows the earlier owner’s draft after an owner change',async()=>{
+ for(const next of ['newer','reset','account']){
+  const {ctx,shim}=await loadApp();ctx.renderAddPanel();const doc=shim.document,input=doc.getElementById('addInput');input.id='addInput';input.matches=()=>false;
+  input.value='Private failed Add';doc.dispatchEvent({type:'input',target:input});
+  const original=shim.localStorage.setItem;shim.localStorage.setItem=()=>{throw new Error('private device write rejection');};
+  const saving=ctx.onAction('add',{});
+  assert.equal(input.value,'','positive control: the box empties in the Add’s tap ('+next+')');
+  if(next==='newer'){input.value='Private newer draft';doc.dispatchEvent({type:'input',target:input});}
+  if(next==='reset'){input.value='';ctx.clearQuickAddDraft();}
+  if(next==='account')ctx.state.syncAccount='other-private-owner';
+  assert.equal(await saving,false,'positive control: the Add’s device save fails ('+next+')');
+  shim.localStorage.setItem=original;
+  assert.equal(input.value,next==='newer'?'Private newer draft':'',next==='newer'?'a draft typed since the Add is kept':next==='reset'?'a box reset since the Add stays empty':'the earlier owner’s draft is not shown after an owner change');
+  assert.equal(ctx.state.tasks.filter(t=>t.title==='Private failed Add').length,1,'the board still holds the Add once ('+next+')');
+ }
+});
+
 test('RISK Add draft durable reset: pending repeated Add and newer edits or reset survive an awaiting save',async()=>{
  for(const next of ['newer','reset','account','same-after-reset','same-after-edit']){
   const {ctx,shim}=await loadApp();ctx.renderAddPanel();const input=shim.document.getElementById('addInput');input.id='addInput';input.matches=()=>false;input.value='Private pending Add';shim.document.dispatchEvent({type:'input',target:input});
