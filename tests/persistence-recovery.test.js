@@ -40,6 +40,7 @@ import { benchmarkEdit } from "./shared.js";
 import { woopFields2421, woopBoard2421, woopSnapshot2421 } from "./shared.js"; // #2421 saved WOOP data
 import { decisionMixedActionsApp146 } from "./shared.js"; // #2435: every kind of recorded choice, for the check before a change record
 import v8 from "node:v8"; // #2435 review: a collection, to show a replaced board's decision data is let go
+import { mulberry32 } from "./shared.js"; // #2459: one random stream for two devices' rank sampling
 
 test('RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap',async t=>{
  if(process.env.CHAIN_RECOVERY_MEMORY_CHILD!=='1'){
@@ -17671,9 +17672,11 @@ test('RISK change records: a server-only repair of a damaged full copy publishes
 });
 
 // #2417 specialist review B1: an answer that leaves the sender's board
-// unprojectable (#2395: a task added during a started pass, then an answer)
-// goes as no change record, as its full copy does not go; the other device
-// shows no error and keeps syncing.
+// unprojectable goes as no change record, as its full copy does not go; the
+// other device shows no error and keeps syncing. #2459: #2395's path here (a
+// task added during a started pass, then an answer) no longer leaves the board
+// unprojectable; a pass draw changed behind its Start's recorded draw, after
+// the answer's replay and before its record goes, still does.
 test('RISK change records: an answer whose board the sender could not push goes as no record, and the other device keeps syncing',{timeout:240000},async t=>{
  const docs=new Map();
  const phone=await answeringDevice2408(t,{board:answeringBoard2408({tasks:3,padBytes:0}),docs,saveMs:0,dropDatabase:true});
@@ -17683,10 +17686,9 @@ test('RISK change records: an answer whose board the sender could not push goes 
  await settledTogether([phone,laptop],[],{within:60000});
  holdFullCopy2417(t,phone);
  const written=recordsWritten2417(phone);
- phone.ctx.addTask('Added during the started pass');
- await new Promise(resolve=>setTimeout(resolve,300));
  phone.tap('cant');
- await until2417(()=>vm.runInContext('decisionEvidenceIssue(state,window.CloudSync.user)',phone.ctx)!==null,'positive control: the answer leaves the phone’s board unprojectable (#2395)');
+ const weights=phone.ctx.state.chance.weights,changed=Object.keys(weights)[0];weights[changed]/=2;
+ await until2417(()=>vm.runInContext('decisionEvidenceIssue(state,window.CloudSync.user)',phone.ctx)!==null,'positive control: the changed draw leaves the phone’s board unprojectable');
  await new Promise(resolve=>setTimeout(resolve,1500));
  assert.equal(recordsWritten2417(phone),written,'the phone sends no record of it');
  await syncSettled(laptop.ctx,{within:30000});
@@ -20921,6 +20923,157 @@ test('RISK scanner press guard: signed in on the large board, a held Yes reaches
  assert.ok(ctx.state.chain.includes(second),'a Yes after the guard answers it');
  await clock.settle();
  assert.ok(decisionsAbout2417((await device.cloud()).board,[second]).length>earlier.length,'and reaches the cloud');
+});
+
+// #2459: the board a Yes after an Add leaves, on the large board with sync on.
+// A Start records its pass's draw (the chance weights of every task then on
+// the board) as the pass's scan-mode choice. A task added later joins that
+// draw the first time a draw scores it, with a frozen weight of its own,
+// which the recorded draw never held. Counted, never timed.
+async function yesAfterAdd2459(t,label){
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock,counters,shim}=device;
+ shim.document.getElementById('addInput').value=label;
+ ctx.onAction('add',{});
+ const added=ctx.state.tasks.find(task=>task.title===label);
+ assert.ok(added,'positive control: the Add is taken');
+ await clock.settle();
+ assert.ok(counters.uploads.at(-1)?.payload.includes(added.id),'positive control: the Add went up by the full copy');
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','positive control: the Add is synced');
+ const before={records:recordsWritten2417(device),uploads:counters.uploads.length};
+ const candidate=device.tap('yes');
+ assert.equal(ctx.state.chain.at(-1),candidate,'positive control: the Yes is taken');
+ assert.ok(Object.hasOwn(ctx.state.chance.weights,added.id),'positive control: the added task has joined the pass’s draw');
+ return {device,added,candidate,before};
+}
+test('RISK change records: after an Add in a Started pass, a Yes still syncs: the added task’s frozen chance weight does not make the board’s decisions fail their check',{timeout:300000},async t=>{
+ const {device,added,candidate}=await yesAfterAdd2459(t,'Added before the Yes 2459 sync');
+ const {ctx,clock,shim}=device;
+ await clock.settle();
+ assert.equal(ctx.window.CloudSync.errorCode??null,null,'sync reports no error');
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','sync ends synced');
+ const cloud=await device.cloud();
+ assert.ok(cloud.board.chain.includes(candidate),'the cloud copy holds the Yes');
+ assert.ok(cloud.board.tasks.some(task=>task.id===added.id),'and the added task');
+ assert.equal(cloud.board.chance.weights[added.id],ctx.state.chance.weights[added.id],'and the added task’s frozen weight in the pass’s draw');
+});
+// #2459: the Yes's change record carries the parts of the board the Yes
+// touched. Where the added task first joined the pass's draw in the Yes's own
+// draw, the Yes touched the whole draw (about 98 KB on the large board, over
+// the 64 KB a record may carry), so it went as a full copy at once instead.
+test('RISK change records: a Yes right after an Add on the large board goes as a change record, not a full copy',{timeout:300000},async t=>{
+ const {device,before}=await yesAfterAdd2459(t,'Added before the Yes 2459 record');
+ const {clock,counters}=device;
+ await clock.advance(1500);
+ const sent={records:recordsWritten2417(device)-before.records,uploads:counters.uploads.length-before.uploads};
+ t.diagnostic(JSON.stringify(sent));
+ assert.equal(sent.records,1,'the Yes goes as a change record');
+ assert.equal(sent.uploads,0,'and asks for no full copy at once');
+ await clock.settle();
+ assert.equal(device.shim.document.getElementById('syncBtn').textContent,'☁ synced','and sync ends synced');
+});
+
+// #2459: a full copy reads its chunks back to verify them: on the large board
+// it writes 2.76 MB and reads every chunk three times, as a listing, in the
+// transaction that seals the copy and in the one that publishes it. No read
+// proves what another checks (cloud-store-v2.js push), so all three stay, and
+// this pins that number: it never grows with the board or its history.
+// Counted, never timed: each read of each chunk of the copy, from the push to
+// Settled.
+function chunkReads2459(device){
+ const reads=new Map(),{docs,faults}=device;
+ const count=path=>reads.set(path,(reads.get(path)||0)+1);
+ const chunk=/^users\/owner\/generations\/[^/]+\/chunks\/[^/]+$/,listing=/^users\/owner\/generations\/[^/]+\/chunks$/;
+ faults.transactionRead=path=>{if(chunk.test(path))count(path);};
+ faults.serverRead=path=>{if(listing.test(path))for(const key of docs.keys())if(key.startsWith(path+'/')&&chunk.test(key))count(key);};
+ return reads;
+}
+test('RISK full copy readback: a full copy on the large board reads each of its chunks at most three times, once in each verification, and publishes one revision on',{timeout:300000},async t=>{
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock,counters,shim,docs}=device;
+ const revision=docs.get('users/owner').rev,reads=chunkReads2459(device);
+ shim.document.getElementById('addInput').value='Added for a full copy 2459';
+ ctx.onAction('add',{});
+ await clock.settle();
+ const root=docs.get('users/owner'),generation=root.activeGeneration;
+ const chunks=[...docs.keys()].filter(key=>key.startsWith('users/owner/generations/'+generation+'/chunks/'));
+ const own=[...reads].filter(([path])=>path.startsWith('users/owner/generations/'+generation+'/'));
+ t.diagnostic(JSON.stringify({chunks:chunks.length,reads:own.map(([,n])=>n)}));
+ assert.equal(root.rev,revision+1,'positive control: the full copy published one revision on');
+ assert.ok(counters.uploads.at(-1)?.payload.includes('Added for a full copy 2459'),'positive control: it carries the Add');
+ assert.ok(chunks.length>1,'positive control: the large board takes several chunks');
+ assert.deepEqual(chunks.filter(path=>!reads.has(path)),[],'every chunk is read back');
+ assert.deepEqual(own.filter(([,n])=>n>3).map(([path,n])=>path.split('/').at(-1)+':'+n),[],'no chunk is read back more than three times: the listing, the seal and the publication');
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','and sync ends synced');
+});
+
+// #2459: an answer's rank sampling (the list's ranks and History's Top x)
+// runs after the answer's paint (#2407), and on the large board it was one
+// 60-80 ms task: 447 tasks times 250 samples, about 112,000 draws, so a tap in
+// that time waited for all of it. Counted, never timed: the draws (calls to
+// the page's random source) each task after the tap makes, on the clock's own
+// timers. RANK_TASK_DRAWS2459 is about what an 80-task board samples at once.
+const RANK_TASK_DRAWS2459=20000;
+function drawsPerTask2459(device){
+ const {ctx}=device,tasks=[];
+ vm.runInContext('(()=>{const random=Math.random;globalThis.__draws2459=0;Math.random=function(){globalThis.__draws2459++;return random.call(Math);};})()',ctx);
+ const draws=()=>vm.runInContext('__draws2459',ctx),schedule=ctx.setTimeout;
+ ctx.setTimeout=(fn,ms,...args)=>schedule((...given)=>{const from=draws();try{return fn(...given);}finally{tasks.push(draws()-from);}},ms,...args);
+ return {tasks,draws};
+}
+test('RISK rank work per answer: a Yes on the large board samples its ranks in tasks of a bounded number of draws, and still samples every open task 250 times',{timeout:300000},async t=>{
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,open=ctx.state.tasks.filter(task=>!task.done).length,samples=ctx.state.settings.samples;
+ const counted=drawsPerTask2459(device),ranks=()=>vm.runInContext('rankCache',ctx),before=ranks();
+ const fromTap=counted.draws();
+ device.tap('yes');
+ const inTap=counted.draws()-fromTap;
+ await clock.advance(1500);
+ const total=counted.draws()-fromTap,largest=Math.max(0,...counted.tasks);
+ t.diagnostic(JSON.stringify({open,samples,inTap,total,largest,tasks:counted.tasks.filter(n=>n>0)}));
+ assert.ok(open>400,'positive control: the large board');
+ assert.ok(total>=open*samples,'positive control: the Yes samples every open task '+samples+' times: '+total+' draws');
+ assert.notEqual(ranks(),before,'positive control: and replaces the ranks it found');
+ assert.equal(ranks().size,open,'with a rank for every open task');
+ assert.ok(inTap<=RANK_TASK_DRAWS2459,'the tap itself samples no ranks: '+inTap+' draws');
+ assert.ok(largest<=RANK_TASK_DRAWS2459,'no task after the tap draws more than '+RANK_TASK_DRAWS2459+': the largest drew '+largest);
+});
+// #2459: ranks sampled in parts after a Yes are exactly the ranks one whole
+// sampling of the same open tasks gives from the same random draws. The page
+// draws from a seeded stream whose position can be put back: right after the
+// Yes, one whole sampling of the open tasks is taken from it, the stream is
+// put back, and the answer's catch-up then samples in parts on the clock. The
+// tap itself draws nothing (the test above).
+test('RISK rank work per answer: ranks sampled in parts after a Yes on the large board equal one whole sampling of the same tasks from the same draws, and History records their Top x',{timeout:300000},async t=>{
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,signedIn:false,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,run=source=>vm.runInContext(source,ctx);
+ const ranksOf=source=>JSON.parse(run(`JSON.stringify([...(${source})].map(([id,rank])=>[id,rank.topK,rank.n,Array.from(rank.hist),Array.from(rank.cdf)]))`));
+ // mulberry32 with its state in view, so the stream can be put back.
+ run(`globalThis.__stream2459={a:2459};Math.random=function(){let t=(__stream2459.a=(__stream2459.a+0x6D2B79F5)>>>0);
+  t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};_spare=null`);
+ const answered=device.tap('yes');
+ const at=run('JSON.stringify([__stream2459.a,_spare])');
+ const expected=ranksOf('rankStats(openTasks().map(t=>({id:t.id,mu:t.mu,sigma:t.sigma})),state.settings.samples)');
+ assert.notEqual(run('__stream2459.a'),JSON.parse(at)[0],'positive control: the whole sampling drew from the stream');
+ run(`(()=>{const [a,spare]=${at};__stream2459.a=a;_spare=spare;})()`);
+ await clock.advance(1500);
+ const actual=ranksOf('rankCache');
+ assert.equal(actual.length,447,'positive control: a rank for every open task');
+ assert.ok(new Set(actual.map(([,topK])=>topK)).size>1,'positive control: the ranks tell tasks apart');
+ // Compared as text: a diff of 447 ranks of 447 places each is too large to print.
+ const differing=actual.filter((rank,index)=>JSON.stringify(rank)!==JSON.stringify(expected[index])).map(([id])=>id);
+ assert.equal(actual.length,expected.length,'the parts rank as many tasks as the whole sampling');
+ assert.deepEqual(differing.slice(0,5),[],'the parts give exactly the whole sampling’s ranks: '+differing.length+' tasks differ');
+ const after=ctx.state.tasks.find(task=>task.id===answered).ratingHistory.at(-1).after;
+ assert.equal(after.topK,expected.find(([id])=>id===answered)[1],'History records the Top x of those ranks');
 });
 
 // #2457 (spec #2455): adding a task on the large board shows it in the tap and
