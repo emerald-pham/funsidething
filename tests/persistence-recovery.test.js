@@ -21314,3 +21314,33 @@ test('RISK rank work per action: ranks caught up after an Add or an editor Dot o
   }
  }
 });
+
+// #2461 round 2 (bce540e0): on a small board the new card can paint about
+// 20 ms after the first tap, so a double tap's second tap 120 ms later lands
+// after the 100 ms grace. A press within 200 ms of the last scanner press the
+// guard let through is held too; a deliberate press further apart still acts.
+test('RISK scanner press guard: a press 150 ms after the last Yes that acted is held though the new candidate painted 140 ms before it, and one 260 ms after acts',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,guard=pressGuard2461(device);
+ guard.paint();await clock.advance(1000);
+ const first=ctx.state.candidateId;
+ const pressed=guard.now();guard.press('yes');
+ assert.ok(ctx.state.chain.includes(first),'positive control: the first Yes answers its candidate');
+ const second=ctx.state.candidateId;assert.ok(second&&second!==first,'positive control: a new candidate is drawn');
+ // The new card paints 10 ms after the tap, as on a small board.
+ await clock.advance(10);guard.paint();
+ await clock.advance(140);
+ assert.equal(guard.now()-pressed,150,'fixture: the second press comes 150 ms after the first');
+ const shown=answeredState2461(ctx);
+ const quick=guard.press('yes');
+ assert.ok(quick.classList.contains('held'),'a Yes 150 ms after the last Yes that acted is held, though 140 ms after its card painted');
+ assert.deepEqual(answeredState2461(ctx),shown,'and changes nothing');
+ guard.key('n');
+ assert.deepEqual(answeredState2461(ctx),shown,'the n key at that moment is held too');
+ await clock.advance(110);
+ const before=answeredState2461(ctx);
+ assert.ok(!guard.press('yes').classList.contains('held'),'a Yes 260 ms after the last one that acted is not held');
+ assert.deepEqual([...ctx.state.chain],[...before.chain,second],'and answers the candidate shown');
+});

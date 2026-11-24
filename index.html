@@ -12095,11 +12095,14 @@ function maybeIntervene(){
 // the new card paints, so every press before the paint is held. After it only
 // a short grace holds: 200 ms there held deliberate presses people made once
 // they could see the card, and they had to press again. #221's pause after
-// Return as candidate keeps the 200 ms below.
+// Return as candidate keeps its 200 ms (RETURN_PRESS_PAUSE_MS).
 // On a small board the new card can paint 20 ms after the first tap, so a
-// second tap 120 ms later lands after the grace; a press within 200 ms of the
-// last one that acted is held too. Deliberate presses come further apart.
-const TASK_PRESS_GUARD_MS=200,TASK_PRESS_GRACE_AFTER_PAINT_MS=100;
+// second tap 120 ms later lands after the grace; a press within
+// REPEAT_PRESS_GUARD_MS of the last scanner press the guard let through is
+// held too, whether or not that press changed the board. Deliberate presses
+// come further apart.
+const TASK_PRESS_GRACE_AFTER_PAINT_MS=100,REPEAT_PRESS_GUARD_MS=200;
+// When the last scanner press the guard let through was made.
 let lastScannerPressAt=-Infinity;
 // Every button that acts on a task the scanner just drew. Removing a dot can also
 // shift the cards, so a second tap can land on a different button of the next task.
@@ -12129,7 +12132,7 @@ function pressedAt(event){
   return typeof at==="number"&&at>0&&at<=now?at:now;
 }
 function answerBeforeCandidateCouldBeRead(at=performance.now()){
-  return at-tasksOnScreenSince<=TASK_PRESS_GRACE_AFTER_PAINT_MS||at-lastScannerPressAt<=TASK_PRESS_GUARD_MS;
+  return at-tasksOnScreenSince<=TASK_PRESS_GRACE_AFTER_PAINT_MS||at-lastScannerPressAt<=REPEAT_PRESS_GUARD_MS;
 }
 // #2461: a held press is never silent. Its button takes the app's dimmed,
 // not-now look for a moment, so the person looks before pressing again. It is
@@ -12176,9 +12179,10 @@ function keepHeldPressShown(){
 // the document, and the scanner's keys are the only other way in; both check here.
 // A click the app makes itself, for a download or the restore file picker, is no
 // one's second press: browsers mark it untrusted, and it always goes through.
+const RETURN_PRESS_PAUSE_MS=200;
 let returnClosedEditorAt=-Infinity;
 function holdPressesAfterReturn(){returnClosedEditorAt=performance.now();}
-function pressTooSoonAfterReturn(){return performance.now()-returnClosedEditorAt<=TASK_PRESS_GUARD_MS;}
+function pressTooSoonAfterReturn(){return performance.now()-returnClosedEditorAt<=RETURN_PRESS_PAUSE_MS;}
 function recordDecisionTime(){
   if(!state.presentedAt) return;
   const dt = Date.now() - state.presentedAt;
