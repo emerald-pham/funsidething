@@ -546,6 +546,11 @@
   ],
   "environmentSkips": [
     {
+      "root": "RISK opening scenery unsynced paint browser: a resize after the board shows and before the opening paint syncs the scene and paints the background without errors, then the opening finishes, in Chromium and WebKit under both motion choices",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
       "root": "RISK opening scenery plan task browser: the scenery boot works out no day plan, and the plan runs after the board shows as its own task with no scenery paint, in Chromium and WebKit under both motion choices",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."

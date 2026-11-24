@@ -7574,6 +7574,73 @@ test('RISK opening scenery plan task browser: the scenery boot works out no day 
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
 
+// #2456 (ac3a59e8): the opening computes the sky but leaves the day's scene
+// unsynced until the opening paint. Once the board shows, a resize paints at
+// once (#2194 B4), even before that paint's own frame. That paint must sync
+// the scene first, or the background reads a scene that was never worked out.
+// Frames are held from the moment the board shows, so the opening paint waits
+// while the resize paints; the page's errors and the background's paint are
+// what is asserted, never time.
+test('RISK opening scenery unsynced paint browser: a resize after the board shows and before the opening paint syncs the scene and paints the background without errors, then the opening finishes, in Chromium and WebKit under both motion choices',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=12;
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('unsynced-'+i,'Unsynced paint task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true}));
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const motion of ['normal','reduced']){
+    const label=`${engineName}/${motion}`,context=await browser.newContext({viewport:{width:390,height:844},timezoneId:'America/New_York',serviceWorkers:'block',reducedMotion:motion==='reduced'?'reduce':'no-preference'});
+    try{
+     await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+     await context.addInitScript(({board,motion})=>{
+      Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+      localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:motion,savedAt:Date.parse('2026-11-18T12:00:00Z')}));
+      if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+      // From the moment the board shows, every frame is held until the test releases them.
+      const raf=window.requestAnimationFrame.bind(window),held=[];
+      const frames=window.__frames={hold:false,held:0,release(){frames.hold=false;for(const fn of held.splice(0))raf(fn);}};
+      window.requestAnimationFrame=fn=>{if(frames.hold){frames.held++;held.push(fn);return -held.length;}return raf(fn);};
+      new MutationObserver(()=>{if(document.documentElement.dataset.appReady==='true'&&!frames.released){frames.released=true;frames.hold=true;}})
+       .observe(document,{attributes:true,subtree:true,attributeFilter:['data-app-ready']});
+      // Whole background paints: the sky filling the background canvas.
+      window.__backPaints=0;
+      const fillRect=CanvasRenderingContext2D.prototype.fillRect;
+      CanvasRenderingContext2D.prototype.fillRect=function(...args){
+       const back=document.querySelector('#landscape [data-scenery]');
+       if(back&&this.canvas===back&&args[0]===0&&args[1]===0&&args[2]>=back.clientWidth&&args[3]>=back.clientHeight)window.__backPaints++;
+       return fillRect.apply(this,args);
+      };
+     },{board,motion});
+     const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+     await page.waitForFunction(()=>window.__frames.hold&&document.documentElement.dataset.appReady==='true',null,{timeout:30000,polling:50});
+     const before=await page.evaluate(()=>({paints:window.__backPaints,period:document.documentElement.dataset.scenePeriod||null}));
+     // A resize while the opening paint still waits for its frame.
+     await page.setViewportSize({width:400,height:850});
+     await page.waitForFunction(paints=>window.__backPaints>paints,before.paints,{timeout:10000,polling:50}).catch(()=>{});
+     const resized=await page.evaluate(()=>({paints:window.__backPaints,held:window.__frames.held}));
+     const resizeErrors=errors.slice();
+     await page.evaluate(()=>window.__frames.release());
+     await page.waitForFunction(()=>getComputedStyle(document.querySelector('#landscape [data-scenery]')).visibility==='visible',null,{timeout:15000,polling:100}).catch(()=>{});
+     const after=await page.evaluate(()=>({paints:window.__backPaints,visible:getComputedStyle(document.querySelector('#landscape [data-scenery]')).visibility,period:document.documentElement.dataset.scenePeriod||null}));
+     observed.push({label,before,resized,after,errors});
+     // Fixture preconditions: the frames were held while the board showed and the opening paint had not run.
+     assert.ok(resized.held>0,`${label}: frames were held after the board showed ${JSON.stringify(resized)}`);
+     assert.equal(before.paints,0,`${label}: nothing painted the background before the resize ${JSON.stringify(before)}`);
+     // Behavior under test.
+     if(resizeErrors.length)failures.push(`${label}: the resize's paint raised ${JSON.stringify(resizeErrors)}`);
+     if(resized.paints<1)failures.push(`${label}: the resize did not paint the background ${JSON.stringify(resized)}`);
+     if(errors.length>resizeErrors.length)failures.push(`${label}: the opening raised ${JSON.stringify(errors.slice(resizeErrors.length))}`);
+     if(after.visible!=='visible')failures.push(`${label}: the scenery did not show once frames came ${JSON.stringify(after)}`);
+    }finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
 // #2430: every opening worked out the day's plan from the sun's position at
 // each minute of the UTC day, about 210 ms of astronomy at 4x CPU, before the
 // scenery could paint. A warm relaunch on the same day in the same place must

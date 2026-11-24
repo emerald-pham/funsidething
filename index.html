@@ -2539,7 +2539,7 @@ function emptyNewWorkWorkspace(){
   return ["new-work","memory-only"].includes(deviceRecoveryCloudHold?.workspace)&&!state?.tasks?.length;
 }
 function currentBoardExportPayload(){
-  answerCatchUp.flush(); // #2407: an export holds every answer given, with its History
+  answerCatchUp.flush(false); // #2407: an export holds every answer given, with its History
   // Use the live board so this remains a recovery path when the most recent
   // device save failed. cloudPayload() strips device-only sync bookkeeping.
   if(!liveBoardAccepted||!state||emptyNewWorkWorkspace())throw new Error("The accepted board is not ready in this tab.");
@@ -4387,7 +4387,7 @@ async function saveDurableBackup(kind,payload,metadata=null){
   }
 }
 async function reconcileDeviceLegacyCopy(){
-  answerCatchUp.flush(); // #2407: merge another copy into every answer given
+  answerCatchUp.flush(false); // #2407: merge another copy into every answer given
   if(!deviceStorageAuthority||!deviceStore) return true;
   const copies=legacyBoardCopies(),signature=legacyBoardSignature(copies);
   if(!copies.length||signature===deviceLegacySeenSignature) return true;
@@ -6631,7 +6631,7 @@ function reportCloudSaveLoop(guard){
 // (lane.generation).
 async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry=0,lane=null){
   // #2407: a device save holds every answer given, with its History.
-  answerCatchUp.flush();
+  answerCatchUp.flush(false);
   // #2378: counted from the call until it returns or throws.
   const syncWork=trackSyncWork("device-save");try{
   // #2408 review: a lane save serializes the board once. When the save-loop
@@ -7076,7 +7076,7 @@ function applyHeardRecordsInPlace(){
   const CS=window.CloudSync;
   if(!state||!cloudReady()||!liveBoardAccepted||cloudAdoptionHeld||cloudRecoveryDeliberate||cloudPullRevalidate||
     provedUnreadableCloudSource||deviceStorageRequired&&!deviceStorageAuthority||decisionRecoveryHolds().length)return false;
-  answerCatchUp.flush();
+  answerCatchUp.flush(false);
   const remote=heardRecordsRemote(CS.user);
   if(!remote)return false;
   if(remote.nothing)return true;
@@ -7794,7 +7794,7 @@ async function heldSourceStillHolds(heldSource,stillCurrent){
 // hidden (startHiddenFullCopy), which goes before sync suspends for it.
 async function sendPush({whileHidden=false}={}){
   // #2407: a push carries every answer given, with its History.
-  answerCatchUp.flush();
+  answerCatchUp.flush(false);
   // #2378: counted from the call until it returns or throws.
   const syncWork=trackSyncWork("push");pushesRunning++;try{
   if(!liveBoardAccepted)return;
@@ -7901,7 +7901,7 @@ async function sendPush({whileHidden=false}={}){
     }
     // #2427: every answer given so far, with its History, is in the board
     // these texts are made of.
-    answerCatchUp.flush();
+    answerCatchUp.flush(false);
     const diagnosticRequestGeneration=saveRequestGeneration,editsAtPayload=boardEditSerial;
     const texts=boardPushTexts(state);
     let payload = texts ? texts.cloud : cloudPayload();
@@ -9485,7 +9485,7 @@ function replaceState(next,{replacement=false}={}){
   // Ordinary adoption seals the preceding local gesture before peer effects.
   // Explicit replacement has just pushed its own frame; its caller seals the
   // installed board before any asynchronous persistence can admit peer work.
-  answerCatchUp.flush(); // #2407: an answer's catch-up belongs to the board it was given on
+  answerCatchUp.flush(false); // #2407: an answer's catch-up belongs to the board it was given on
   if(!replacement)sealUndoFrame();
   // #2435 review: the decision projection verified the board being replaced;
   // the new board gets its own, so the old one's decisions are let go.
@@ -10245,7 +10245,7 @@ function heardRecordsRemote(account){
 }
 async function cloudPull({records=false}={}){
   // #2407: a cloud read reconciles against every answer given.
-  answerCatchUp.flush();
+  answerCatchUp.flush(false);
   // #2378: counted from the call until it returns or throws.
   const syncWork=trackSyncWork("pull");try{
   // Even source-only repair waits for boot to classify its saved sources.
@@ -11255,7 +11255,7 @@ function captureUndoBoard(board,prior){
 function sealUndoFrame(){
   // #2407: an answer still catching up finishes first, so its own frame is
   // sealed before a save or adoption can add anything else.
-  answerCatchUp.flush();
+  answerCatchUp.flush(false);
   sealTopUndoFrame();
 }
 function sealTopUndoFrame(){
@@ -11685,8 +11685,8 @@ function decisionsPerMinute(){
 function recomputeRanks(items=null,samples=state.settings.samples,parts=null){
   // An answer still catching up samples its ranks first, as it did in its
   // tap, so the random draws keep their order. Inside a catch-up step this
-  // does nothing.
-  answerCatchUp.flush();
+  // does nothing. Ranks alone still queued are replaced below.
+  answerCatchUp.flush(false);
   if(parts){
     parts.sampler??=rankSampler(items,samples,rankSpare);
     if(!parts.sampler.step(RANK_PART_DRAWS))return false;
@@ -12220,6 +12220,19 @@ function recordDecisionTime(){
    board is marked unsaved before the paint, so nothing shows it saved or
    synced before the save and the Cloud acknowledgement happen. */
 const RANK_PART_DRAWS=16384;
+/* #2455 review: true while the app handles a person's press, a click, key or
+   paste that reaches the document. An Add, an import, a Delete and an editor
+   Done or Dot made that way leave their ranks to catch up after the frame
+   that shows them (answerCatchUp.ranks), so the press is not held by a whole
+   sampling of the board. A call from the app's own code or a script that
+   drives it gets the ranks before it returns, as before. */
+let handlingPress=false;
+function asPress(handle){
+  const outer=handlingPress;handlingPress=true;
+  try{return handle();}finally{handlingPress=outer;}
+}
+function rankBeforeCommit(){if(!handlingPress)recomputeRanks();}
+function rankAfterPress(){if(handlingPress)answerCatchUp.ranks();}
 const answerCatchUp=(()=>{
   const queue=[];let timer=null,work=null,running=false,chainedWeights=null;
   // Behind an answer still queued, the weight cache the next answer's History
@@ -12292,7 +12305,8 @@ const answerCatchUp=(()=>{
      once the frame that shows the action has painted. Until then the board
      keeps its earlier ranks; a new task shows no rank yet. Nothing saved or
      synced reads ranks, so a save or push does not wait for them (flush
-     leaves them queued), and any later sampling of the ranks (another
+     leaves them queued) and nor does a scanner answer; any other action runs
+     them first, as it sees the board as it was. Any later sampling of the ranks (another
      action's, or a whole recomputeRanks()) replaces them, since its inputs
      are newer. Their random draws are only ever ranks. */
   function ranks(){
@@ -12333,21 +12347,23 @@ const answerCatchUp=(()=>{
     running=true;
     try{runStep(next);}finally{running=false;finish();}
   }
-  // Runs every answer queued now, in order; ranks alone stay queued (ranks()).
-  // Inside a step (a save the step asks for) it does nothing: the queue goes
-  // on after that step.
-  function flush(){
-    if(running||!queue.some(entry=>!entry.ranksOnly))return;
+  // Runs everything queued now, in order. withRanks false, for what reads
+  // only saved data (a save, a push, a cloud read, an Undo seal), leaves ranks
+  // alone queued (ranks()). Inside a step (a save the step asks for) it does
+  // nothing: the queue goes on after that step.
+  function flush(withRanks=true){
+    const due=entry=>withRanks||!entry.ranksOnly;
+    if(running||!queue.some(due))return;
     if(timer!==null){clearTimeout(timer);timer=null;}
     running=true;
-    try{for(let next;(next=queue.find(entry=>!entry.ranksOnly));)runStep(next);}finally{running=false;finish();}
+    try{for(let next;(next=queue.find(due));)runStep(next);}finally{running=false;finish();}
   }
   // #2419: whether an answer shown is still waiting for its save and record
   // to be asked for (its store step).
   return Object.freeze({begin,show,ranks,dropRanks,flush,pending:()=>queue.some(answer=>answer.steps?.includes(store))});
 })();
-window.addEventListener("pagehide",()=>answerCatchUp.flush());
-document.addEventListener("visibilitychange",()=>{if(document.hidden)answerCatchUp.flush();});
+window.addEventListener("pagehide",()=>answerCatchUp.flush(false));
+document.addEventListener("visibilitychange",()=>{if(document.hidden)answerCatchUp.flush(false);});
 const taskActionOwnerBundle=(()=>{
   function applyEditorDraft(task,draft){
     if(!task||!draft||typeof draft!=="object")return false;
@@ -12404,16 +12420,22 @@ const taskActionOwnerBundle=(()=>{
       contextIds:Array.isArray(observedCtx)?observedCtx.slice():[],resting});
     if(!result){commit();return false;}
     if(action==="dot")observation.id=result.rows[0].id;
-    // #2455 review: a Done or Dot from the task editor shows first, as a
-    // scanner answer does (#2407): its ranks, History's after values (a Dot's
-    // Top x reads the new ranks), the Undo seal, the save and the push catch
-    // up after the paint (answerCatchUp), from what the action left.
-    if(action==="done"||action==="dot"){
+    // #2455 review: a person's Dot from the task editor shows first, as a
+    // scanner Yes does (#2407): its ranks, History's after values (its Top x
+    // reads the new ranks), the Undo seal, the save and the push catch up
+    // after the paint (answerCatchUp), from what the Dot left.
+    if(action==="dot"&&handlingPress){
       answerCatchUp.show(answerCatchUp.begin(action,observation.ids,{observation,weights:chanceDisplayWeightCache}),{immediate:true});
       return true;
     }
+    // A Done's History reads no rank (a done task has none), so it is
+    // recorded and saved as before; a person's Done leaves only its ranks to
+    // catch up after the frame that shows it (answerCatchUp.ranks).
+    const ranked=action==="done"||action==="dot";
+    if(ranked&&!handlingPress)recomputeRanks();
     finishRatingObservation(action==="return"?{...observation,membershipChanged:result.moved}:observation);
-    commit();
+    commit(ranked?true:undefined,ranked?true:undefined);
+    if(ranked&&handlingPress)answerCatchUp.ranks();
     return true;
   }
   function executeEditorGesture(command){
@@ -13026,8 +13048,9 @@ function deleteTask(id){ // removes a task entirely — from the list, the chain
   delete state.cantAt[id];
   delete state.workedAt[id];
   if(state.candidateId===id) state.candidateId=null;
+  rankBeforeCommit();
   commit(true, true);           // deletions sync to the cloud right away
-  answerCatchUp.ranks();        // #2455 review: after the frame that shows it gone
+  rankAfterPress();             // #2455 review: a person's Delete, after the frame that shows it
 }
 /* newDay is true only when the caller crossed the 02:00 date marker — see
    ensureCandidate(). It is what separates "a new pass" from "a new day". */
@@ -13156,8 +13179,9 @@ function importList(text, ctx, dates = {}, taskOptions = {}){
     normalizeTaskPrerequisites(task);writeTaskDependencyModes(task,taskOptions.dependencyModes);state.tasks.push(task);
     added++;
   }
-  // #2455 review: the ranks catch up after the frame that shows the tasks.
-  if(added){ commit(); answerCatchUp.ranks(); } else { undoStack.pop(); }
+  // #2455 review: a person's import leaves its ranks to catch up after the
+  // frame that shows the tasks (rankAfterPress).
+  if(added){ rankBeforeCommit(); commit(); rankAfterPress(); } else { undoStack.pop(); }
   return {added, skipped, completed};
 }
 function importSummary(added, skipped, completed){
@@ -13382,8 +13406,9 @@ function addTask(title, dot, ctx, dates = {}, taskOptions = {}){
     if(chainStart()){ state.passStartedAt = Date.now(); state.passId = uid(); applyScanPreference(); }
     state.chain.push(t.id); state.interventionActive=false;
   }
+  rankBeforeCommit();
   commit(true, !!dot);          // "Add & dot" syncs to the cloud right away
-  answerCatchUp.ranks();        // #2455 review: after the frame that shows the task
+  rankAfterPress();             // #2455 review: a person's Add, after the frame that shows it
   return t;
 }
 function createContextChoice(name){
@@ -22820,7 +22845,7 @@ document.addEventListener("click", e=>{
     if(answerBeforeCandidateCouldBeRead(at)){acknowledgeHeldPress(el.dataset.act,el);return;}
     lastScannerPressAt=at;
   }
-  onAction(el.dataset.act, el);
+  asPress(()=>onAction(el.dataset.act, el));
 });
 document.addEventListener("change", e=>{
   const el = e.target;
@@ -22951,13 +22976,13 @@ document.addEventListener("paste", e=>{
   if(!txt || !/\r?\n/.test(txt.trim())) return;      // single line — let it paste normally
   e.preventDefault();
   const input=document.getElementById("addInput");input.value=txt;
-  syncQuickAddAppearance();submitQuickAdd(txt);
+  syncQuickAddAppearance();asPress(()=>submitQuickAdd(txt));
 });
 document.addEventListener("keydown", e=>{
   if(openingRecoveryHeld){if(e.key==="Escape")closeModal();return;}
   const t = e.target;
   if(t && t.matches && t.matches("input,textarea,select")){
-    if(e.key==="Enter" && t.id==="addInput"){ onAction("add", t); }
+    if(e.key==="Enter" && t.id==="addInput"){ asPress(()=>onAction("add", t)); }
     return;
   }
   // Native scenery controls and the inert scene view must not dispatch task shortcuts.
@@ -22981,7 +23006,7 @@ document.addEventListener("keydown", e=>{
   else if(k==="c"&&!e.repeat&&!state.interventionActive&&offeredCandidateId()) TaskActionOwner.perform({type:"decision",decision:"cant"});
   else if(k==="d"&&!e.repeat) hotkeyDone();                                                   // one held key is one completion
   else if(k==="w") TaskActionOwner.perform({type:"benchmark",action:"worked"});           // worked on it — cross off, back to the bottom
-  else if(e.key==="Delete"||e.key==="Backspace"){ e.preventDefault(); hotkeyDelete(); }       // remove it entirely
+  else if(e.key==="Delete"||e.key==="Backspace"){ e.preventDefault(); asPress(hotkeyDelete); }       // remove it entirely
   else if(k==="z"&&plainEditUndo) TaskActionOwner.undo();
   else if(k==="e"&&plainEditUndo){const task=scannerEditTask();if(task)onAction("edit",{dataset:{id:task.id}});}
 });

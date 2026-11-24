@@ -21242,21 +21242,22 @@ test('RISK add box clears at once: on the large board an Add empties the add box
 // sampling of about 112,000 draws on the large board. Their ranks now catch up
 // after the frame that shows the action, in tasks of a bounded number of draws,
 // as an answer's do (#2459). Counted with the #2459 draw counter, never timed,
-// on #2408's answering device. Each action goes through its own control: the
-// add box and Add, a pasted list, the editor's Done and Dot, and Delete.
+// on #2408's answering device. Each action is a person's press, one click on
+// the document: Add with a title, Add with a list, the editor's Done and Dot,
+// and Delete.
 function rankActions2455(device){
  const {ctx,shim}=device,run=source=>vm.runInContext(source,ctx);
  const press=(act,dataset={})=>{const target={dataset:{act,...dataset},classList:{contains:()=>false}};target.closest=()=>target;shim.document.dispatchEvent({type:'click',detail:1,target});};
  const typed=title=>()=>{shim.document.getElementById('addInput').value=title;press('add');};
  // A pool task the editor can Dot, Done or Delete: not the candidate, not dotted.
  const free=()=>run('pool().find(t=>canDotTask(t)&&t.id!==state.candidateId&&!t.evergreen)?.id');
- const editor=action=>()=>{const id=free();hydrateUnchangedEditorDraft(device,id);return ()=>{ctx.onAction(action,{dataset:{id}});return id;};};
+ const editor=action=>()=>{const id=free();hydrateUnchangedEditorDraft(device,id);return ()=>{press(action,{id});return id;};};
  return [
   ['Add',()=>typed('Ranked after its tap 2455')],
   ['import',()=>typed('Imported first 2455\nImported second 2455')],
   ['editor Done',editor('done-task')],
   ['editor Dot',editor('dot-task')],
-  ['Delete',()=>{const id=free();return ()=>{ctx.onAction('delete-task',{dataset:{id}});return id;};}],
+  ['Delete',()=>{const id=free();return ()=>{press('delete-task',{id});return id;};}],
  ];
 }
 test('RISK rank work per action: an Add, an import, an editor Done or Dot and a Delete on the large board sample no ranks in the tap, then rank every open task in tasks of a bounded number of draws',{timeout:300000},async t=>{
