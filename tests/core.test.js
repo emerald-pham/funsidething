@@ -23932,6 +23932,130 @@ test('RISK steady scanner browser: Yes No and Cant share one width and no scanne
  assert.deepEqual(failures,[]);
 });
 
+// #2460: the dotted task's actions and the candidate's were built separately,
+// so the same action rendered at different widths in the two rows (Done 164 vs
+// 189 px, Worked on it 265 vs 235, Delete 150 vs 185 on a 375 px phone) and
+// changed width as its key hint moved between cards. Each row is found by its
+// card, not its class: the actions under both cards must look like one family,
+// whichever card the keys act on, with Delete last in each row.
+const STEADY_SHARED_ACTIONS=[['Done','bench-done','cand-done'],['Edit','edit','edit'],['Worked on it','worked','cand-worked'],['Delete','delete-task','delete-task']];
+test('RISK steady scanner browser: the actions under the dotted task and the candidate match in size type and colour whichever card the key hints sit on, share one alignment and keep Delete last, across phone enlarged short-landscape tablet and desktop views in day and night with web fonts and blocked in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ const readRows=page=>page.evaluate(()=>{
+  const rowAfter=selector=>{
+   const card=document.querySelector(selector),row=card?.nextElementSibling;if(!row)return null;
+   const rs=getComputedStyle(row),rr=row.getBoundingClientRect();
+   const buttons=[...row.children].filter(el=>el.matches('button')).map(el=>{
+    const r=el.getBoundingClientRect(),s=getComputedStyle(el);
+    return {act:el.dataset.act,width:r.width,height:r.height,left:r.left,right:r.right,top:r.top,fontSize:s.fontSize,fontWeight:s.fontWeight,fontFamily:s.fontFamily,radius:s.borderTopLeftRadius,background:s.backgroundColor,color:s.color,
+     hints:[...el.querySelectorAll('.keyhint')].map(h=>({text:h.textContent,shown:getComputedStyle(h).visibility==='visible'&&h.getClientRects().length>0,ariaHidden:!!h.closest('[aria-hidden="true"]')}))};
+   });
+   return {buttons,contentRight:rr.right-parseFloat(rs.paddingRight),opacity:+rs.opacity};
+  };
+  const root=document.documentElement;
+  return {bench:rowAfter('.card.bench'),cand:rowAfter('.card.cand'),theme:root.dataset.theme,scheme:getComputedStyle(root).colorScheme,paint:getComputedStyle(document.getElementById('scan')).backgroundColor,mode:state.mode,viewportWidth:innerWidth,overflow:root.scrollWidth-innerWidth};
+ });
+ const by=(row,act)=>row.buttons.find(b=>b.act===act);
+ const shownHints=b=>b.hints.filter(h=>h.shown).map(h=>h.text).join('');
+ // Lines of a wrapped row, top to bottom, each left to right.
+ const lines=row=>{const tops=[...new Set(row.buttons.map(b=>Math.round(b.top)))].sort((a,b)=>a-b);return tops.map(t=>row.buttons.filter(b=>Math.abs(Math.round(b.top)-t)<=1).sort((a,b)=>a.left-b.left));};
+ const sameLook=(label,a,b)=>{
+  for(const key of ['width','height'])assert.ok(Math.abs(a[key]-b[key])<=1,`${label}: ${key} ${a[key].toFixed(1)} vs ${b[key].toFixed(1)} px`);
+  for(const key of ['fontSize','fontWeight','fontFamily','radius','background','color'])assert.equal(a[key],b[key],`${label}: ${key}`);
+ };
+ const checkRow=(label,row)=>{
+  assert.equal(row.buttons.at(-1).act,'delete-task',`${label}: Delete is the last action: ${row.buttons.map(b=>b.act).join(', ')}`);
+  const rows=lines(row),last=rows.at(-1);
+  assert.equal(last.at(-1).act,'delete-task',`${label}: Delete sits at the end of the last line`);
+  for(const line of rows){
+   assert.ok(Math.abs(line.at(-1).right-row.contentRight)<=1,`${label}: every line ends at the row's right edge: ${line.map(b=>b.act+'@'+b.right.toFixed(1)).join(', ')} vs ${row.contentRight.toFixed(1)}`);
+   assert.ok(Math.max(...line.map(b=>b.top))-Math.min(...line.map(b=>b.top))<=1,`${label}: a line's buttons share one top`);
+  }
+  return rows;
+ };
+ const gaps=rows=>rows.flatMap(line=>line.slice(1).map((b,i)=>b.left-line[i].right));
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const spec of [
+    {name:'small phone',width:320,height:568},
+    {name:'small phone with enlarged text and Postpone',width:320,height:568,enlarged:true,showPostpone:true},
+    {name:'common phone',width:375,height:812},
+    {name:'common phone with Postpone',width:375,height:812,showPostpone:true},
+    {name:'iPhone portrait',width:390,height:844},
+    {name:'short landscape with Postpone',width:844,height:390,showPostpone:true},
+    {name:'large phone at 200% text with Postpone',width:430,height:932,enlarged:true,doubleText:true,showPostpone:true},
+    {name:'just above phone width at 200% text',width:421,height:900,enlarged:true,doubleText:true},
+    {name:'tablet portrait with Postpone',width:768,height:1024,showPostpone:true},
+    {name:'desktop with Postpone',width:1000,height:900,touch:false,showPostpone:true},
+   ])for(const webFonts of [true,false]){
+    const label=`${engineName} ${spec.name} ${webFonts?'with web fonts':'fonts blocked'}`;
+    const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard(spec),spec);
+    try{
+     if(webFonts){
+      await context.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//,route=>route.continue());
+      await page.reload({waitUntil:'domcontentloaded'});
+      await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]'),null,{timeout:60000});
+     }
+     if(spec.enlarged)await page.addStyleTag({content:spec.doubleText?STEADY_DOUBLE_TEXT:STEADY_ENLARGED_TEXT});
+     await page.waitForFunction(()=>!!document.querySelector('.card.bench')&&!!document.querySelector('.card.cand')&&!!document.querySelector('[data-act="cand-worked"]'),null,{timeout:15000});
+     await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(80);
+     const loadedFonts=await page.evaluate(()=>[...document.fonts].filter(face=>face.status==='loaded').length);
+     if(webFonts)assert.ok(loadedFonts>0,`${label}: positive control: the web fonts loaded, which needs the network`);
+     else assert.equal(loadedFonts,0,`${label}: positive control: no web font loaded`);
+     const setTheme=async theme=>{
+      await page.evaluate(theme=>setTheme(theme),theme);await page.waitForTimeout(40);
+      const seen=await readRows(page);
+      assert.equal(seen.theme,theme,`${label}: the ${theme} theme is applied`);
+      assert.match(seen.scheme,new RegExp('^'+theme+'$'),`${label}: the computed colour scheme is ${theme}`);
+      return seen;
+     };
+     // The candidate is showing, so d, e and ⌫ act on it and only w on the dotted task.
+     const candidateListens={};
+     for(const theme of ['light','dark']){
+      const seen=candidateListens[theme]=await setTheme(theme),tl=`${label} ${theme}, candidate listening`;
+      assert.ok(seen.bench&&seen.cand,`${tl}: both cards show their actions`);
+      if(spec.showPostpone)assert.ok(by(seen.bench,'bench-postpone'),`${tl}: Postpone is in the dotted task's row`);
+      for(const [name,benchAct,candAct] of STEADY_SHARED_ACTIONS)sameLook(`${tl}: ${name} under the dotted task and the candidate`,by(seen.bench,benchAct),by(seen.cand,candAct));
+      assert.deepEqual(STEADY_SHARED_ACTIONS.map(([name,benchAct,candAct])=>[name,shownHints(by(seen.bench,benchAct)),shownHints(by(seen.cand,candAct))]),
+       [['Done','','d'],['Edit','','e'],['Worked on it','w',''],['Delete','','⌫']],`${tl}: key hints show only where the key acts`);
+      for(const b of [...seen.bench.buttons,...seen.cand.buttons])for(const h of b.hints)if(!h.shown)assert.equal(h.ariaHidden,true,`${tl}: ${b.act}'s unshown ${h.text} hint is kept out of the accessibility tree`);
+      const benchLines=checkRow(`${tl}: dotted task's row`,seen.bench),candLines=checkRow(`${tl}: candidate's row`,seen.cand);
+      assert.ok(Math.abs(seen.bench.contentRight-seen.cand.contentRight)<=1,`${tl}: both rows end at one right edge: ${seen.bench.contentRight.toFixed(1)} vs ${seen.cand.contentRight.toFixed(1)}`);
+      const allGaps=[...gaps(benchLines),...gaps(candLines)];
+      if(allGaps.length)assert.ok(Math.max(...allGaps)-Math.min(...allGaps)<=1,`${tl}: both rows space their buttons alike: ${allGaps.map(g=>g.toFixed(1)).join(', ')}`);
+      assert.ok(seen.overflow<=0,`${tl}: no sideways page overflow: ${seen.overflow}`);
+      assert.ok(seen.bench.opacity<1&&seen.bench.opacity===seen.cand.opacity,`${tl}: both rows dim alike while the candidate is weighed: ${seen.bench.opacity} and ${seen.cand.opacity}`);
+     }
+     assert.notEqual(candidateListens.light.paint,candidateListens.dark.paint,`${label}: the scanner pane paints differently by day and night: ${candidateListens.light.paint}`);
+     // Accessible names stay as they were: an unshown hint is not read out.
+     const benchRow=page.locator('.card.bench + *'),candRow=page.locator('.card.cand + *');
+     for(const [row,name,exact] of [[benchRow,'✓ Done',true],[benchRow,'Edit this task',true],[benchRow,/^Worked on it\s*w$/,false],[benchRow,'Delete',true],
+      [candRow,/^✓ Done\s*d$/,false],[candRow,'Edit this task (e)',true],[candRow,'Worked on it',true],[candRow,/^Delete\s*⌫$/,false]])
+      assert.equal(await row.getByRole('button',{name,exact:exact||undefined}).count(),1,`${label}: a button named ${name} in the ${row===benchRow?"dotted task's":"candidate's"} row`);
+     // done adding for now: no candidate, so every hint moves to the dotted task.
+     await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
+     const finish=page.locator('[data-act="start-working"]');
+     if(spec.touch===false)await finish.click();else await finish.tap();
+     await page.waitForFunction(()=>state.mode==='work'&&!document.querySelector('.card.cand'),null,{timeout:10000});
+     for(const theme of ['light','dark']){
+      const seen=await setTheme(theme),before=candidateListens[theme],tl=`${label} ${theme}, dotted task listening`;
+      assert.deepEqual(STEADY_SHARED_ACTIONS.map(([name,benchAct])=>[name,shownHints(by(seen.bench,benchAct))]),[['Done','d'],['Edit','e'],['Worked on it','w'],['Delete','⌫']],`${tl}: every hint is on the dotted task`);
+      for(const [name,benchAct,candAct] of STEADY_SHARED_ACTIONS){
+       sameLook(`${tl}: ${name} keeps its width when its hint moves to the dotted task`,by(seen.bench,benchAct),by(before.bench,benchAct));
+       sameLook(`${tl}: ${name} under the listening dotted task matches the listening candidate's`,by(seen.bench,benchAct),by(before.cand,candAct));
+      }
+      checkRow(`${tl}: dotted task's row`,seen.bench);
+      assert.equal(seen.bench.opacity,1,`${tl}: the dotted task's row is at full strength once scanning stops`);
+     }
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(error.message.split('\n')[0]);}finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
 // When the next title is as long as the last, a second tap lands on the button
 // of the next candidate before anyone could have read it, so a physical press
 // inside 200 ms of the new task appearing is dropped.
