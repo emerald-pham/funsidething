@@ -24108,6 +24108,109 @@ async function steadyScannerAnswer(page,point,prior){
  await page.touchscreen.tap(point.x,point.y);
  await page.waitForFunction(prior=>state.candidateId!==prior||state.interventionActive,prior,{timeout:10000});
 }
+// #2461 dims a held press to the not-now look. The #2467 typography review
+// found a keyboard press held inside the already dimmed side rail or check-in
+// row dimmed twice, to a quarter (B1), that a focused held button dimmed its
+// focus ring with it (N1), and that no browser test read the held paint (N2).
+// The keyboard holds these presses: a mouse or touch press hovers the rail,
+// which brightens it, so only keys reach the doubled dim.
+const heldScannerTheme=page=>page.evaluate(()=>({attr:document.documentElement.getAttribute('data-theme'),scheme:getComputedStyle(document.documentElement).colorScheme,scan:getComputedStyle(document.getElementById('scan')).backgroundColor}));
+const heldScannerReady=page=>page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead()&&!document.querySelector('#scan .btn.held'),null,{timeout:5000});
+// Read in the first frame that shows the held class, since it lasts 450 ms.
+const heldScannerPaint=page=>page.waitForFunction(()=>{
+ const button=document.querySelector('#scan .btn.held');if(!button)return null;
+ let effective=1;for(let node=button;node&&node.nodeType===1;node=node.parentElement)effective*=+getComputedStyle(node).opacity;
+ const row=button.closest('.siderail,.actionrow,.decide,.btnwrap');
+ return {act:button.dataset.act,effective,row:row?.className||null,hovered:!!row?.matches(':hover')};
+},null,{timeout:3000,polling:'raf'}).then(handle=>handle.jsonValue());
+async function heldScannerThemedPage(browser,theme,tasks,over,label){
+ const opened=await steadyScannerPage(browser,steadyScannerBoard({tasks,over:{...over,settings:{...syncState().settings,theme}}}),{width:1280,height:800,touch:false});
+ await opened.page.emulateMedia({colorScheme:theme});
+ const applied=await heldScannerTheme(opened.page);
+ assert.equal(applied.attr,theme,`${label}: the theme attribute is applied`);
+ assert.equal(applied.scheme,theme,`${label}: the computed color scheme follows it`);
+ await opened.page.mouse.move(1,1);
+ return {...opened,paint:applied.scan};
+}
+test('Scanner browser: a keyboard-held press shows at half strength in a normal row, the dimmed side rail and the dimmed check-in row in both themes in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   const paints={};
+   for(const theme of ['light','dark']){
+    const label=`${engineName} ${theme}`;
+    const {context,page,errors,paint}=await heldScannerThemedPage(browser,theme,8,{chain:['steady-0','steady-1'],candidateId:'steady-2'},label);
+    paints[theme]=paint;
+    try{
+     // A normal row: a second y lands on the next candidate's Yes.
+     await heldScannerReady(page);
+     await page.keyboard.press('y');await page.keyboard.press('y');
+     const yes=await heldScannerPaint(page);
+     assert.equal(yes.act,'yes',`${label}: the second y is held on Yes ${JSON.stringify(yes)}`);
+     assert.ok(Math.abs(yes.effective-.5)<.02,`${label}: a held Yes shows at half strength ${JSON.stringify(yes)}`);
+     // The dimmed side rail: y answers, d is held on the next candidate's Done.
+     await heldScannerReady(page);
+     assert.ok(await page.locator('.siderail.disabled').count(),`${label}: the candidate's rail is dimmed while scanning`);
+     await page.keyboard.press('y');await page.keyboard.press('d');
+     const rail=await heldScannerPaint(page);
+     assert.equal(rail.act,'cand-done',`${label}: d is held on the candidate's Done ${JSON.stringify(rail)}`);
+     assert.match(rail.row,/siderail/);assert.equal(rail.hovered,false,`${label}: no pointer brightens the rail`);
+     assert.ok(Math.abs(rail.effective-.5)<.02,`${label}: a held Done in the dimmed rail shows at half strength, never dimmed twice ${JSON.stringify(rail)}`);
+     // The dimmed check-in row: the check-in prompt's d goes to the dotted task's Done.
+     await heldScannerReady(page);
+     await page.evaluate(()=>{state.interventionActive=true;render();});
+     await heldScannerReady(page);
+     assert.ok(await page.locator('.actionrow.disabled').count(),`${label}: the dotted task's row is dimmed during the check-in`);
+     await page.keyboard.press('y');await page.keyboard.press('d');
+     const checkIn=await heldScannerPaint(page);
+     assert.equal(checkIn.act,'bench-done',`${label}: d is held on the dotted task's Done ${JSON.stringify(checkIn)}`);
+     assert.match(checkIn.row,/actionrow/);assert.equal(checkIn.hovered,false);
+     assert.ok(Math.abs(checkIn.effective-.5)<.02,`${label}: a held Done in the dimmed check-in row shows at half strength ${JSON.stringify(checkIn)}`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }finally{await context.close();}
+   }
+   assert.notEqual(paints.light,paints.dark,`${engineName}: the two themes paint the scan panel differently`);
+  }finally{await browser.close();}
+ }
+});
+// The sole task's Done, focused by keyboard, a no-op y, then Enter: the one
+// natural path the review found where focus and a held press coincide.
+test('Scanner browser: a keyboard-focused held button keeps its focus ring at full strength while it looks dimmed, in both themes in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const theme of ['light','dark']){
+    const label=`${engineName} ${theme}`;
+    const {context,page,errors}=await heldScannerThemedPage(browser,theme,1,{chain:['steady-0'],candidateId:null},label);
+    try{
+     const tab=engineName==='webkit'?'Alt+Tab':'Tab';
+     for(let n=0;n<80&&!await page.evaluate(()=>document.activeElement?.dataset?.act==='bench-done');n++)await page.keyboard.press(tab);
+     assert.ok(await page.evaluate(()=>document.activeElement.matches('#scan [data-act="bench-done"]:focus-visible')),`${label}: Done has keyboard focus`);
+     const r=await page.locator('#scan [data-act="bench-done"]').evaluate(e=>{const b=e.getBoundingClientRect();return {x:b.left,y:b.top,w:b.width,h:b.height};});
+     // The 2px ring sits 2px outside the button; the strip skips its rounded corners.
+     const ringClip={x:Math.ceil(r.x+6),y:Math.ceil(r.y-4),width:Math.floor(r.w-12),height:1},insideClip={x:Math.ceil(r.x+2),y:Math.ceil(r.y+2),width:Math.floor(r.w-4),height:Math.floor(r.h-4)};
+     let held=null;
+     for(let attempt=0;attempt<3&&!held;attempt++){
+      await heldScannerReady(page);
+      await page.keyboard.press('y');await page.keyboard.press('Enter');
+      const paint=await heldScannerPaint(page);
+      const ring=await page.screenshot({clip:ringClip}),inside=await page.screenshot({clip:insideClip});
+      if(await page.evaluate(()=>!!document.querySelector('#scan [data-act="bench-done"].held:focus-visible')))held={paint,ring,inside};
+     }
+     assert.ok(held,`${label}: the focused Done was held through its captures`);
+     assert.equal(held.paint.act,'bench-done');
+     await heldScannerReady(page);
+     assert.ok(await page.evaluate(()=>document.activeElement.matches('#scan [data-act="bench-done"]:focus-visible')),`${label}: Done keeps keyboard focus after the hold`);
+     const ring=await page.screenshot({clip:ringClip}),inside=await page.screenshot({clip:insideClip});
+     assert.ok(held.ring.equals(ring),`${label}: the focus ring paints at full strength while the press is held`);
+     assert.ok(!held.inside.equals(inside),`${label}: the held Done still looks dimmed inside its ring`);
+     assert.equal(await page.evaluate(()=>state.tasks.find(t=>t.id==='steady-0').done),false,`${label}: the held Enter did not mark the task done`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+});
 // The choices move a little with the title's length (#2420 accepts that), so
 // every answer taps where the choice is now, scrolled onto the screen first as
 // a person would. Scrolling the page by a known amount has to carry the
