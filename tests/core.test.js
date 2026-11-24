@@ -24195,9 +24195,23 @@ test("RISK steady scanner browser: a key hint never widens an action beside a ca
     {name:'common phone with a 16 px minimum font size and Postpone',width:375,height:812,minimum:16,showPostpone:true},
     {name:'desktop with a 16 px minimum font size',width:1000,height:900,touch:false,minimum:16,showPostpone:true},
     {name:'desktop with Postpone',width:1000,height:900,touch:false,showPostpone:true},
+    // Chrome's own setting, which raises font sizes but not the em lengths
+    // sized from them, as a modelled minimum does.
+    ...(engineName==='chromium'?[
+     {name:'common phone with Chrome set to a 16 px minimum font size and Postpone',width:375,height:812,chromeMinimum:16,showPostpone:true},
+     {name:'desktop with Chrome set to a 16 px minimum font size',width:1000,height:900,touch:false,chromeMinimum:16,showPostpone:true},
+    ]:[]),
    ])for(const webFonts of [true,false]){
     const label=`${engineName} ${spec.name} ${webFonts?'with web fonts':'fonts blocked'}`;
-    const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard(spec),spec);
+    let profile=null,host=browser;
+    if(spec.chromeMinimum){
+     profile=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'hint-minimum-font-2460-'));
+     fs.mkdirSync(path.join(profile,'Default'));
+     fs.writeFileSync(path.join(profile,'Default','Preferences'),JSON.stringify({webkit:{webprefs:{minimum_font_size:spec.chromeMinimum,minimum_logical_font_size:spec.chromeMinimum}}}));
+     // The headless shell ignores the profile's setting; full Chromium reads it.
+     host={newContext:options=>engine.launchPersistentContext(profile,{...options,headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chromium'})};
+    }
+    const {page,context,errors}=await steadyScannerPage(host,steadySeededBoard(spec),spec);
     try{
      if(webFonts){
       await context.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//,route=>route.continue());
@@ -24206,8 +24220,9 @@ test("RISK steady scanner browser: a key hint never widens an action beside a ca
      }
      await page.waitForFunction(()=>!!document.querySelector('.card.bench')&&!!document.querySelector('.card.cand')&&!!document.querySelector('[data-act="cand-worked"]'),null,{timeout:15000});
      await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(80);
-     const normalText=!spec.scale&&!spec.minimum;
-     if(!normalText){await enlargeRowText(page,spec);await page.waitForTimeout(80);}
+     const normalText=!spec.scale&&!spec.minimum&&!spec.chromeMinimum;
+     if(spec.scale||spec.minimum){await enlargeRowText(page,spec);await page.waitForTimeout(80);}
+     if(spec.chromeMinimum)assert.equal(await page.evaluate(()=>getComputedStyle(document.querySelector('.card.cand + * .keyhint')).fontSize),spec.chromeMinimum+'px',`${label}: positive control: Chrome raised the hint to its minimum font size`);
      const loadedFonts=await page.evaluate(()=>[...document.fonts].filter(face=>face.status==='loaded').length);
      if(webFonts)assert.ok(loadedFonts>0,`${label}: positive control: the web fonts loaded, which needs the network`);
      else assert.equal(loadedFonts,0,`${label}: positive control: no web font loaded`);
@@ -24235,7 +24250,7 @@ test("RISK steady scanner browser: a key hint never widens an action beside a ca
      checkActions(`${label}, dotted task listening: dotted task's row`,after.bench,normalText);
      sameGap(`${label}, dotted task listening`,after.bench);
      assert.deepEqual(errors,[],`${label}: no page errors`);
-    }catch(error){failures.push(error.message.split('\n')[0]);}finally{await context.close();}
+    }catch(error){failures.push(error.message.split('\n')[0]);}finally{await context.close();if(profile)fs.rmSync(profile,{recursive:true,force:true});}
    }
   }finally{await browser.close();}
  }

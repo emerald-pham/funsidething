@@ -234,19 +234,25 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
    the released build, so on 407-432px phones its row wrapped with Delete alone
    (#2460 review B1). Pinned to the button's edge instead it sat 1.7px from
    "Delete" and 14px from "Edit" (review B2).
-   The hint's box is 1.06em wide, room for its widest glyph ⌫, and a fixed
-   -9.95px end margin cancels that box and its gap at the normal 7.5px size,
-   so the glyph overflows into the 12px end padding and still clears the edge
-   by 2px. The rows have no width to spare for more padding (the dotted task's
+   The hint's box is at least 7.95px wide, its widest glyph ⌫ at 7.5px, and a
+   fixed -9.95px end margin cancels that box and its gap, so at the normal
+   size the glyph overflows into the 12px end padding and clears the edge by
+   2px. The rows have no width to spare for more padding (the dotted task's
    second line at 375px with Postpone has 5px), hence 7.5px. When text grows
    (a platform text scale, or a browser minimum font size, which also raises
-   this 7.5px) the box grows past the fixed margin and widens the button by
-   exactly the growth, so the hint never reaches its label or the edge; that
-   happened with fixed room (independent review B2). An equal box before the
-   label keeps the label centred. */
-.btn.sm .keyhint,.btn.sm:has(> .keyhint)::before{font-size:.577em}
-.btn.sm .keyhint{display:inline-block;inline-size:1.06em;margin:0;margin-inline:2px -9.95px;text-align:start;white-space:nowrap}
-.btn.sm:has(> .keyhint)::before{content:'';display:inline-block;inline-size:calc(1.06em + 2px);margin-inline-end:-9.95px}
+   this 7.5px) the glyph outgrows the box and widens the button by exactly
+   that much, so it never reaches its label or the edge; with fixed room it
+   did (independent review B2). The lengths stay in px: Chrome's minimum font
+   size raises font sizes but not em lengths. The same glyph, hidden, before
+   the label keeps the label centred; data-act names the key, as in
+   cardActions. */
+.btn.sm .keyhint,.btn.sm:has(> .keyhint)::before{display:inline-block;font-size:7.5px;min-inline-size:7.95px;white-space:nowrap}
+.btn.sm .keyhint{margin:0;margin-inline:2px -9.95px;text-align:start}
+.btn.sm:has(> .keyhint)::before{margin-inline-end:-7.95px;visibility:hidden}
+.btn.sm[data-act$="done"]:has(> .keyhint)::before{content:"d";content:"d"/""}
+.btn.sm[data-act="edit"]:has(> .keyhint)::before{content:"e";content:"e"/""}
+.btn.sm[data-act$="worked"]:has(> .keyhint)::before{content:"w";content:"w"/""}
+.btn.sm[data-act="delete-task"]:has(> .keyhint)::before{content:"\232B";content:"\232B"/""}
 /* A hint on the card the key doesn't act on isn't seen or read (#2460). */
 .keyhint.unheard{visibility:hidden}
 .sparkbox{display:flex;align-items:center;gap:8px;margin-left:auto}
