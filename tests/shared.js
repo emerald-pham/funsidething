@@ -1255,8 +1255,13 @@ async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactor
     // A late in-flight continuation cannot revive a disposed fixture.
     const timer=setTimeout(()=>{ownedTimers.delete(timer);if(!disposed)fn(...args);},ms);
     if(disposed)clearTimeout(timer);else ownedTimers.add(timer);
+    // #2457: work the app defers to the next task (an Add's device save after
+    // the frame that draws the task) keeps the test process alive until it
+    // runs, as a browser runs it; a later timer or a frame callback does not.
+    if(!(Number(ms)>0))return timer;
     timer.unref?.();return timer;
   };
+  const scheduleFrame=fn=>{const timer=schedule(fn,0);timer.unref?.();return timer;};
   const cancel=timer=>{ownedTimers.delete(timer);clearTimeout(timer);};
   if(locationHref)shim.window.location=new URL(locationHref);
   if(fetchProvider){shim.window.fetch=fetchProvider;shim.window.AbortController=AbortController;}
@@ -1309,7 +1314,7 @@ async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactor
     CustomEvent: class CustomEvent { constructor(type, opts) { this.type = type; Object.assign(this, opts || {}); } },
     setTimeout: schedule,
     clearTimeout: cancel,
-    requestAnimationFrame: (fn) => schedule(fn, 0),
+    requestAnimationFrame: scheduleFrame,
     confirm: () => true,
     alert: () => {},
     prompt: () => null,

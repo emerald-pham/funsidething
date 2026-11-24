@@ -5342,9 +5342,17 @@ function save(preserveBackupId=null){
       endSyncTimer(timer);
       if(saveTimer!==timer)return;
       // Settles as persist() does: true once the board is durable here.
-      saveTimer=null;return deviceSaveLane.request({preserveBackupId}).done;
+      saveTimer=null;
+      // #2457: an Add's save that started after this edit and saved it, with
+      // nothing changed since it started, has saved this board.
+      const served=debounceServedBy;debounceServedBy=null;
+      if(served?.timer===timer&&served.generation===saveRequestGeneration&&served.edits===boardEditSerial){
+        const again=()=>deviceSaveLane.request({preserveBackupId}).done;
+        return served.done.then(saved=>saved===true||again(),again);
+      }
+      return deviceSaveLane.request({preserveBackupId}).done;
     },350));
-    saveTimer=timer;saveTimerBackupId=preserveBackupId;
+    saveTimer=timer;saveTimerBackupId=preserveBackupId;debounceServedBy=null;
   }
 }
 /* #2457: an Add's device save runs after the frame that draws the new task,
@@ -5354,11 +5362,13 @@ function save(preserveBackupId=null){
    beside it, outside the lane, and merged the board again. Adds made before
    this save starts share it; one made while it runs joins the lane's next
    save. A lane save writes the board as it is when it starts, so it also
-   serves the edit's debounced save, which is dropped, unless that keeps a
-   backup id of its own. Until the save is in the lane the debounce stays set,
-   so nothing shows the board saved before it commits. Hiding the page starts
-   it at once, as it runs an answer's catch-up. Resolves as persist() does. */
-let afterFrameSave=null;
+   serves the edit's debounced save (debounceServedBy), unless that keeps a
+   backup id of its own: the debounce still runs when it is due, and starts no
+   second save when nothing changed since this one started and this one
+   saved. The debounce stays set until then, as for any edit, so nothing shows
+   the board saved early. Hiding the page starts this save at once, as it runs
+   an answer's catch-up. Resolves as persist() does. */
+let afterFrameSave=null,debounceServedBy=null;
 function deviceSaveAfterFrame(){
   if(afterFrameSave)return afterFrameSave.done;
   let settle;
@@ -5367,8 +5377,9 @@ function deviceSaveAfterFrame(){
     if(afterFrameSave!==job)return;
     afterFrameSave=null;
     if(job.timer!==null){clearSyncTimeout(job.timer);job.timer=null;}
-    if(saveTimer&&saveTimerBackupId===null){clearSyncTimeout(saveTimer);saveTimer=null;}
-    settle(deviceSaveLane.request().done);
+    const request=deviceSaveLane.request();
+    if(saveTimer&&saveTimerBackupId===null)debounceServedBy={timer:saveTimer,done:request.done,generation:saveRequestGeneration,edits:boardEditSerial};
+    settle(request.done);
   };
   // Counted as the debounce is, so the Settled signal (#2378) waits for it.
   const timer=countSyncTimer("save-debounce",setTimeout(()=>{endSyncTimer(timer);if(job.timer===timer)job.timer=null;job.start();},0));

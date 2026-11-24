@@ -20630,8 +20630,10 @@ const QUICK_ADDS2457=['Second task 2457','Third task 2457','Fourth task 2457'];
 async function addsSaveOnce2457(t,{signedIn}){
  const device=await relaunchedAdder2457(t,{signedIn}),{ctx}=device,work=addSaveWork2457(device);
  const settle=()=>syncSettled(ctx,{within:60000});
+ const saveRuns=()=>device.report().save.persistCalls.value;
  // The first Add after opening.
  work.reset();
+ let runs=saveRuns();
  const first=pressAdd2457(device,'First task added after opening 2457');
  assert.ok(first.added,'positive control: the Add is taken');
  assert.ok(first.drawn,'the new task is drawn in the tap');
@@ -20644,8 +20646,11 @@ async function addsSaveOnce2457(t,{signedIn}){
  assert.equal(opening.commits,1,'the first Add after opening saves the board once: '+JSON.stringify(opening));
  assert.equal(opening.checks,1,'and checks it for missing tasks once: '+JSON.stringify(opening));
  assert.equal(opening.fullMerges,0,'with no full merge, as any later save: '+JSON.stringify(opening));
+ // With sync off nothing else saves: the Add's edit is saved by one save run,
+ // its debounced save included.
+ if(!signedIn)assert.equal(saveRuns()-runs,1,'the Add’s board is saved by one save run');
  // Adds made close together, as a person enters a list.
- work.reset();
+ work.reset();runs=saveRuns();
  const quick=QUICK_ADDS2457.map(title=>pressAdd2457(device,title));
  assert.ok(quick.every(add=>add.added&&add.drawn),'each Add is drawn in its tap: '+JSON.stringify(quick));
  assert.deepEqual(quick.map(add=>add.saveRuns),[0,0,0],'no tap starts a device save');
@@ -20655,6 +20660,7 @@ async function addsSaveOnce2457(t,{signedIn}){
  assert.equal(later.commits,1,'Adds made close together share one device save: '+JSON.stringify(later));
  assert.equal(later.checks,later.commits,'one missing-task check per committed save: '+JSON.stringify(later));
  assert.equal(later.fullMerges,0,'and no full merge: '+JSON.stringify(later));
+ if(!signedIn)assert.equal(saveRuns()-runs,1,'by one save run');
  // With sync on, the cloud copy holds them too.
  if(signedIn){
   const cloud=await cloudCopy2408(device.docs);
