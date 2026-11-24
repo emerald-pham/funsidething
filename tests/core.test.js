@@ -14662,6 +14662,33 @@ test("UI: the benchmark's d/⌫ keyhints hide when a candidate is showing", asyn
     "candidate's Done should show d keyhint");
 });
 
+// #2460 review: the dotted task's Done and Delete tooltips still named d and the
+// Delete key while a candidate showed, though those keys act on the candidate.
+// A tooltip names a key only on the card that answers it, and the candidate's
+// Worked on it explains itself like the dotted task's.
+test("UI: action tooltips name a key only on the card that answers it, and both Worked on it buttons have one", async () => {
+  const titleOf = (html, act) => (html.match(new RegExp('<button[^>]*data-act="'+act+'"[^>]*>')) || [''])[0].match(/title="([^"]*)"/)?.[1];
+  const benchDelete = html => (benchAction(html).match(/<button[^>]*data-act="delete-task"[^>]*>/) || [''])[0].match(/title="([^"]*)"/)?.[1];
+  const { ctx, shim } = await loadApp({ seed: 260 });
+  addTaskAged(ctx, "Oldest", 900000);
+  addTaskAged(ctx, "Newer", 1000);
+  ctx.addTask("Third task", true);
+  ctx.render();
+  const both = shim.elements.get("scan").innerHTML;
+  assert.ok(both.includes('data-act="cand-done"'), "a candidate is showing");
+  assert.ok(!/\(d\)/.test(titleOf(both, "bench-done")), `the dotted task's Done doesn't name d: ${titleOf(both, "bench-done")}`);
+  assert.ok(!/Delete key/.test(benchDelete(both)), `the dotted task's Delete doesn't name the Delete key: ${benchDelete(both)}`);
+  assert.match(titleOf(both, "cand-done"), /\(d\)/, "the candidate's Done names d");
+  const candRail = (both.match(/<div class="siderail[^"]*">[\s\S]*?<\/div>/) || [''])[0];
+  assert.match((candRail.match(/<button[^>]*data-act="delete-task"[^>]*>/) || [''])[0], /title="[^"]*Delete key/, "the candidate's Delete names the Delete key");
+  assert.ok(titleOf(both, "cand-worked"), "the candidate's Worked on it has a tooltip");
+  ctx.onAction("start-working", {});
+  ctx.render();
+  const alone = shim.elements.get("scan").innerHTML;
+  assert.match(titleOf(alone, "bench-done"), /\(d\)/, "with no candidate the dotted task's Done names d");
+  assert.match(benchDelete(alone), /Delete key/, "with no candidate the dotted task's Delete names the Delete key");
+});
+
 test("UI: benchmark's action row is full opacity in work mode (not greyed)", async () => {
   const { ctx, shim } = await loadApp({ seed: 261 });
   ctx.addTask("Task", true);
@@ -17034,7 +17061,20 @@ test('RISK opening board presentation: shared markup retains released cards cont
  // Everything else keeps the released markup byte for byte.
  const releasedWith221Pills=markup=>markup.replace(/<button class="crumb" data-act="reveal" (data-id="[^"]*")([^>]*?) title="([^"]*)">/g,'<button class="crumb" data-act="edit" $1$2 title="$3" aria-label="Open $3 to edit it">');
  assert.match(old.shim.document.getElementById('scan').innerHTML,/<button class="crumb" data-act="reveal"/,'the released scan panel has a trail pill to compare');
- for(const id of ['ctxPanel','scan','listBody','histPanel','listEligibilityRow','listTagRow'])assert.equal(current.shim.document.getElementById(id).innerHTML,releasedWith221Pills(old.shim.document.getElementById(id).innerHTML),id+' keeps the released markup after sharing its pure formatter');
+ // #2460 deliberately changed one more: every Done, Edit, Worked on it and Delete
+ // beside a card keeps its key hint's space, hidden and aria-hidden on the card
+ // the key doesn't act on, so the released buttons without a hint gain one.
+ const HINT_KEYS={'✓ Done':'d','Edit':'e','Worked on it':'w','Delete':'⌫'};
+ const releasedWith2460Hints=markup=>markup.replace(/(<button class="btn sm [^"]*" data-act="(?:bench-done|cand-done|edit|worked|cand-worked|delete-task)"[^>]*>)(✓ Done|Edit|Worked on it|Delete)<\/button>/g,(_,open,label)=>open+label+'<span class="keyhint unheard" aria-hidden="true">'+HINT_KEYS[label]+'</span></button>');
+ // The #2460 review also changed tooltips: while a candidate shows, the dotted
+ // task's Done and Delete stop naming d and the Delete key (they act on the
+ // candidate), and the candidate's Worked on it gains the dotted task's tooltip.
+ const releasedWith2460Titles=markup=>{
+  const withCandidate=markup.includes('data-act="cand-done"');
+  return markup.replace(/<div class="actionrow[^"]*">[\s\S]*?<\/div>/,row=>withCandidate?row.replace(' title="Done — cross it off (d)"',' title="Done — cross it off"').replace(' title="Delete this task entirely (Delete key)"',' title="Delete this task entirely"'):row)
+   .replace(/(<button class="btn sm worked" data-act="cand-worked" data-id="[^"]*")>/,'$1 title="Started it, crossing it off, back to the bottom of the list (rule 7)">');
+ };
+ for(const id of ['ctxPanel','scan','listBody','histPanel','listEligibilityRow','listTagRow'])assert.equal(current.shim.document.getElementById(id).innerHTML,releasedWith2460Titles(releasedWith2460Hints(releasedWith221Pills(old.shim.document.getElementById(id).innerHTML))),id+' keeps the released markup after sharing its pure formatter');
  for(const app of [old,current]){app.ctx.state.chain=[];app.ctx.state.settings.skipOldestFirstDot=false;app.ctx.renderList();}
  assert.equal(current.shim.document.getElementById('listBody').innerHTML,old.shim.document.getElementById('listBody').innerHTML,'the shared row facts retain next-dot placement');
  const before=JSON.stringify(current.ctx.state),keys=[SYNC_STORE_KEY,LOCAL_HEAD_KEY,LOCAL_BACKUPS_KEY],stored=keys.map(key=>current.shim.localStorage.getItem(key));
@@ -17061,6 +17101,30 @@ test('RISK saved view invisible active scanner: a running scan retains scanner a
    assert.deepEqual(view.errors,[]);
   }finally{await view.browser.close();}
  }
+});
+
+// #2460 specialist B1: the saved view keeps classes but never data-* attributes,
+// so a rule that sizes the action rows by data-act styled the live buttons and
+// not their saved copies. With the rows' text enlarged on a phone, or the
+// wider tablet hints, the saved scanner came out up to 117 px shorter and the
+// page jumped as the board loaded.
+const SAVED_VIEW_ENLARGED_ROWS='.actionrow .btn.sm,.siderail .btn.sm{font-size:26px!important}.actionrow .keyhint,.siderail .keyhint,.actionrow .btn.sm::before,.siderail .btn.sm::before{font-size:15px!important}';
+test('RISK saved view invisible active scanner: the action rows keep their live geometry and the scanner its height in the saved view with the rows at 200% text on a phone and at tablet and desktop width',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [name,viewport,initStyle] of [['375 px phone, rows at 200% text',{width:375,height:812},SAVED_VIEW_ENLARGED_ROWS],['768 px tablet',{width:768,height:1024},''],['1100 px desktop',{width:1100,height:1000},'']]){
+  const view=await invisibleSavedViewBrowser('light',false,false,viewport,true,{initStyle,actionRows:true});
+  try{
+   assert.ok(view.before.geometry.separators>0,`${name}: positive control: the scan shows the dotted task and the candidate`);
+   assert.equal(view.early.settled,false,`${name}: the local read is still pending`);
+   assert.ok(view.before.actionRows.length>=8,`${name}: positive control: both action rows are measured live: ${view.before.actionRows.length}`);
+   const live=view.before.geometry.scan.height,saved=view.early.geometry.scan?.height;
+   assert.ok(Math.abs(saved-live)<=1,`${name}: the saved scanner is as tall as the live one: ${saved?.toFixed(1)} vs ${live.toFixed(1)} px`);
+   assert.equal(view.early.actionRows.length,view.before.actionRows.length,`${name}: the saved view keeps every action`);
+   view.before.actionRows.forEach((r,i)=>{const e=view.early.actionRows[i];for(const key of ['x','y','width','height'])assert.ok(Math.abs(e[key]-r[key])<=1,`${name}: action ${i} ${key} in the saved view matches live: ${e[key].toFixed(1)} vs ${r[key].toFixed(1)} px`);});
+   assert.deepEqual(view.errors,[],`${name}: no page errors`);
+  }catch(error){failures.push(error.message.split('\n')[0]);}finally{await view.browser.close();}
+ }
+ assert.deepEqual(failures,[]);
 });
 
 test('RISK saved view invisible large window: a tall viewport retains all visible rows with bounded projection work',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
@@ -24499,6 +24563,304 @@ test('RISK steady scanner browser: Yes No and Cant share one width and no scanne
      assert.ok(shot.overflow<=0,`${label}: no sideways page overflow: ${shot.overflow}`);
      assert.deepEqual(errors,[],`${label}: no page errors`);
     }catch(error){failures.push(error.message.split('\n')[0]);}finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+// #2460: the dotted task's actions and the candidate's were built separately,
+// so the same action rendered at different widths in the two rows (Done 164 vs
+// 189 px, Worked on it 265 vs 235, Delete 150 vs 185 on a 375 px phone) and
+// changed width as its key hint moved between cards. Each row is found by its
+// card, not its class: the actions under both cards must look like one family,
+// whichever card the keys act on, with Delete last in each row.
+const STEADY_SHARED_ACTIONS=[['Done','bench-done','cand-done'],['Edit','edit','edit'],['Worked on it','worked','cand-worked'],['Delete','delete-task','delete-task']];
+test('RISK steady scanner browser: the actions under the dotted task and the candidate match in size type and colour whichever card the key hints sit on, share one alignment and keep Delete last, across phone enlarged short-landscape tablet and desktop views in day and night with web fonts and blocked in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ const readRows=page=>page.evaluate(()=>{
+  const rowAfter=selector=>{
+   const card=document.querySelector(selector),row=card?.nextElementSibling;if(!row)return null;
+   const rs=getComputedStyle(row),rr=row.getBoundingClientRect();
+   const buttons=[...row.children].filter(el=>el.matches('button')).map(el=>{
+    const r=el.getBoundingClientRect(),s=getComputedStyle(el);
+    return {act:el.dataset.act,width:r.width,height:r.height,left:r.left,right:r.right,top:r.top,fontSize:s.fontSize,fontWeight:s.fontWeight,fontFamily:s.fontFamily,radius:s.borderTopLeftRadius,background:s.backgroundColor,color:s.color,
+     hints:[...el.querySelectorAll('.keyhint')].map(h=>({text:h.textContent,shown:getComputedStyle(h).visibility==='visible'&&h.getClientRects().length>0,ariaHidden:!!h.closest('[aria-hidden="true"]')}))};
+   });
+   return {buttons,contentRight:rr.right-parseFloat(rs.paddingRight),opacity:+rs.opacity};
+  };
+  const root=document.documentElement;
+  return {bench:rowAfter('.card.bench'),cand:rowAfter('.card.cand'),theme:root.dataset.theme,scheme:getComputedStyle(root).colorScheme,paint:getComputedStyle(document.getElementById('scan')).backgroundColor,mode:state.mode,viewportWidth:innerWidth,overflow:root.scrollWidth-innerWidth};
+ });
+ const by=(row,act)=>row.buttons.find(b=>b.act===act);
+ const shownHints=b=>b.hints.filter(h=>h.shown).map(h=>h.text).join('');
+ // Lines of a wrapped row, top to bottom, each left to right.
+ const lines=row=>{const tops=[...new Set(row.buttons.map(b=>Math.round(b.top)))].sort((a,b)=>a-b);return tops.map(t=>row.buttons.filter(b=>Math.abs(Math.round(b.top)-t)<=1).sort((a,b)=>a.left-b.left));};
+ const sameLook=(label,a,b)=>{
+  for(const key of ['width','height'])assert.ok(Math.abs(a[key]-b[key])<=1,`${label}: ${key} ${a[key].toFixed(1)} vs ${b[key].toFixed(1)} px`);
+  for(const key of ['fontSize','fontWeight','fontFamily','radius','background','color'])assert.equal(a[key],b[key],`${label}: ${key}`);
+ };
+ const checkRow=(label,row)=>{
+  assert.equal(row.buttons.at(-1).act,'delete-task',`${label}: Delete is the last action: ${row.buttons.map(b=>b.act).join(', ')}`);
+  const rows=lines(row),last=rows.at(-1);
+  assert.equal(last.at(-1).act,'delete-task',`${label}: Delete sits at the end of the last line`);
+  for(const line of rows){
+   assert.ok(Math.abs(line.at(-1).right-row.contentRight)<=1,`${label}: every line ends at the row's right edge: ${line.map(b=>b.act+'@'+b.right.toFixed(1)).join(', ')} vs ${row.contentRight.toFixed(1)}`);
+   assert.ok(Math.max(...line.map(b=>b.top))-Math.min(...line.map(b=>b.top))<=1,`${label}: a line's buttons share one top`);
+  }
+  return rows;
+ };
+ const gaps=rows=>rows.flatMap(line=>line.slice(1).map((b,i)=>b.left-line[i].right));
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const spec of [
+    {name:'small phone',width:320,height:568},
+    {name:'small phone with enlarged text and Postpone',width:320,height:568,enlarged:true,showPostpone:true},
+    {name:'common phone',width:375,height:812},
+    {name:'common phone with Postpone',width:375,height:812,showPostpone:true},
+    {name:'iPhone portrait',width:390,height:844},
+    {name:'short landscape with Postpone',width:844,height:390,showPostpone:true},
+    {name:'large phone at 200% text with Postpone',width:430,height:932,enlarged:true,doubleText:true,showPostpone:true},
+    {name:'just above phone width at 200% text',width:421,height:900,enlarged:true,doubleText:true},
+    {name:'tablet portrait with Postpone',width:768,height:1024,showPostpone:true},
+    {name:'desktop with Postpone',width:1000,height:900,touch:false,showPostpone:true},
+   ])for(const webFonts of [true,false]){
+    const label=`${engineName} ${spec.name} ${webFonts?'with web fonts':'fonts blocked'}`;
+    const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard(spec),spec);
+    try{
+     if(webFonts){
+      await context.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//,route=>route.continue());
+      await page.reload({waitUntil:'domcontentloaded'});
+      await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]'),null,{timeout:60000});
+     }
+     if(spec.enlarged)await page.addStyleTag({content:spec.doubleText?STEADY_DOUBLE_TEXT:STEADY_ENLARGED_TEXT});
+     await page.waitForFunction(()=>!!document.querySelector('.card.bench')&&!!document.querySelector('.card.cand')&&!!document.querySelector('[data-act="cand-worked"]'),null,{timeout:15000});
+     await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(80);
+     const loadedFonts=await page.evaluate(()=>[...document.fonts].filter(face=>face.status==='loaded').length);
+     if(webFonts)assert.ok(loadedFonts>0,`${label}: positive control: the web fonts loaded, which needs the network`);
+     else assert.equal(loadedFonts,0,`${label}: positive control: no web font loaded`);
+     const setTheme=async theme=>{
+      await page.evaluate(theme=>setTheme(theme),theme);await page.waitForTimeout(40);
+      const seen=await readRows(page);
+      assert.equal(seen.theme,theme,`${label}: the ${theme} theme is applied`);
+      assert.match(seen.scheme,new RegExp('^'+theme+'$'),`${label}: the computed colour scheme is ${theme}`);
+      return seen;
+     };
+     // The candidate is showing, so d, e and ⌫ act on it and only w on the dotted task.
+     const candidateListens={};
+     for(const theme of ['light','dark']){
+      const seen=candidateListens[theme]=await setTheme(theme),tl=`${label} ${theme}, candidate listening`;
+      assert.ok(seen.bench&&seen.cand,`${tl}: both cards show their actions`);
+      if(spec.showPostpone)assert.ok(by(seen.bench,'bench-postpone'),`${tl}: Postpone is in the dotted task's row`);
+      for(const [name,benchAct,candAct] of STEADY_SHARED_ACTIONS)sameLook(`${tl}: ${name} under the dotted task and the candidate`,by(seen.bench,benchAct),by(seen.cand,candAct));
+      assert.deepEqual(STEADY_SHARED_ACTIONS.map(([name,benchAct,candAct])=>[name,shownHints(by(seen.bench,benchAct)),shownHints(by(seen.cand,candAct))]),
+       [['Done','','d'],['Edit','','e'],['Worked on it','w',''],['Delete','','⌫']],`${tl}: key hints show only where the key acts`);
+      for(const b of [...seen.bench.buttons,...seen.cand.buttons])for(const h of b.hints)if(!h.shown)assert.equal(h.ariaHidden,true,`${tl}: ${b.act}'s unshown ${h.text} hint is kept out of the accessibility tree`);
+      const benchLines=checkRow(`${tl}: dotted task's row`,seen.bench),candLines=checkRow(`${tl}: candidate's row`,seen.cand);
+      assert.ok(Math.abs(seen.bench.contentRight-seen.cand.contentRight)<=1,`${tl}: both rows end at one right edge: ${seen.bench.contentRight.toFixed(1)} vs ${seen.cand.contentRight.toFixed(1)}`);
+      const allGaps=[...gaps(benchLines),...gaps(candLines)];
+      if(allGaps.length)assert.ok(Math.max(...allGaps)-Math.min(...allGaps)<=1,`${tl}: both rows space their buttons alike: ${allGaps.map(g=>g.toFixed(1)).join(', ')}`);
+      assert.ok(seen.overflow<=0,`${tl}: no sideways page overflow: ${seen.overflow}`);
+      assert.ok(seen.bench.opacity<1&&seen.bench.opacity===seen.cand.opacity,`${tl}: both rows dim alike while the candidate is weighed: ${seen.bench.opacity} and ${seen.cand.opacity}`);
+     }
+     assert.notEqual(candidateListens.light.paint,candidateListens.dark.paint,`${label}: the scanner pane paints differently by day and night: ${candidateListens.light.paint}`);
+     // Accessible names stay as they were: an unshown hint is not read out.
+     const benchRow=page.locator('.card.bench + *'),candRow=page.locator('.card.cand + *');
+     for(const [row,name,exact] of [[benchRow,'✓ Done',true],[benchRow,'Edit this task',true],[benchRow,/^Worked on it\s*w$/,false],[benchRow,'Delete',true],
+      [candRow,/^✓ Done\s*d$/,false],[candRow,'Edit this task (e)',true],[candRow,'Worked on it',true],[candRow,/^Delete\s*⌫$/,false]])
+      assert.equal(await row.getByRole('button',{name,exact:exact||undefined}).count(),1,`${label}: a button named ${name} in the ${row===benchRow?"dotted task's":"candidate's"} row`);
+     // done adding for now: no candidate, so every hint moves to the dotted task.
+     await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
+     const finish=page.locator('[data-act="start-working"]');
+     if(spec.touch===false)await finish.click();else await finish.tap();
+     await page.waitForFunction(()=>state.mode==='work'&&!document.querySelector('.card.cand'),null,{timeout:10000});
+     const benchListens={};
+     for(const theme of ['light','dark']){
+      const seen=benchListens[theme]=await setTheme(theme),before=candidateListens[theme],tl=`${label} ${theme}, dotted task listening`;
+      assert.deepEqual(STEADY_SHARED_ACTIONS.map(([name,benchAct])=>[name,shownHints(by(seen.bench,benchAct))]),[['Done','d'],['Edit','e'],['Worked on it','w'],['Delete','⌫']],`${tl}: every hint is on the dotted task`);
+      for(const [name,benchAct,candAct] of STEADY_SHARED_ACTIONS){
+       sameLook(`${tl}: ${name} keeps its width when its hint moves to the dotted task`,by(seen.bench,benchAct),by(before.bench,benchAct));
+       sameLook(`${tl}: ${name} under the listening dotted task matches the listening candidate's`,by(seen.bench,benchAct),by(before.cand,candAct));
+      }
+      checkRow(`${tl}: dotted task's row`,seen.bench);
+      assert.equal(seen.bench.opacity,1,`${tl}: the dotted task's row is at full strength once scanning stops`);
+     }
+     assert.notEqual(benchListens.light.paint,benchListens.dark.paint,`${label}: with the dotted task listening, the scanner pane paints differently by day and night: ${benchListens.light.paint}`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(error.message.split('\n')[0]);}finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+// #2460 review B1: a hint that kept its width while hidden made the candidate's
+// Worked on it 13 px wider than on the released build, so on 407-432 px phones
+// the candidate's row broke 3 + 1 with Delete alone where the released build
+// kept one line, and the dotted task's row gained a line at 375 px with
+// Postpone. A hint now draws inside the button's own padding: shown, hidden or
+// absent, it never adds width, and the label stays centred clear of it.
+test("RISK steady scanner browser: a key hint never widens an action beside a card and its label sits centred clear of the hint, so the candidate's row keeps one line on 412 to 430 px phones and the dotted task's Delete is never alone at 375 px with Postpone, with web fonts and blocked in Chromium and WebKit",{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ const readActions=page=>page.evaluate(()=>{
+  const rowAfter=selector=>{
+   const row=document.querySelector(selector)?.nextElementSibling;if(!row)return null;
+   return [...row.children].filter(el=>el.matches('button')).map(el=>{
+    const s=getComputedStyle(el),r=el.getBoundingClientRect();
+    const inner={left:r.left+parseFloat(s.borderLeftWidth),right:r.right-parseFloat(s.borderRightWidth)};
+    // The label is the button's own text, outside any hint.
+    const range=document.createRange(),rects=[];
+    const walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT,{acceptNode:n=>n.parentElement.closest('.keyhint')||!n.textContent.trim()?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT});
+    for(let n;(n=walker.nextNode());){range.selectNodeContents(n);rects.push(...[...range.getClientRects()].filter(b=>b.width>0));}
+    const label={left:Math.min(...rects.map(b=>b.left)),right:Math.max(...rects.map(b=>b.right)),top:Math.min(...rects.map(b=>b.top)),bottom:Math.max(...rects.map(b=>b.bottom))};
+    // A hint is measured by its glyph, which may overflow a box of its own.
+    const hints=[...el.querySelectorAll('.keyhint')].map(h=>{const glyph=document.createRange();glyph.selectNodeContents(h);const b=glyph.getBoundingClientRect();return {text:h.textContent,left:b.left,right:b.right,top:b.top,bottom:b.bottom};});
+    // The same button with its hint taken out, then put back as it was.
+    let bare=r.width,bareHeight=r.height;
+    if(el.querySelector('.keyhint')){
+     const taken=[...el.querySelectorAll('.keyhint')].map(h=>[h,h.parentNode,h.nextSibling]);
+     taken.forEach(([h])=>h.remove());({width:bare,height:bareHeight}=el.getBoundingClientRect());
+     taken.reverse().forEach(([h,parent,next])=>parent.insertBefore(h,next));
+    }
+    return {act:el.dataset.act,width:r.width,bare,height:r.height,bareHeight,top:r.top,left:r.left,inner,label,hints};
+   });
+  };
+  return {bench:rowAfter('.card.bench'),cand:rowAfter('.card.cand')};
+ });
+ const lines=row=>{const tops=[...new Set(row.map(b=>Math.round(b.top)))].sort((a,b)=>a-b);return tops.map(t=>row.filter(b=>Math.abs(Math.round(b.top)-t)<=1).sort((a,b)=>a.left-b.left).map(b=>b.act));};
+ // At the normal text size a hint takes no room of its own, so the rows keep
+ // the released build's lines. Enlarged text may widen a button to keep the
+ // hint clear of its label, as the released build's hint always did.
+ const checkActions=(label,row,normalText)=>{
+  for(const b of row){
+   const bl=`${label}: ${b.act}`;
+   if(normalText==='phone'){
+    assert.ok(Math.abs(b.width-b.bare)<=0.5,`${bl}: its key hint adds no width: ${b.width.toFixed(1)} px with it, ${b.bare.toFixed(1)} px without`);
+    assert.ok(Math.abs(b.height-b.bareHeight)<=0.5,`${bl}: its key hint adds no height: ${b.height.toFixed(1)} px with it, ${b.bareHeight.toFixed(1)} px without`);
+   }
+   const leftInset=b.label.left-b.inner.left,rightInset=b.inner.right-b.label.right;
+   assert.ok(Math.abs(leftInset-rightInset)<=1,`${bl}: its label is centred: ${leftInset.toFixed(1)} px from the left, ${rightInset.toFixed(1)} px from the right`);
+   for(const h of b.hints){
+    const apart=h.left>=b.label.right||h.right<=b.label.left||h.top>=b.label.bottom||h.bottom<=b.label.top;
+    assert.ok(apart,`${bl}: its ${h.text} hint (${h.left.toFixed(1)}-${h.right.toFixed(1)}) stays clear of its label (${b.label.left.toFixed(1)}-${b.label.right.toFixed(1)})`);
+    assert.ok(h.left>=b.inner.left-0.5&&b.inner.right-h.right>=2,`${bl}: its ${h.text} hint stays inside the button at least 2 px from its edge: ${(b.inner.right-h.right).toFixed(1)} px`);
+   }
+  }
+ };
+ // Review B2: a hint flush with the button's edge sat 1.7 px from "Delete" and
+ // 14 px from "Edit". Every hint beside a card follows its label by one gap, as
+ // the Yes, No and Can't hints do.
+ // Review B3: from 768 px the rows have room to spare, so the hints there
+ // take the choices' 5 px gap (and their size, checked below) rather than
+ // the phone's 2 px.
+ const sameGap=(label,wide,...rows)=>{
+  const gaps=rows.flat().flatMap(b=>b.hints.map(h=>({at:b.act+' '+h.text,gap:h.left-b.label.right})));
+  assert.ok(gaps.length>0,`${label}: positive control: there are hints to compare`);
+  const sizes=gaps.map(g=>g.gap);
+  assert.ok(Math.max(...sizes)-Math.min(...sizes)<=1&&Math.min(...sizes)>=1.5,`${label}: every hint follows its label by one gap of at least 1.5 px: ${gaps.map(g=>g.at+' '+g.gap.toFixed(1)).join(', ')}`);
+  if(wide)assert.ok(sizes.every(g=>Math.abs(g-5)<=1),`${label}: at tablet and desktop width every hint follows its label by the choices' 5 px: ${gaps.map(g=>g.at+' '+g.gap.toFixed(1)).join(', ')}`);
+ };
+ // Text enlarged where the padding stays put (review B2, independent review):
+ // a platform text scale multiplies every font size, the hints' included, and
+ // a browser minimum font size raises every smaller one, generated content
+ // included. Both are modelled on the rows' own computed sizes, so the model
+ // doesn't depend on how the hint is built. Rules name classes, not nodes, so
+ // they outlast a re-render.
+ const enlargeRowText=(page,{scale,minimum})=>page.evaluate(({scale,minimum})=>{
+  const rules=new Map();
+  for(const row of document.querySelectorAll('.siderail,.actionrow'))for(const el of row.querySelectorAll('*')){
+   const selector='.'+row.classList[0]+' '+el.localName+[...el.classList].filter(c=>c!=='unheard').map(c=>'.'+c).join('');
+   for(const pseudo of ['','::before','::after']){
+    const cs=getComputedStyle(el,pseudo||null);if(pseudo&&(cs.content==='none'||cs.content==='normal'))continue;
+    const size=parseFloat(cs.fontSize),to=scale?size*scale:Math.max(size,minimum);
+    rules.set(selector+pseudo,selector+pseudo+'{font-size:'+to+'px!important}');
+   }
+  }
+  const style=document.createElement('style');style.textContent=[...rules.values()].join('\n');document.head.append(style);
+ },{scale:scale||0,minimum:minimum||0});
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const spec of [
+    {name:'small phone at 150% text with Postpone',width:320,height:568,scale:1.5,showPostpone:true},
+    {name:'common phone',width:375,height:812},
+    {name:'common phone with Postpone',width:375,height:812,showPostpone:true,benchNoLoneDelete:true},
+    {name:'412 px phone',width:412,height:915,candOneLine:true},
+    {name:'414 px phone',width:414,height:896,candOneLine:true},
+    {name:'428 px phone',width:428,height:926,candOneLine:true},
+    {name:'430 px phone',width:430,height:932,candOneLine:true},
+    {name:'common phone at 150% text with Postpone',width:375,height:812,scale:1.5,showPostpone:true},
+    {name:'common phone at 200% text with Postpone',width:375,height:812,scale:2,showPostpone:true},
+    {name:'large phone at 200% text with Postpone',width:430,height:932,scale:2,showPostpone:true},
+    {name:'common phone with a 16 px minimum font size and Postpone',width:375,height:812,minimum:16,showPostpone:true},
+    {name:'desktop with a 16 px minimum font size',width:1000,height:900,touch:false,minimum:16,showPostpone:true},
+    {name:'desktop with Postpone',width:1000,height:900,touch:false,showPostpone:true},
+    {name:'tablet portrait with Postpone',width:768,height:1024,showPostpone:true},
+    {name:'desktop at DPR 1 with Postpone',width:1280,height:800,touch:false,dpr:1,showPostpone:true},
+    // Chrome's own setting, which raises font sizes but not the em lengths
+    // sized from them, as a modelled minimum does.
+    ...(engineName==='chromium'?[
+     {name:'common phone with Chrome set to a 16 px minimum font size and Postpone',width:375,height:812,chromeMinimum:16,showPostpone:true},
+     {name:'desktop with Chrome set to a 16 px minimum font size',width:1000,height:900,touch:false,chromeMinimum:16,showPostpone:true},
+    ]:[]),
+   ])for(const webFonts of [true,false]){
+    const label=`${engineName} ${spec.name} ${webFonts?'with web fonts':'fonts blocked'}`;
+    let profile=null,host=browser;
+    if(spec.dpr)host={newContext:options=>browser.newContext({...options,deviceScaleFactor:spec.dpr})};
+    if(spec.chromeMinimum){
+     profile=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'hint-minimum-font-2460-'));
+     fs.mkdirSync(path.join(profile,'Default'));
+     fs.writeFileSync(path.join(profile,'Default','Preferences'),JSON.stringify({webkit:{webprefs:{minimum_font_size:spec.chromeMinimum,minimum_logical_font_size:spec.chromeMinimum}}}));
+     // The headless shell ignores the profile's setting; full Chromium reads it.
+     host={newContext:options=>engine.launchPersistentContext(profile,{...options,headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chromium'})};
+    }
+    const {page,context,errors}=await steadyScannerPage(host,steadySeededBoard(spec),spec);
+    try{
+     if(webFonts){
+      await context.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//,route=>route.continue());
+      await page.reload({waitUntil:'domcontentloaded'});
+      await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]'),null,{timeout:60000});
+     }
+     await page.waitForFunction(()=>!!document.querySelector('.card.bench')&&!!document.querySelector('.card.cand')&&!!document.querySelector('[data-act="cand-worked"]'),null,{timeout:15000});
+     await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(80);
+     const wide=spec.width>=768,normalText=!spec.scale&&!spec.minimum&&!spec.chromeMinimum&&(wide?'wide':'phone');
+     if(spec.scale||spec.minimum){await enlargeRowText(page,spec);await page.waitForTimeout(80);}
+     if(spec.chromeMinimum)assert.equal(await page.evaluate(()=>getComputedStyle(document.querySelector('.card.cand + * .keyhint')).fontSize),spec.chromeMinimum+'px',`${label}: positive control: Chrome raised the hint to its minimum font size`);
+     const loadedFonts=await page.evaluate(()=>[...document.fonts].filter(face=>face.status==='loaded').length);
+     if(webFonts)assert.ok(loadedFonts>0,`${label}: positive control: the web fonts loaded, which needs the network`);
+     else assert.equal(loadedFonts,0,`${label}: positive control: no web font loaded`);
+     const seen=await readActions(page),tl=`${label}, candidate listening`;
+     assert.ok(seen.bench&&seen.cand,`${tl}: both cards show their actions`);
+     assert.ok(seen.cand.some(b=>b.hints.length)&&seen.bench.some(b=>b.hints.length),`${tl}: positive control: both rows carry key hints`);
+     const benchLines=lines(seen.bench),candLines=lines(seen.cand);
+     if(spec.candOneLine)assert.equal(candLines.length,1,`${tl}: the candidate's actions share one line, as on the released build: ${JSON.stringify(candLines)}`);
+     // With the fallback fonts the released build already wraps this row 3 + 3 + 1
+     // at 375 px (its second line needs 322.5 of 321 px with no hint at all), so
+     // there it may take no more lines than that build's three.
+     if(spec.benchNoLoneDelete&&webFonts){
+      assert.ok(benchLines.length<=2,`${tl}: the dotted task's row takes no more lines than the released build's two: ${JSON.stringify(benchLines)}`);
+      assert.ok(!benchLines.some(line=>line.length===1&&line[0]==='delete-task'),`${tl}: Delete is not alone on a line under the dotted task: ${JSON.stringify(benchLines)}`);
+     }
+     if(spec.benchNoLoneDelete&&!webFonts)assert.ok(benchLines.length<=3,`${tl}: the dotted task's row takes no more lines than the released build's three: ${JSON.stringify(benchLines)}`);
+     sameGap(tl,wide,seen.bench,seen.cand);
+     if(normalText==='wide'){
+      assert.equal(benchLines.length,1,`${tl}: the dotted task's actions share one line: ${JSON.stringify(benchLines)}`);
+      assert.equal(candLines.length,1,`${tl}: the candidate's actions share one line: ${JSON.stringify(candLines)}`);
+      const sizes=await page.evaluate(()=>({choice:getComputedStyle(document.querySelector('.decide .keyhint')).fontSize,card:[...document.querySelectorAll('.siderail .keyhint,.actionrow .keyhint')].map(h=>getComputedStyle(h).fontSize)}));
+      assert.ok(sizes.card.length&&sizes.card.every(size=>size===sizes.choice),`${tl}: card hints are the choices' ${sizes.choice}: ${sizes.card.join(', ')}`);
+     }
+     checkActions(`${tl}: dotted task's row`,seen.bench,normalText);checkActions(`${tl}: candidate's row`,seen.cand,normalText);
+     // done adding for now: every hint moves to the dotted task.
+     await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
+     const finish=page.locator('[data-act="start-working"]');
+     if(spec.touch===false)await finish.click();else await finish.tap();
+     await page.waitForFunction(()=>state.mode==='work'&&!document.querySelector('.card.cand'),null,{timeout:10000});
+     const after=await readActions(page);
+     checkActions(`${label}, dotted task listening: dotted task's row`,after.bench,normalText);
+     sameGap(`${label}, dotted task listening`,wide,after.bench);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(error.message.split('\n')[0]);}finally{await context.close();if(profile)fs.rmSync(profile,{recursive:true,force:true});}
    }
   }finally{await browser.close();}
  }

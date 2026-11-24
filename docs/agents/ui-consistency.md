@@ -19,6 +19,9 @@ had.
   controls inherit it. `.btn`'s minimum width is the model (#2449). Yes, No
   and Can't had shrunk to their labels under far wider side-rail buttons of
   the same colors, because each control had been sized on its own.
+- Build neighbors from one renderer where they share a role. The actions under
+  the dotted task and under the candidate are one family, built by
+  `boardPresentation.cardActions` with one style (#2460).
 - Give a genuinely new kind of control a named class with a comment on why it
   differs from its neighbors.
 - Size in em, so enlarged text scales a control with its neighbors.

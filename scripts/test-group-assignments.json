@@ -581,6 +581,11 @@
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
     {
+      "root": "RISK saved view invisible active scanner: the action rows keep their live geometry and the scanner its height in the saved view with the rows at 200% text on a phone and at tablet and desktop width",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
       "root": "RISK FAQs menu browser: Chromium and WebKit show every section closed on each open and each section still opens and closes by pointer and keyboard",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
@@ -662,6 +667,16 @@
     },
     {
       "root": "RISK steady scanner browser: Yes No and Cant share one width and no scanner or side-rail button is narrower than the shared minimum, including a newly added choice, across phone enlarged short-landscape tablet and desktop views in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK steady scanner browser: the actions under the dotted task and the candidate match in size type and colour whichever card the key hints sit on, share one alignment and keep Delete last, across phone enlarged short-landscape tablet and desktop views in day and night with web fonts and blocked in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK steady scanner browser: a key hint never widens an action beside a card and its label sits centred clear of the hint, so the candidate's row keeps one line on 412 to 430 px phones and the dotted task's Delete is never alone at 375 px with Postpone, with web fonts and blocked in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
