@@ -129,6 +129,31 @@ This command supplements `npm test`; it does not change the full-suite
 boundary. Run the affected focused process tests during development, and use the
 repository's required full suite and CI gates for final qualification.
 
+## Environment-gated tests
+
+Some tests run only when a variable is set. A test skipped for a missing
+variable never ran, so it is not a pass: read the run's `skipped` count.
+
+| Variable | Unlocks | Set by |
+| --- | --- | --- |
+| `LANDSCAPE_BROWSER_URL` | Browser tests, such as `steady scanner browser:` and saved-view cases; `environmentSkips` in `scripts/test-group-assignments.json` lists them | You: the URL of the served checkout, as below |
+| `FIRESTORE_EMULATOR_HOST` | `Firestore rules:` tests | `npm run test:rules` |
+| `CHAIN_NATIVE_PORT` | Local serving fixtures, which fail without it | `npm run agent:worktree-ready -- env` |
+| `CHAIN_NATIVE_CANDIDATE_SHA`, `CHAIN_NATIVE_CANDIDATE_TREE`, `CHAIN_NATIVE_OUTPUT` | Installed-client native cases | `test:group`; by hand, see [installed-client regression](tdd-and-regression.md#installed-client-regression) |
+
+To serve the app and run the steady-scanner browser tests (narrow the pattern to
+one test's title to run only it), run these in one shell from the worktree root.
+The first line exports both worktree ports, `CHAIN_NATIVE_PORT` and `CHAIN_NATIVE_SMOKE_PORT`:
+
+```sh
+eval "$(npm run -s agent:worktree-ready -- env)"
+node scripts/serve-shell.mjs --port "$CHAIN_NATIVE_SMOKE_PORT" & server=$!
+LANDSCAPE_BROWSER_URL="http://127.0.0.1:$CHAIN_NATIVE_SMOKE_PORT/" node --test --test-name-pattern='steady scanner browser' tests/core.test.js; kill $server
+```
+
+Run the full suite on a clean tree, with no edits or checkouts during the run:
+a run with files changing under it failed a PWA cache test falsely (#2469).
+
 ## Loaded runs
 
 Add `--cpu-load <busy-processes>` (1 to 64) to a group run to reproduce a slow
@@ -283,6 +308,9 @@ Reused group records claim zero current cases, artifacts or test-child execution
 The aggregate accepts a mixture of original coverage and actual current groups,
 reobserves original proof immediately before acceptance, and counts only current
 execution as current cases. Changed or missing final proof fails the aggregate.
+When the final recheck no longer verifies a pass the first routing reused, the
+failure names both routing decisions and their reused gates, plus the recheck's
+reason when it recorded one; rerun the whole workflow (#2489).
 Actual emulator consumer outcomes decide whether retained emulator proof is still
 needed after a runtime fallback. Each covered emulator consumer fingerprints its complete original reference;
 the final recheck must match that exact original, including its run/attempt/job,

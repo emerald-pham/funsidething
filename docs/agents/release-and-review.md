@@ -113,7 +113,10 @@ specialist review. A code reviewer and a specialist reviewer are both required
 only when the exact diff affects both domains.
 
 Risk is derived from changed paths and their exact diff content; callers cannot
-lower the required review plan. An optional `additionalSpecialistDomains`
+lower the required review plan. Test files (`tests/`, `*.test.js`,
+`*.test.mjs`) and `scripts/test-group-assignments.json` derive no specialist
+domain on their own: they get the code review, and a weakened test needs its
+test-first rationale (#2488). An optional `additionalSpecialistDomains`
 input may add domains from the validator's known-domain list, but cannot replace
 or remove any derived domain; that escalation is recorded in the receipt.
 Ambiguous auth, state-persistence, and session-persistence changes fail closed

@@ -14689,6 +14689,99 @@ test("UI: action tooltips name a key only on the card that answers it, and both 
   assert.match(benchDelete(alone), /Delete key/, "with no candidate the dotted task's Delete names the Delete key");
 });
 
+// #2470: the #2460 fix covered Done and Delete by name. This check is general:
+// every scanner button whose tooltip, accessible name or visible key hint names
+// a key must belong to the card that key acts on right now, and a key a tooltip
+// names must be the button's visible hint too. Which card a key acts on comes
+// from pressing it through the real keydown handler on a fresh copy of the same
+// board, not from the render code. A tooltip names a key in parentheses: "(d)",
+// "(Delete key)", "(rule 7, w)".
+test("UI: every key a scanner button names acts on that button's card, with a candidate showing and without", async t => {
+  const SEED = 2470;
+  const scenarios = {
+    "a candidate showing (it is the edit target)": ctx => {
+      ctx.addTask("Waiting task", false);   // the only one left to deal, so every copy deals it
+      ctx.addTask("Dotted task", true);
+    },
+    "no candidate, paused to work the chain (the dotted task is the edit target)": ctx => {
+      ctx.addTask("Waiting task", false);
+      ctx.addTask("Dotted task", true);
+      ctx.onAction("start-working", {});
+    },
+    "no candidate, asked whether to continue": ctx => {
+      ctx.addTask("Waiting task", false);
+      ctx.addTask("Dotted task", true);
+      ctx.state.interventionActive = true; ctx.state.interventionP = 0.1; ctx.state.candidateId = null;
+    },
+    "no candidate, scanning at the end of the list": ctx => {
+      ctx.addTask("Dotted task", true);
+    },
+  };
+  // Every copy gets new task ids, so tasks are told apart by their titles.
+  const fresh = async setup => {
+    const app = await loadApp({ seed: SEED });
+    let now = 0; app.ctx.performance = { now: () => now };
+    setup(app.ctx);
+    app.ctx.render();
+    await new Promise(resolve => setTimeout(resolve, 5));   // the frame that shows the board
+    now += 60000;   // long after it, so the press guard cannot be what stops a key
+    return app;
+  };
+  // The task(s) a key acts on: removed, done, answered, dotted or undotted, or opened to edit.
+  const actsOn = async (setup, key) => {
+    const { ctx, shim } = await fresh(setup);
+    const mark = () => new Map(ctx.state.tasks.map(task => [task.title, JSON.stringify([task.done, task.lastDoneAt ?? null, ctx.state.considered[task.id] ?? null, ctx.state.chain.includes(task.id)])]));
+    const ids = new Map(ctx.state.tasks.map(task => [task.title, task.id])), before = mark();
+    shim.document.dispatchEvent({ type: "keydown", key: key === "⌫" ? "Delete" : key, repeat: false, preventDefault() {}, target: { matches: () => false } });
+    const after = mark(), editor = shim.elements.get("modalRoot").innerHTML;
+    return [...before.keys()].filter(title => after.get(title) !== before.get(title) || editor.includes('data-id="' + ids.get(title) + '"'));
+  };
+  const attr = (attrs, name) => attrs.match(new RegExp('\\s' + name + '="([^"]*)"'))?.[1] ?? "";
+  const keysNamedIn = text => (text.match(/\(([^)]*)\)/g) || [])
+    .flatMap(group => group.slice(1, -1).split(","))
+    .map(part => part.trim().replace(/^press\s+/i, "").replace(/\s+key$/i, ""))
+    .map(part => /^(Delete|Backspace)$/i.test(part) ? "⌫" : part.toLowerCase())
+    .filter(part => /^[a-z⌫]$/.test(part));
+  // Which card a stretch of the scanner belongs to, by the markup that opens it.
+  const regions = [['<div class="crumbs"', null], ['<div class="benchblock"', "bench"], ['<hr class="sep"', null], ['<div class="notice', null], ['<div class="cardrow"', "cand"], ['<div class="qline"', null], ['<div class="decide"', "cand"]];
+
+  for (const [name, setup] of Object.entries(scenarios)) await t.test(name, async () => {
+    const { ctx, shim } = await fresh(setup);
+    const html = shim.elements.get("scan").innerHTML;
+    const cardAt = index => regions.map(([marker, card]) => [html.lastIndexOf(marker, index), card]).filter(([at]) => at >= 0).sort((a, b) => b[0] - a[0])[0]?.[1] ?? null;
+    const buttons = [...html.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)].map(m => ({
+      at: m.index, act: attr(m[1], "data-act"), id: attr(m[1], "data-id"), title: attr(m[1], "title"), aria: attr(m[1], "aria-label"),
+      hints: [...m[2].matchAll(/<span class="keyhint">([^<]*)<\/span>/g)].map(h => h[1]),
+    }));
+    const titleOf = id => ctx.state.tasks.find(task => task.id === id)?.title;
+    const cards = { bench: titleOf(buttons.find(b => b.act === "edit" && cardAt(b.at) === "bench")?.id), cand: titleOf(buttons.find(b => b.act === "edit" && cardAt(b.at) === "cand")?.id) };
+    const editNamesE = card => keysNamedIn(buttons.find(b => b.act === "edit" && cardAt(b.at) === card)?.aria ?? "").includes("e");
+    if (name.startsWith("a candidate")) {
+      assert.ok(cards.bench && cards.cand, "precondition: the dotted task and the candidate both show");
+      assert.ok(html.includes('data-act="yes"'), "precondition: the Yes, No and Can't row shows");
+      assert.ok(editNamesE("cand"), "precondition: the candidate's Edit is the one e opens");
+    } else {
+      assert.ok(cards.bench && !cards.cand, "precondition: only the dotted task shows");
+      assert.ok(editNamesE("bench"), "precondition: the dotted task's Edit is the one e opens");
+    }
+    const routed = new Map();
+    let checked = 0;
+    for (const button of buttons) {
+      const label = `${button.act || "button"} (${button.title || button.aria || "no tooltip"})`;
+      const named = [...new Set([...keysNamedIn(button.title), ...keysNamedIn(button.aria)])];
+      for (const key of named) assert.ok(button.hints.includes(key), `${label} names ${key}, but its visible key hint is ${JSON.stringify(button.hints)}`);
+      for (const key of new Set([...named, ...button.hints])) {
+        const card = cardAt(button.at);
+        assert.ok(card, `${label} names ${key} but sits on no card`);
+        if (!routed.has(key)) routed.set(key, await actsOn(setup, key));
+        assert.deepEqual(routed.get(key), [cards[card]], `${label} on the ${card === "bench" ? "dotted task" : "candidate"} names ${key}, so ${key} should act on that card`);
+        checked++;
+      }
+    }
+    assert.ok(checked > 0, "some button names a key");
+  });
+});
+
 test("UI: benchmark's action row is full opacity in work mode (not greyed)", async () => {
   const { ctx, shim } = await loadApp({ seed: 261 });
   ctx.addTask("Task", true);
