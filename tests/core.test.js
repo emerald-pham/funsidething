@@ -43766,9 +43766,36 @@ test('Changelog #2481: the November 25 notes say quick Yes and No taps in a row 
  const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();
  const answer=app.shim.document.getElementById('modalRoot').innerHTML.match(/<dt>Why didn’t my second tap count\?<\/dt><dd>(.*?)<\/dd>/)?.[1]??'';
  assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the Help topic length');
- assert.match(answer,/After your own Yes or No brings up the next task, a Yes or No counts once it shows/,'Help says a Yes or No on your own next task waits only for it to show');
+ assert.match(answer,/After your own Yes, No or Done brings up the next task, any of them counts once it shows/,'Help says a Yes or No on your own next task waits only for it to show');
  assert.match(answer,/so quick taps each count/,'and that quick Yes and No taps in a row count');
  assert.match(answer,/With sync on, a large board’s next task can be slow to show, and a tap before it shows is ignored/,'and that with sync on a slow next task still holds a tap');
+});
+
+// #2486: quick Done taps each count once the press guard times them, so the
+// November 25 notes give them their own bullet, with the double tap that
+// still completes one task and the sync-on limit the Yes and No bullet keeps.
+// A tap in the moment between the next task being drawn and it showing is
+// now held: its own bullet, with the limit that the app can learn of the
+// task showing a little early. Help names Done beside Yes and No.
+test('Changelog #2486: the November 25 notes say quick Done taps each count and a double tap on Done still completes one task, and that a tap just before the next task shows is held, and Help names Done',async t=>{
+ const notes=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ const items=(notes.split('<h3>November 25, 2026</h3>')[1]?.split('</ul>')[0]||'').split('<li>').slice(1);
+ const done=items.filter(item=>/Quick Done taps in a row/.test(item));
+ assert.equal(done.length,1,'one bullet is about quick Done taps: '+items.join(' | '));
+ assert.match(done[0],/on the task you’re weighing and on the dotted task/,'it names both Done buttons the tests drive');
+ assert.match(done[0],/instead of every tap after the first being ignored without a sign/,'it says what changed');
+ assert.match(done[0],/A double tap on Done still completes only one task, and Done dims to show the second tap was held/,'with the double tap that still completes one task');
+ assert.match(done[0],/With sync on, the next task on a large board can take long enough to show that some quick taps are still held/,'and the sync-on limit');
+ assert.doesNotMatch(done[0],/Yes and No|timeStamp|paint|guard|frame|detail|\d\s*ms\b/i,'it is about Done alone and says what the person sees');
+ const appears=items.filter(item=>/between the next task being drawn and it appearing on the screen/.test(item));
+ assert.equal(appears.length,1,'one bullet is about a tap just before the next task shows: '+items.join(' | '));
+ assert.match(appears[0],/is now held, as a tap before it was drawn always was, instead of answering a task you could not see yet/,'it says what changed');
+ assert.match(appears[0],/Some browsers tell the app the task has appeared a few thousandths of a second early/,'with the limit measured in Chromium');
+ assert.doesNotMatch(appears[0],/Done|timeStamp|paint|guard|frame|\d\s*ms\b/i,'it is one feature and says what the person sees');
+ const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();
+ const answer=app.shim.document.getElementById('modalRoot').innerHTML.match(/<dt>Why didn’t my second tap count\?<\/dt><dd>(.*?)<\/dd>/)?.[1]??'';
+ assert.match(answer,/After your own Yes, No or Done brings up the next task, any of them counts once it shows, so quick taps each count/,'Help names Done beside Yes and No');
+ assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the Help topic length');
 });
 
 // #2455 review: the November 23 changelog has one feature per bullet: the
