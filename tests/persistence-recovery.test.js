@@ -22029,6 +22029,31 @@ test('RISK answer shows first (#2484): signed out on the large board, at Yes ans
  assert.deepEqual(late,[],'every answer is saved on the device, with every answer before it, within 1.35 s of its tap');
 });
 
+// #2490 review, CI on 81829029: timing an answer's save from its tap kept a
+// save due once its time had passed, and an ordinary edit made after that
+// but before the timer ran (a busy page runs timers late) then saved at once
+// instead of restarting the debounce as before #2484. Only an answer's
+// catch-up, or a save waiting for one, keeps a due save due. Here another
+// timer at the same instant, scheduled first, makes the edit just as the
+// save's own timer comes due.
+test('RISK answer shows first (#2484): signed out on the large board, an ordinary edit made as an earlier edit’s device save comes due, before its timer runs, restarts the 350 ms debounce as before #2484',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ await startAnswering2408(device);
+ const {ctx,clock,counters}=device;
+ await clock.settle();
+ const commitsBefore=counters.commits.length,start=clock.now;
+ ctx.setTimeout(()=>vm.runInContext('state.tasks[0].title+=" (late edit)";save()',ctx),350);
+ vm.runInContext('state.tasks[0].title+=" (edit)";save()',ctx);
+ assert.ok(vm.runInContext('saveTimer!==null',ctx),'positive control: the first edit’s save waits on its debounce');
+ await clock.advance(699);
+ assert.deepEqual(counters.commits.slice(commitsBefore).map(commit=>commit.at-start),[],'no device save starts before 350 ms after the later edit');
+ await clock.advance(1);
+ const saves=counters.commits.slice(commitsBefore);
+ assert.deepEqual(saves.map(commit=>commit.at-start),[700],'one device save starts 350 ms after the later edit');
+ assert.ok(JSON.parse(saves[0].payload).tasks[0].title.endsWith(' (edit) (late edit)'),'and it holds both edits');
+});
+
 // What an answer's own tap serializes and parses, counted where the app turns
 // a value into text or text into a value. The app's JSON is this process's,
 // so it is counted only while the tap runs. Each task's text is its own call;
