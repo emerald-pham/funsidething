@@ -142,7 +142,8 @@ variable never ran, so it is not a pass: read the run's `skipped` count.
 | `CHAIN_NATIVE_CANDIDATE_SHA`, `CHAIN_NATIVE_CANDIDATE_TREE`, `CHAIN_NATIVE_OUTPUT` | Installed-client native cases | `test:group`; by hand, see [installed-client regression](tdd-and-regression.md#installed-client-regression) |
 
 To serve the app and run the steady-scanner browser tests (narrow the pattern to
-one test's title to run only it), from the worktree root:
+one test's title to run only it), run these in one shell from the worktree root.
+The first line exports both worktree ports, `CHAIN_NATIVE_PORT` and `CHAIN_NATIVE_SMOKE_PORT`:
 
 ```sh
 eval "$(npm run -s agent:worktree-ready -- env)"
