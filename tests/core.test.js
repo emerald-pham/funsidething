@@ -43647,6 +43647,32 @@ test('Changelog #2461: one bullet says a scanner press held for being too soon n
  assert.match(answer,/For a moment after Return as candidate closes the editor, every tap, click and key press is ignored, wherever it lands/,'the #221 pause is still explained');
 });
 
+// #2481: quick taps in a row each count. The November 25 notes say so in one
+// bullet, its double-tap caveat with it, and Help's answer about a second tap
+// says a task your own press brought up waits only until it shows.
+// #2483 review: the promise names only Yes and No, the buttons the #2481 tests
+// drive; a quick second Done tap is still dropped by the older double-click
+// rule. With sync on, a large board can paint the next task late enough that
+// some quick taps are still held, so both texts say so.
+test('Changelog #2481: the November 25 notes say quick Yes and No taps in a row each count, that with sync on some can still be held on a large board, and that a double tap still answers once, and Help says the same',async t=>{
+ const notes=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ assert.ok(notes.includes('<h3>November 25, 2026</h3>')&&notes.indexOf('<h3>November 25, 2026</h3>')<notes.indexOf('<h3>November 23, 2026</h3>'),'the newest release comes first');
+ const items=(notes.split('<h3>November 25, 2026</h3>')[1]?.split('</ul>')[0]||'').split('<li>').slice(1);
+ const quick=items.filter(item=>/Quick Yes and No taps in a row/.test(item));
+ assert.equal(quick.length,1,'one bullet is about quick Yes and No taps: '+items.join(' | '));
+ assert.doesNotMatch(quick[0],/other scanner buttons/,'it promises only the buttons that were measured');
+ assert.match(quick[0],/ten taps in two seconds/,'it names the rhythm that now counts');
+ assert.match(quick[0],/With sync on, the next task on a large board can take long enough to show that some quick taps are still held/,'it keeps the sync-on limit with its feature');
+ assert.match(quick[0],/A double tap still answers only once/,'with the double tap that still answers once');
+ assert.doesNotMatch(quick[0],/timeStamp|paint|guard|frame|\d\s*ms\b/i,'it says what the person sees, not how it works');
+ const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();
+ const answer=app.shim.document.getElementById('modalRoot').innerHTML.match(/<dt>Why didn’t my second tap count\?<\/dt><dd>(.*?)<\/dd>/)?.[1]??'';
+ assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the Help topic length');
+ assert.match(answer,/After your own Yes or No brings up the next task, a Yes or No counts once it shows/,'Help says a Yes or No on your own next task waits only for it to show');
+ assert.match(answer,/so quick taps each count/,'and that quick Yes and No taps in a row count');
+ assert.match(answer,/With sync on, a large board’s next task can be slow to show, and a tap before it shows is ignored/,'and that with sync on a slow next task still holds a tap');
+});
+
 // #2455 review: the November 23 changelog has one feature per bullet: the
 // scenery's lighter frames apart from its later opening plan, the add box that
 // empties at once apart from the save after the frame, and the ranks that

@@ -24937,5 +24937,45 @@
       "command": "node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <git-common-dir>/agent-test-runs/issue-2455-review --purpose preimplementation-red --summary -- node --max-old-space-size=8192 --test --test-name-pattern=\"RISK add box clears at once\" tests/persistence-recovery.test.js",
       "failure": "Record 2026-11-24T06-37-02-604Z-bf6d3cbd on 6f61ddd9, before the add box change: 'RISK add box clears at once' failed with 'the add box is empty in that same tap' (the box still held the title). For the Help scenery wording, record 2026-11-24T07-09-36-547Z-cf4c96d4 on 29453d5e (preimplementation-red) failed 'RISK freeze and startup guidance' and the two changelog tests before the FAQ edit. Earlier entries' RED runs, now consolidated here: #2457 record 2026-11-24T01-58-21-898Z-a650819c on 90dd6074 (cancelled Add setups under the unref'd frame timer); #2459 group run 2459-pr-1 on 7fb34faf ('positive control: the answer leaves the phone’s board unprojectable (#2395)' timed out); #2461 record 2026-11-24T04-24-23-140Z-a44b6d43 on a8d4ef67, declared preimplementation-red, where 'a Yes 150 ms after the new candidate painted is not held' failed before the grace change. That entry's earlier command named record b04c025b, which was declared green: it was the old #2312 boundary test failing ('the Yes key at 199 ms is dropped') after the grace was applied, not the RED."
     }
+  },
+  {
+    "baseCommit": "15a8bc80e8dede5edf16ffb07cae1b57bed2a661",
+    "weakenedTestLines": [
+      "tests/persistence-recovery.test.js:-assert.equal(guard.now()-pressed,150,'fixture: the second press comes 150 ms after the first');",
+      "tests/persistence-recovery.test.js:-assert.ok(!guard.press('yes').classList.contains('held'),'a Yes 260 ms after the last one that acted is not held');",
+      "tests/persistence-recovery.test.js:-assert.ok(ctx.state.chain.includes(first),'positive control: the first Yes, long after its candidate painted, answers it');",
+      "tests/persistence-recovery.test.js:-assert.ok(guard.press('yes').classList.contains('held'),'positive control: a Yes 50 ms after the new candidate painted is held and dims');",
+      "tests/persistence-recovery.test.js:-assert.ok(quick.classList.contains('held'),'a Yes 150 ms after the last Yes that acted is held, though 140 ms after its card painted');",
+      "tests/persistence-recovery.test.js:-await clock.advance(100);guard.paint();await clock.advance(50);",
+      "tests/persistence-recovery.test.js:-await clock.advance(110);",
+      "tests/persistence-recovery.test.js:-await clock.advance(140);",
+      "tests/persistence-recovery.test.js:-guard.press('yes');",
+      "tests/persistence-recovery.test.js:-guard.press('yes');",
+      "tests/persistence-recovery.test.js:-test('RISK scanner press guard: a press 150 ms after the last Yes that acted is held though the new candidate painted 140 ms before it, and one 260 ms after acts',{timeout:300000},async t=>{",
+      "tests/persistence-recovery.test.js:-test('RISK scanner press guard: on the large board, a deliberate Yes or n key 150 ms after the new candidate painted answers it, while one 50 ms after is held',{timeout:300000},async t=>{",
+      "tests/persistence-recovery.test.js:-test('RISK scanner press guard: on the large board, a press within the guard of the new candidate first painting, by touch click or by key, is held with a visible acknowledgement on its button and changes nothing, though the frame waited behind a long task',{timeout:300000},async t=>{"
+    ],
+    "reason": "#2481 (owner report: ten Yes taps within two seconds don't all register). Measured in Chromium at 4x CPU on largeBoardFixture(), main held 12 to 16 of every 30 taps at 150 to 250 ms rhythms: with sync off almost all by the 200 ms repeat guard (a 200 ms gap is inclusive) or the 100 ms grace after the paint of the card the person's own press had just drawn. The issue requires deliberate taps 150 ms and more apart to each record an answer, so three #2461 tests that pinned holds of exactly those presses no longer describe the product: a Yes 250 ms after the press that drew its card and 100 ms after the paint, a Yes 150 ms after that press and 50 ms after the paint, and a Yes 150 ms after the last Yes that acted. The fourth (the dim that outlasts blocked frames) used the 150 ms / 50 ms press only to produce a hold. The two grace tests now make the card the app's own answer rather than the person's press, where the grace still applies; the round-2 test pins the double tap at 120 ms held and 150 ms acting; the dim test produces its hold with a 120 ms double tap.",
+    "previousBehavior": "A scanner press was held when made within 100 ms of any new card's paint, or within 200 ms (inclusive) of the last scanner press the guard let through, so a steady 200 ms or 150 ms run of deliberate Yes taps had about every other tap held.",
+    "intendedBehavior": "A press before the new card paints is always held (#2312). A press under 150 ms (DOUBLE_TAP_MS) after the last scanner press the guard let through is a double tap and held. The 100 ms grace after the paint applies only to a card something other than the person's last let-through press drew (the app, another device, Undo). A held press still dims its button and changes nothing; #221's Return pause is unchanged.",
+    "replacementTests": [
+      "RISK scanner press guard (#2481): on the large board with sync off, ten Yes taps at a steady 200 ms, a steady 150 ms or jittered between them each answer the candidate shown, and so do alternating Yes and No by touch click and by y and n keys",
+      "RISK scanner press guard (#2481): signed in on the large board, ten Yes taps 200 ms apart each record an answer that reaches the cloud, and a double tap 40 ms apart after them answers once",
+      "RISK scanner press guard (#2481): after a Yes that acted, a card the app then draws still holds a press 100 ms after it paints, 400 ms after that Yes",
+      "RISK scanner press guard: on the large board, a press within the guard of a new candidate first painting that no press of the person drew, by touch click or by key, is held with a visible acknowledgement on its button and changes nothing, though the frame waited behind a long task",
+      "RISK scanner press guard: on the large board, a deliberate Yes or n key 150 ms after a new candidate no press of the person drew painted answers it, while one 50 ms after is held",
+      "RISK scanner press guard: a press 120 ms after the last Yes that acted is held though the new candidate painted 110 ms before it, and one 150 ms after acts",
+      "Changelog #2481: the November 25 notes say quick Yes and No taps in a row each count, that with sync on some can still be held on a large board, and that a double tap still answers once, and Help says the same"
+    ],
+    "preservedCoverage": [
+      "Every press before the new card paints is still held, by click and by key, however long the frame waits (the #2461 unpainted and no-frame tests are unchanged and green).",
+      "The 100 ms grace after the paint keeps both boundaries (held at 50 and 100 ms, acting at 150 ms) for cards the person's press did not draw, by click and by key, with the held acknowledgement and the late-handled press timed from its own event time.",
+      "A double tap still answers once: 40 ms and 120 ms second taps are held at the Node seam, by click and key, and the Chromium and WebKit steady-scanner browser double-tap test (60 ms, 120 ms touch taps, mouse double click, two key presses) is unchanged.",
+      "The core #2312 boundary test (held before paint and at 99 ms, accepted at 101 ms, for y n c d keys and six clicks), the held-press dim tests, the signed-in held-press save/cloud test and the #221 Return tests are unchanged and green."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <git-common-dir>/agent-test-runs/issue-2481 --purpose preimplementation-red --summary -- node --test --test-name-pattern=2481 tests/persistence-recovery.test.js",
+      "failure": "Record 2026-11-25T01-16-37-620Z-3f544407 on 15a8bc80 before the guard change: 'RISK scanner press guard (#2481): on the large board with sync off, ten Yes taps ...' failed with 'steady 200 ms: every one of ten Yes taps records one answer', recorded [1,0,1,0,1,0,...]: every other tap held. Later baseline sensitivity, record 2026-11-25T01-20-50-445Z-3c14cc15 (main's index.html with this diff's tests): the sync-off and sync-on #2481 tests and the 120/150 ms round-2 test fail ('a Yes 150 ms after the last one that acted is not held'), while the four reworked #2461 tests pass on main. Changelog RED: record 2026-11-25T01-23-02-611Z-8753e0b6, 'the newest release comes first'."
+    }
   }
 ]
