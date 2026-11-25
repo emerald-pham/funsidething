@@ -1342,6 +1342,8 @@ window.formatScannerCalendarDate = (date,timeZone) => {
 };
 let saveTimer = null;
 let saveTimerBackupId = null; // #2457: the backup id the save on saveTimer keeps from retirement
+let saveTimerDueAt = null; // #2490 review: when the save on saveTimer comes due (saveAfterDebounce)
+const SAVE_DEBOUNCE_MS = 350; // an edit's device save waits this long for another edit
 let saveRequestGeneration = 0;
 /* #2427 review: counts every change made to the live board in place, whether
    or not a save has been asked for yet: an edit or answer (markBoardEdited,
@@ -5418,7 +5420,10 @@ function markBoardEdited(savesBefore=saveRequestGeneration){
   state.updatedAt = Date.now();
   state.syncDirty = true;
 }
-function save(preserveBackupId=null){
+// editedAt: when the edit was made (performance.now), null for now; an
+// answer's is its tap, which its catch-up asks for this save after (#2490
+// review).
+function save(preserveBackupId=null,editedAt=null){
   saveRequestGeneration++;
   const at=supportDiagnosticsNow();
   // The last failure's stage, code and attempts stay until a verified save or
@@ -5431,13 +5436,16 @@ function save(preserveBackupId=null){
   sealUndoFrame();
   markBoardEdited(saveRequestGeneration-1);
   cloudPush();
+  // A save already due, still waiting for an answer to catch up, stays due.
+  const dueAt=saveTimer?saveTimerDueAt:null;
   if(saveTimer){clearSyncTimeout(saveTimer);saveTimer=null;}
   // A new random draw must survive even an immediate reload. Ordinary edits
   // retain the debounce; cloud pushes retain their revision/reconcile guard.
   // #2408: both go through this tab's one device-save lane, so neither runs
   // beside an earlier save; the draw's save skips the debounce, as before.
   if(state.chance && state.chance.seed !== persistedChanceSeed) deviceSaveLane.request({preserveBackupId});
-  else saveAfterDebounce(preserveBackupId);
+  else if(dueAt!==null&&(editedAt??performance.now())>=dueAt)saveAfterDebounce(preserveBackupId,dueAt);
+  else saveAfterDebounce(preserveBackupId,editedAt===null?null:editedAt+SAVE_DEBOUNCE_MS);
 }
 /* An edit's device save, once no other edit has come for 350 ms.
    #2484: an answer shown but not caught up yet (answerCatchUp.pending) is an
@@ -5445,16 +5453,42 @@ function save(preserveBackupId=null){
    runs, after the frame that shows it. Started now, the save ran that
    catch-up first (a device save holds every answer given) and then saved
    the board: one long task in the middle of quick taps, and the next tap
-   was held (Chromium at 4x CPU, large signed-in board: 263-269 ms). So the
-   debounce waits again instead, and the saves of quick answers come
-   together, 350 ms after the last of them has caught up. Hiding the page
-   runs that catch-up at once, and with it the save it asks for. */
-function saveAfterDebounce(preserveBackupId){
+   was held (Chromium at 4x CPU, large signed-in board: 263-269 ms). So a
+   save that comes due waits for that catch-up instead, and the saves of
+   quick answers come together.
+   #2490 review: an answer's 350 ms count from its tap, not from its
+   catch-up, so its save comes due when it did before #2484, when the
+   catch-up ran just after the tap: 350 ms after the last of a run of
+   answers each given less than 350 ms after the one before. Counted from
+   the catch-up, with taps 350-440 ms apart and frames 60-120 ms late, each
+   answer's save came due while the next waited for its frame and was put
+   off again, so nothing was saved on the device until the taps stopped, and
+   signed out (no change records) a page closed meanwhile lost every answer.
+   A save that is due and still finds an answer waiting for its frame (one
+   whose frame came more than 350 ms after its tap) waits for it at most
+   FRAME_WAIT_FALLBACK_MS, its longest wait, and then runs that catch-up
+   first and saves. Hiding the page runs every catch-up at once; the save
+   they ask for still comes due 350 ms after the last answer's tap, at once
+   if that has passed. */
+// dueAt: when the save comes due, null for SAVE_DEBOUNCE_MS from now; runAt:
+// when its timer runs, later only while a due save waits for an answer to
+// catch up.
+function saveAfterDebounce(preserveBackupId,dueAt=null,runAt=dueAt){
+  const now=performance.now(),delay=runAt===null?SAVE_DEBOUNCE_MS:Math.max(0,runAt-now);
+  if(dueAt===null)dueAt=now+SAVE_DEBOUNCE_MS;
+  if(runAt===null)runAt=dueAt;
   const timer=countSyncTimer("save-debounce",setTimeout(()=>{
     endSyncTimer(timer);
     if(saveTimer!==timer)return;
-    if(answerCatchUp.pending()){
-      const served=debounceServedBy;saveAfterDebounce(preserveBackupId);
+    // An answer given before the save came due puts it off, as any edit
+    // does; one given since, still waiting for its frame, holds it until the
+    // longest wait. That answer's own catch-up asks for the save again and
+    // finds it due (save).
+    let due=dueAt;
+    for(const editedAt of answerCatchUp.pendingEdits())if(editedAt<due)due=Math.max(due,editedAt+SAVE_DEBOUNCE_MS);
+    const longest=due+FRAME_WAIT_FALLBACK_MS,later=due>dueAt?due:answerCatchUp.pending()&&runAt<longest?longest:null;
+    if(later!==null){
+      const served=debounceServedBy;saveAfterDebounce(preserveBackupId,due,later);
       if(served?.timer===timer)debounceServedBy={...served,timer:saveTimer};
       return;
     }
@@ -5470,8 +5504,8 @@ function saveAfterDebounce(preserveBackupId){
     if(served?.timer===timer&&!served.job&&served.generation===saveRequestGeneration&&served.edits===boardEditSerial)
       return served.done.then(saved=>saved===true||again(),again);
     return deviceSaveLane.request({preserveBackupId}).done;
-  },350));
-  saveTimer=timer;saveTimerBackupId=preserveBackupId;debounceServedBy=null;
+  },delay));
+  saveTimer=timer;saveTimerBackupId=preserveBackupId;saveTimerDueAt=dueAt;debounceServedBy=null;
 }
 /* #2457: an Add's device save runs once the frame that draws the new task
    has painted, in this tab's one device-save lane (#2408), as an answer's
@@ -12426,7 +12460,7 @@ const answerCatchUp=(()=>{
     // Only its own frame: a later action's pushUndo has sealed it otherwise.
     if(answer.frame&&undoStack.at(-1)===answer.frame)sealTopUndoFrame();
   }
-  function store(answer){storeCommit(answer.save,answer.immediate,null,answer.frame);}
+  function store(answer){storeCommit(answer.save,answer.immediate,null,answer.frame,answer.editedAt);}
   function draw(answer){
     if(queue.length>1)return;
     listRanksDeferred=answer.deferRanks;listRowsReuse=LIST_ROWS_ANSWER; // #2428: keeps the rows the answer did not change
@@ -12440,7 +12474,8 @@ const answerCatchUp=(()=>{
     answer.after=ranked?captureRatingInputs(answer.ids):null;
     answer.frame=undoStack.at(-1)||null;
     // #2484: painted once the frame that shows this answer has run.
-    Object.assign(answer,{save:doSave,immediate:!!immediate,deferRanks,steps:[seal,store,draw],painted:false});
+    // #2490 review: editedAt, the tap, times its device save (save).
+    Object.assign(answer,{save:doSave,immediate:!!immediate,deferRanks,steps:[seal,store,draw],painted:false,editedAt:performance.now()});
     if(ranked){answer.steps.unshift(ratings);takeOverRanks(answer);}
     queue.push(answer);
     if(!work)work=trackSyncWork("answer-catch-up");
@@ -12534,8 +12569,11 @@ const answerCatchUp=(()=>{
     try{for(let next;(next=queue.find(due));)runStep(next);}finally{running=false;finish();}
   }
   // #2419: whether an answer shown is still waiting for its save and record
-  // to be asked for (its store step).
-  return Object.freeze({begin,show,ranks,dropRanks,flush,pending:()=>queue.some(answer=>answer.steps?.includes(store))});
+  // to be asked for (its store step). #2490 review: pendingEdits, when each
+  // such answer that saves was given, in tap order.
+  const waiting=answer=>answer.steps?.includes(store);
+  return Object.freeze({begin,show,ranks,dropRanks,flush,pending:()=>queue.some(waiting),
+    pendingEdits:()=>queue.filter(answer=>waiting(answer)&&answer.save!==false).map(answer=>answer.editedAt)});
 })();
 window.addEventListener("pagehide",()=>answerCatchUp.flush(false));
 document.addEventListener("visibilitychange",()=>{if(document.hidden)answerCatchUp.flush(false);});
@@ -13659,9 +13697,9 @@ function settleCommit(){
 // #2419: an action whose change goes as a change record goes to the cloud at
 // once that way, so it asks for no full copy at once; its save's push waits
 // for the checkpoint pause once the record is accepted (recordCoverageChanged).
-function storeCommit(doSave,immediateSync,preserveBackupId=null,frame=undoStack.at(-1)){
+function storeCommit(doSave,immediateSync,preserveBackupId=null,frame=undoStack.at(-1),editedAt=null){
   let recorded=false;
-  if(doSave!==false){save(preserveBackupId);recorded=noteRecordCoverage(changeRecordOutbox.record(frame));}
+  if(doSave!==false){save(preserveBackupId,editedAt);recorded=noteRecordCoverage(changeRecordOutbox.record(frame));}
   if(immediateSync&&!recorded) cloudPushNow();
 }
 
