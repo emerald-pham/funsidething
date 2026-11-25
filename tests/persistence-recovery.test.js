@@ -21764,12 +21764,12 @@ test('RISK scanner press guard (#2486): signed in on the large board, after a Ye
 // own clock. Measured 2026-11-25 on one machine, the builds interleaved:
 // that work took a median 110 ms here on the build before #2484 and 29 ms
 // with it, and Chromium at 4x CPU, through #2481's harness, put the next card
-// on the screen a median 165–181 ms and 86–90 ms after the tap (three batches
-// of 30 taps each). The rest of the browser's figure, about 60 ms on both
-// builds, is the browser's own share of a tap: the touch's delivery (that
-// harness stamps each touch 22 ms before sending it), drawing the frame and
-// the task after it. So the tap to the next card is the app's work here plus
-// that share.
+// on the screen a median 167–175 ms after the tap on the build before and
+// 87–93 ms with #2484 (three interleaved batches of 30 taps each). The rest
+// of the browser's figure, about 60 ms on both builds, is the browser's own
+// share of a tap: the touch's delivery (that harness stamps each touch 22 ms
+// before sending it), drawing the frame and the task after it. So the tap to
+// the next card is the app's work here plus that share.
 const BROWSER_SHARE_MS2484=60;
 // The app's work from each tap until the frame that first shows the card it
 // drew (the press guard's own frame callback), with everything the app runs
