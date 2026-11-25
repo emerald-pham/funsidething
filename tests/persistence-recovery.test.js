@@ -20765,15 +20765,18 @@ function pressGuard2461(device){
 // What a test compares: the board as it would be saved, and the answered state.
 const answeredState2461=ctx=>({chain:[...ctx.state.chain],candidate:ctx.state.candidateId,decisions:ctx.state.decisionEvents.length,payload:ctx.cloudPayload()});
 
-test('RISK scanner press guard: on the large board, a press within the guard of the new candidate first painting, by touch click or by key, is held with a visible acknowledgement on its button and changes nothing, though the frame waited behind a long task',{timeout:300000},async t=>{
+// #2481: the grace after the paint holds for a card the person's own press did
+// not draw; here the app answers, as another device's answer or Undo would
+// change the card.
+test('RISK scanner press guard: on the large board, a press within the guard of a new candidate first painting that no press of the person drew, by touch click or by key, is held with a visible acknowledgement on its button and changes nothing, though the frame waited behind a long task',{timeout:300000},async t=>{
  const fixture=await largeBoardFixture();
  const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
  await startAnswering2408(device);
  const {ctx,clock}=device,guard=pressGuard2461(device);
  guard.paint();await clock.advance(1000);
  const first=ctx.state.candidateId;
- guard.press('yes');
- assert.ok(ctx.state.chain.includes(first),'positive control: the first Yes, long after its candidate painted, answers it');
+ ctx.onAction('yes',guard.button('yes'));
+ assert.ok(ctx.state.chain.includes(first),'positive control: the app’s Yes answers the first candidate');
  const next=ctx.state.candidateId;assert.ok(next&&next!==first,'positive control: a new candidate is drawn');
  // The frame that shows it waits behind 150 ms of other work.
  await clock.advance(150);
@@ -20829,13 +20832,15 @@ test('RISK scanner press guard: on the large board, a press made more than the g
 // #2461 coordinator decision: a press before the new card paints is the
 // second tap of a double tap and is always held; after the paint the hold is
 // a short grace, so a deliberate press soon after the card shows counts.
-test('RISK scanner press guard: on the large board, a deliberate Yes or n key 150 ms after the new candidate painted answers it, while one 50 ms after is held',{timeout:300000},async t=>{
+// #2481: the first card is one the app drew, so the 50 ms press meets the grace
+// rather than a double tap.
+test('RISK scanner press guard: on the large board, a deliberate Yes or n key 150 ms after a new candidate no press of the person drew painted answers it, while one 50 ms after is held',{timeout:300000},async t=>{
  const fixture=await largeBoardFixture();
  const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
  await startAnswering2408(device);
  const {ctx,clock}=device,guard=pressGuard2461(device);
  guard.paint();await clock.advance(1000);
- guard.press('yes');
+ ctx.onAction('yes',guard.button('yes'));
  const second=ctx.state.candidateId;
  // Its frame waits 100 ms behind the answer's own work, as on this board.
  await clock.advance(100);
@@ -20867,9 +20872,10 @@ test('RISK scanner press guard: a held press stays dimmed until a frame has show
  const {ctx,clock}=device,guard=pressGuard2461(device);
  guard.paint();await clock.advance(1000);
  guard.press('yes');
- await clock.advance(100);guard.paint();await clock.advance(50);
+ // #2481: a second press 120 ms after the first is a double tap's, and held.
+ await clock.advance(100);guard.paint();await clock.advance(20);
  const shown=answeredState2461(ctx);
- assert.ok(guard.press('yes').classList.contains('held'),'positive control: a Yes 50 ms after the new candidate painted is held and dims');
+ assert.ok(guard.press('yes').classList.contains('held'),'positive control: a Yes 120 ms after the last Yes, 20 ms after the new candidate painted, is held and dims');
  // No frame paints for the next 600 ms: other work holds the page.
  await clock.advance(600);
  assert.ok(guard.button('yes').classList.contains('held'),'Yes is still dimmed when the next frame comes, 600 ms later');
@@ -21376,9 +21382,9 @@ test('RISK History before values: a Yes pressed after a person’s Add, Delete o
 
 // #2461 round 2 (bce540e0): on a small board the new card can paint about
 // 20 ms after the first tap, so a double tap's second tap 120 ms later lands
-// after the 100 ms grace. A press within 200 ms of the last scanner press the
-// guard let through is held too; a deliberate press further apart still acts.
-test('RISK scanner press guard: a press 150 ms after the last Yes that acted is held though the new candidate painted 140 ms before it, and one 260 ms after acts',{timeout:300000},async t=>{
+// after the 100 ms grace. A press under 150 ms after the last scanner press the
+// guard let through is held too; #2481: a deliberate press 150 ms after it acts.
+test('RISK scanner press guard: a press 120 ms after the last Yes that acted is held though the new candidate painted 110 ms before it, and one 150 ms after acts',{timeout:300000},async t=>{
  const fixture=await largeBoardFixture();
  const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
  await startAnswering2408(device);
@@ -21390,16 +21396,109 @@ test('RISK scanner press guard: a press 150 ms after the last Yes that acted is 
  const second=ctx.state.candidateId;assert.ok(second&&second!==first,'positive control: a new candidate is drawn');
  // The new card paints 10 ms after the tap, as on a small board.
  await clock.advance(10);guard.paint();
- await clock.advance(140);
- assert.equal(guard.now()-pressed,150,'fixture: the second press comes 150 ms after the first');
+ await clock.advance(110);
+ assert.equal(guard.now()-pressed,120,'fixture: the second press comes 120 ms after the first');
  const shown=answeredState2461(ctx);
  const quick=guard.press('yes');
- assert.ok(quick.classList.contains('held'),'a Yes 150 ms after the last Yes that acted is held, though 140 ms after its card painted');
+ assert.ok(quick.classList.contains('held'),'a Yes 120 ms after the last Yes that acted is held, though 110 ms after its card painted');
  assert.deepEqual(answeredState2461(ctx),shown,'and changes nothing');
  guard.key('n');
  assert.deepEqual(answeredState2461(ctx),shown,'the n key at that moment is held too');
- await clock.advance(110);
+ await clock.advance(30);
  const before=answeredState2461(ctx);
- assert.ok(!guard.press('yes').classList.contains('held'),'a Yes 260 ms after the last one that acted is not held');
+ assert.ok(!guard.press('yes').classList.contains('held'),'a Yes 150 ms after the last one that acted is not held');
  assert.deepEqual([...ctx.state.chain],[...before.chain,second],'and answers the candidate shown');
+});
+
+// ---------- #2481: ten quick Yes taps in two seconds all count ----------
+// Measured 2026-11-25 in Chromium at 4x CPU on largeBoardFixture() with sync
+// off: each Yes painted its next card a median 67–81 ms after the press, and
+// main held 40–50% of ten taps at these rhythms. A steady 200 ms is ten taps
+// in two seconds, 150 ms is the fastest the issue asks to count, and the
+// jittered run is the gaps the measurement used for a person's 150–250 ms.
+const RHYTHMS2481={'steady 200 ms':Array(9).fill(200),'steady 150 ms':Array(9).fill(150),'jittered 150–250 ms':[236,174,234,193,230,223,156,200,195]};
+const PAINT_AFTER_PRESS2481=70;
+// Presses each act in turn at the rhythm's gaps, by touch click or by key; the
+// card a press draws paints paintAfter later. Reports, for each press, the
+// candidate it landed on and how many decisions it recorded.
+async function pressInRhythm2481(device,guard,gaps,acts,{paintAfter=PAINT_AFTER_PRESS2481}={}){
+ const {ctx,clock}=device,presses=[];
+ for(let i=0;i<=gaps.length;i++){
+  const {act,key}=acts[i%acts.length],candidate=ctx.state.candidateId,decisions=ctx.state.decisionEvents.length;
+  if(key)guard.key(key);else guard.press(act);
+  presses.push({act:key?'key '+key:act,candidate,recorded:ctx.state.decisionEvents.length-decisions});
+  const gap=gaps[i]??1000;
+  if(ctx.state.candidateId!==candidate){await clock.advance(paintAfter);guard.paint();await clock.advance(gap-paintAfter);}
+  else{guard.paint();await clock.advance(gap);}
+ }
+ return presses;
+}
+
+test('RISK scanner press guard (#2481): on the large board with sync off, ten Yes taps at a steady 200 ms, a steady 150 ms or jittered between them each answer the candidate shown, and so do alternating Yes and No by touch click and by y and n keys',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,guard=pressGuard2461(device);
+ guard.paint();await clock.advance(1000);
+ for(const [rhythm,gaps] of Object.entries(RHYTHMS2481)){
+  const presses=await pressInRhythm2481(device,guard,gaps,[{act:'yes'}]);
+  assert.deepEqual(presses.map(press=>press.recorded),Array(10).fill(1),rhythm+': every one of ten Yes taps records one answer: '+JSON.stringify(presses));
+  assert.equal(new Set(presses.map(press=>press.candidate)).size,10,rhythm+': each answers a new candidate');
+  assert.ok(presses.every(press=>ctx.state.chain.includes(press.candidate)),rhythm+': and Yes adds each to the chain');
+ }
+ const mixed=await pressInRhythm2481(device,guard,RHYTHMS2481['steady 150 ms'],[{act:'yes'},{key:'n'},{act:'no'},{key:'y'}]);
+ assert.deepEqual(mixed.map(press=>press.recorded),Array(10).fill(1),'Yes and No by click and y and n by key, 150 ms apart, each record one answer: '+JSON.stringify(mixed));
+ const yes=mixed.filter(press=>press.act==='yes'||press.act==='key y'),no=mixed.filter(press=>press.act==='no'||press.act==='key n');
+ assert.ok(yes.every(press=>ctx.state.chain.includes(press.candidate)),'the Yes answers dot their candidates');
+ assert.ok(no.every(press=>ctx.state.considered[press.candidate]==='no'),'and the No answers turn theirs down');
+});
+
+// The press's own card loses the grace; a card something else draws after it
+// (another device's answer, Undo) keeps it.
+test('RISK scanner press guard (#2481): after a Yes that acted, a card the app then draws still holds a press 100 ms after it paints, 400 ms after that Yes',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,guard=pressGuard2461(device);
+ guard.paint();await clock.advance(1000);
+ const first=ctx.state.candidateId;
+ guard.press('yes');
+ assert.ok(ctx.state.chain.includes(first),'positive control: the Yes answers its candidate');
+ await clock.advance(70);guard.paint();await clock.advance(230);
+ const second=ctx.state.candidateId;
+ ctx.onAction('no',guard.button('no'));
+ assert.equal(ctx.state.considered[second],'no','positive control: the app answers the card the Yes drew');
+ guard.paint();await clock.advance(100);
+ const shown=answeredState2461(ctx);
+ assert.ok(guard.press('yes').classList.contains('held'),'a Yes 100 ms after the app’s card painted is held');
+ assert.deepEqual(answeredState2461(ctx),shown,'and changes nothing');
+ await clock.advance(50);
+ const before=answeredState2461(ctx);
+ guard.press('yes');
+ assert.deepEqual([...ctx.state.chain],[...before.chain,before.candidate],'a Yes 150 ms after it painted answers it');
+});
+
+test('RISK scanner press guard (#2481): signed in on the large board, ten Yes taps 200 ms apart each record an answer that reaches the cloud, and a double tap 40 ms apart after them answers once',{timeout:600000},async t=>{
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,guard=pressGuard2461(device);
+ guard.paint();await clock.advance(1000);
+ const presses=await pressInRhythm2481(device,guard,RHYTHMS2481['steady 200 ms'],[{act:'yes'}]);
+ assert.deepEqual(presses.map(press=>press.recorded),Array(10).fill(1),'every one of ten Yes taps records one answer with sync on: '+JSON.stringify(presses));
+ const answered=presses.map(press=>press.candidate);
+ assert.equal(new Set(answered).size,10,'each answers a new candidate');
+ // A double tap: the second tap lands 40 ms after the first, after the new card painted.
+ const tapped=ctx.state.candidateId,decisions=ctx.state.decisionEvents.length;
+ guard.press('yes');const next=ctx.state.candidateId;
+ await clock.advance(20);guard.paint();await clock.advance(20);
+ const second=guard.press('yes');
+ assert.equal(ctx.state.decisionEvents.length,decisions+1,'the double tap records one answer');
+ assert.ok(ctx.state.chain.includes(tapped)&&!ctx.state.chain.includes(next),'its first tap dots the candidate it landed on and its second leaves the next alone');
+ assert.ok(second.classList.contains('held'),'and the second tap shows that it was held');
+ await clock.settle();
+ const cloud=(await device.cloud()).board;
+ const opened=JSON.parse(fixture.payload);
+ for(const id of [...answered,tapped])assert.equal(decisionsAbout2417(cloud,[id]).length,decisionsAbout2417(opened,[id]).length+1,'the cloud holds one new answer about '+id);
+ assert.ok(answered.every(id=>cloud.chain.includes(id))&&cloud.chain.includes(tapped),'and its chain holds every dotted candidate');
 });

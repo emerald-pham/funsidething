@@ -43647,6 +43647,24 @@ test('Changelog #2461: one bullet says a scanner press held for being too soon n
  assert.match(answer,/For a moment after Return as candidate closes the editor, every tap, click and key press is ignored, wherever it lands/,'the #221 pause is still explained');
 });
 
+// #2481: quick taps in a row each count. The November 25 notes say so in one
+// bullet, its double-tap caveat with it, and Help's answer about a second tap
+// says a task your own press brought up waits only until it shows.
+test('Changelog #2481: the November 25 notes say quick taps in a row on Yes, No and the other scanner buttons each count while a double tap still answers once, and Help says the same',async t=>{
+ const notes=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ assert.ok(notes.includes('<h3>November 25, 2026</h3>')&&notes.indexOf('<h3>November 25, 2026</h3>')<notes.indexOf('<h3>November 23, 2026</h3>'),'the newest release comes first');
+ const items=(notes.split('<h3>November 25, 2026</h3>')[1]?.split('</ul>')[0]||'').split('<li>').slice(1);
+ const quick=items.filter(item=>/Quick taps in a row/.test(item));
+ assert.equal(quick.length,1,'one bullet is about quick taps: '+items.join(' | '));
+ assert.match(quick[0],/ten taps in two seconds/,'it names the rhythm that now counts');
+ assert.match(quick[0],/A double tap still answers only once/,'with the double tap that still answers once');
+ assert.doesNotMatch(quick[0],/timeStamp|paint|guard|frame|\d\s*ms\b/i,'it says what the person sees, not how it works');
+ const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();
+ const answer=app.shim.document.getElementById('modalRoot').innerHTML.match(/<dt>Why didn’t my second tap count\?<\/dt><dd>(.*?)<\/dd>/)?.[1]??'';
+ assert.match(answer,/After your own press brings up a new task, a press counts as soon as that task shows/,'Help says a press on your own next task waits only for it to show');
+ assert.match(answer,/so quick taps one after another each count/,'and that quick taps in a row count');
+});
+
 // #2455 review: the November 23 changelog has one feature per bullet: the
 // scenery's lighter frames apart from its later opening plan, the add box that
 // empties at once apart from the save after the frame, and the ranks that
