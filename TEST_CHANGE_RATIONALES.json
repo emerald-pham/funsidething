@@ -25000,5 +25000,24 @@
       "command": "LANDSCAPE_BROWSER_URL=<served candidate> node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <git-common-dir>/agent-test-runs/issue-2482 --purpose preimplementation-red --summary -- node --test --test-name-pattern \"share one alignment and keep Delete last\" --test-name-pattern \"action rows keep their live geometry\" tests/core.test.js",
       "failure": "Record 2026-11-25T04-52-18-829Z-bce9c442 on 2b6a089f before the CSS change: the parity test failed in all 40 Chromium and WebKit cases, e.g. \"chromium common phone with web fonts light, candidate listening: dotted task's row: every line starts at the row's left edge: bench-done@94.5, edit@173.4, worked@245.4 vs 27.0\"; the saved-view check (then inside the geometry test) failed at 375 px 200% text (81.0 vs 27.0 px), 768 px (187.1 vs 37.0) and 1100 px (353.1 vs 203.0). The check then moved into its own RISK test; later-baseline-sensitivity record 2026-11-25T05-01-08-594Z-16cfffd7 (this diff's tests against a served copy of main) fails it for both the saved and live copies at all three sizes. GREEN record 2026-11-25T05-01-19-821Z-1f01b178."
     }
+  },
+  {
+    "baseCommit": "49c89b54e57cc601307e18a091097ddf8c070f5c",
+    "weakenedTestLines": [
+      "tests/persistence-recovery.test.js:-start=vm.runInContext('Date.now()',ctx);base=performance.now();"
+    ],
+    "reason": "#2485: the fake answer clock (answerClock2408) took its base straight from the test process's performance.now(), a fractional reading. Once base+now passed a power of two (2^20 ms is about 17.5 minutes into a test process; CI's persistence group runs about 50), the sum rounded and the app's timers fired a rounding error away from the times they were set for, so a test's result depended on where the process clock happened to be. The changed line now rounds the base up to a whole millisecond; it asserts nothing itself.",
+    "previousBehavior": "With a process clock of 2^20 - 2000 + 0.1 ms, a 1.5 s-save phone answering every second recorded every tap, save and upload 2^-33 ms off its whole millisecond (uploads at 24000.000000000116 and 39000.00000000012 ms), and other late readings fired timers at 22999.999999999767 ms (23000 - 2^-32), the form of the reported 29999.999999999767 ms upload.",
+    "intendedBehavior": "The fake clock's base is Math.ceil(performance.now()): every clock read the app takes is a whole millisecond, so every delay it works out is exact and timers fire at the whole milliseconds they were set for, whatever the process clock reads. Rounding up keeps the fake clock from reading behind what the app read on the real clock before install. Nothing else in the harness changes.",
+    "replacementTests": [
+      "Fake answer clock: on a test process whose clock reads late, a slow phone\u2019s answer run still taps, saves and uploads on the whole milliseconds the fake clock schedules, and each answer reaches the cloud within the 20 s longest wait"
+    ],
+    "preservedCoverage": [
+      "Every test that uses answeringDevice2408, slowPhone2408 or startAnswering2408 runs unchanged on the same fake clock; only the base's fraction is gone. The issue's 'answers every 1 to 2 s ... within the 20 s longest wait' RISK test passed 50 of 50 runs after the change, 25 of them with Node's performance.now() shifted to land the base near 2^20 ms, and 'a run of answers saves at most once per answer ... one save at a time' still fails when the save lane lets two saves overlap (later-baseline-sensitivity record 2026-11-25T10-45-41-628Z-2de17af8)."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <git-common-dir>/agent-test-runs/issue-2485 --purpose preimplementation-red --summary -- node --max-old-space-size=8192 --test --test-name-pattern=\"Fake answer clock: on a test process whose clock reads late\" tests/persistence-recovery.test.js",
+      "failure": "Record 2026-11-25T10-44-50-004Z-1210497b: AssertionError: every tap, save and upload is on a whole millisecond (every tap, save and upload of the run off by 2^-33 ms, uploads at 24000.000000000116 and 39000.00000000012). GREEN record 2026-11-25T10-45-11-852Z-5972d81f. The issue's own assertion ('first upload with it at 29999.999999999767 ms') did not reproduce in about 120 late-clock runs before the fix, so its RED is this whole-millisecond check, not that message."
+    }
   }
 ]
