@@ -6,6 +6,7 @@ procedure, output and limits; package script names are the command entry points.
 | Task | Command | Guide |
 | --- | --- | --- |
 | Measure rendered typography, zoom, theme and capture evidence | `npm run agent:rendered-evidence --` | [Rendered evidence](rendered-evidence.md) |
+| Find widths where a scanner row takes more lines than on a base build | `npm run agent:layout-sweep --` | [Layout sweep](rendered-evidence.md#layout-sweep) |
 | Record a command's test and source provenance | `npm run agent:record-test-run --` | [Test-run provenance](test-run-provenance.md) |
 | Validate a compact checkpoint with distinct required gates and follow-ups | `npm run agent:checkpoint --` | [Checkpoints](checkpoints.md) |
 | Check native task actions and durable readback in an isolated profile | `npm run agent:native-task-smoke --` | [Native task smoke](native-task-smoke.md) |

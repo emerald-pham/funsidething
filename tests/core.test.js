@@ -59,6 +59,7 @@ import { rewriteGenerationFixture } from "./shared.js";
 import { coldRelaunch2198 } from "./shared.js";
 import { appFixtureScope } from "./shared.js";
 import { scannerDataAttributeLayoutRules } from "./shared.js"; // #2480
+import { scaleText as steadyScaleText, chromeMinimumFontHost, serveBuild, compareCase, sweepBuilds, describeFinding } from "../scripts/agent-tools/layout-sweep.mjs"; // #2480
 import { woopFields2421, woopBoard2421, woopSnapshot2421 } from "./shared.js"; // #2421 saved WOOP data
 import { backupRowsWithText } from "./shared.js";
 import { releaseKnownCloudCopy2377 } from "./shared.js";
@@ -24420,7 +24421,12 @@ test('RISK steady scanner browser: a long chain keeps the dot trail to one row o
  assert.deepEqual(failures,[]);
 });
 
-const STEADY_ENLARGED_TEXT='.btn{font-size:21px!important}.crumbs{font-size:19px!important}.card .title{font-size:23px!important}.qline{font-size:28px!important}';
+// Enlarged text is a platform text scale (#2480): it multiplies every font size
+// inside the scanner, a child's own px size such as a key hint's included, so
+// the child grows with its label. It used to set only the buttons', crumbs',
+// titles' and question's sizes, so a hint that ignored its label's size never
+// grew in these tests. The sweep command enlarges text the same way.
+const STEADY_ENLARGED_TEXT=1.5;
 const steadySeededBoard=({floatingHeader=false,showPostpone=false,tasks=8}={})=>steadyScannerBoard({tasks,showPostpone,
  taskOver:i=>i===2?{due:'2026-01-02'}:{},
  over:{chain:['steady-0','steady-1'],candidateId:'steady-2',settings:{floatingHeader}}});
@@ -24463,7 +24469,7 @@ test('RISK steady scanner browser: every choice stays reachable unclipped and in
     const label=`${engineName} ${spec.name}`;
     const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard(spec),spec);
     try{
-     if(spec.enlarged)await page.addStyleTag({content:STEADY_ENLARGED_TEXT});
+     if(spec.enlarged)await steadyScaleText(page,STEADY_ENLARGED_TEXT);
      // #2421 removed Run WOOP: the overdue candidate gets only the ordinary choices.
      await page.waitForFunction(()=>!!document.querySelector('.card.cand .due-overdue')&&!!document.querySelector('[data-act="no"]'),null,{timeout:15000}).catch(()=>{throw new Error(`${label}: the overdue candidate is offered`);});
      assert.equal(await page.locator('[data-act="run-woop"]').count(),0,`${label}: the overdue candidate offers no Run WOOP`);
@@ -24564,8 +24570,8 @@ test('RISK steady scanner browser: the finish row sits on its own line under the
 // Postpone included, share one width; on a phone Postpone keeps its longer
 // label's width so the row stays on one line.
 const buttonMinEm=viewportWidth=>viewportWidth<=420?5:6;
-// 200% button text, the issue's largest size (STEADY_ENLARGED_TEXT is 150%).
-const STEADY_DOUBLE_TEXT=STEADY_ENLARGED_TEXT.replace('.btn{font-size:21px','.btn{font-size:28px');
+// 200% text, the issue's largest size (STEADY_ENLARGED_TEXT is 150%).
+const STEADY_DOUBLE_TEXT=2;
 test('RISK steady scanner browser: Yes No and Cant share one width and no scanner or side-rail button is narrower than the shared minimum, including a newly added choice, across phone enlarged short-landscape tablet and desktop views in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[];
  const measureWithAddedChoice=page=>page.evaluate(()=>{
@@ -24602,7 +24608,7 @@ test('RISK steady scanner browser: Yes No and Cant share one width and no scanne
       await page.reload({waitUntil:'domcontentloaded'});
       await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]'),null,{timeout:60000});
      }
-     if(spec.enlarged)await page.addStyleTag({content:spec.doubleText?STEADY_DOUBLE_TEXT:STEADY_ENLARGED_TEXT});
+     if(spec.enlarged)await steadyScaleText(page,spec.doubleText?STEADY_DOUBLE_TEXT:STEADY_ENLARGED_TEXT);
      await page.waitForFunction(()=>!!document.querySelector('.decide [data-act="cant"]')&&!!document.querySelector('.siderail [data-act="cand-worked"]'),null,{timeout:15000});
      await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(80);
      const loadedFonts=await page.evaluate(()=>[...document.fonts].filter(face=>face.status==='loaded').length);
@@ -24639,9 +24645,31 @@ test('RISK steady scanner browser: Yes No and Cant share one width and no scanne
 // whichever card the keys act on, with Delete last in each row.
 // #2482: both rows line up on the left, as asked on 2026-11-25, so every line
 // of each row, wrapped ones too, starts at the row's left edge.
+// #2480: no listed row takes more lines than on the base build. In #2460 every
+// extra-line width (the candidate's row wrapping with Delete alone on 407-432 px
+// phones) came from a reviewer's own sweep, never a test. The base is served
+// from LAYOUT_BASE_REF (main by default) the way the sweep command serves a
+// build; the candidate is the app at LANDSCAPE_BROWSER_URL.
+const STEADY_LINE_ROWS=['.card.bench + *','.card.cand + *','.decide'];
+const steadyBaseBuild=()=>serveBuild(__dirname,process.env.LAYOUT_BASE_REF||'origin/main');
+const steadyCandidateBuild=()=>({url:process.env.LANDSCAPE_BROWSER_URL,fingerprint:null});
+const steadyNoMoreLinesThanBase=(label,findings)=>assert.deepEqual(findings.map(f=>describeFinding(f.case||label,f)),[],`${label}: no row takes more lines than on the base build`);
+test("RISK steady scanner browser: no row of actions beside a card or of choices takes more lines than on the base build at any phone width from 320 to 480 px or at tablet and desktop width, at 100% 150% and 200% text and Chrome's minimum font size, with web fonts and blocked and Postpone on and off, in Chromium and WebKit",{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const base=await steadyBaseBuild();
+ try{
+  const playwright=await import(process.env.LANDSCAPE_PLAYWRIGHT||process.env.PLAYWRIGHT_MODULE||'playwright');
+  const {cases,findings}=await sweepBuilds({base,candidate:steadyCandidateBuild()},{engines:['chromium','webkit'],fonts:['web','blocked'],postpone:['on','off'],
+   text:['100%','150%','200%','minimum'],minimumFontSize:16,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chromium',selectors:STEADY_LINE_ROWS},{playwright});
+  assert.equal(cases.length,(4+3)*2*2*2,'positive control: every engine, font, Postpone, text and view case ran');
+  assert.ok(cases.every(c=>c.lines.base[c.widths[0]]['.card.cand + *'].length===1),'positive control: the base build shows the candidate\'s row in every case');
+  steadyNoMoreLinesThanBase(`base ${base.sha}`,findings);
+ }finally{await base.close();}
+});
+
 const STEADY_SHARED_ACTIONS=[['Done','bench-done','cand-done'],['Edit','edit','edit'],['Worked on it','worked','cand-worked'],['Delete','delete-task','delete-task']];
 test('RISK steady scanner browser: the actions under the dotted task and the candidate match in size type and colour whichever card the key hints sit on, share one alignment and keep Delete last, across phone enlarged short-landscape tablet and desktop views in day and night with web fonts and blocked in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[];
+ const lineBase=await steadyBaseBuild();
  const readRows=page=>page.evaluate(()=>{
   const rowAfter=selector=>{
    const card=document.querySelector(selector),row=card?.nextElementSibling;if(!row)return null;
@@ -24675,6 +24703,27 @@ test('RISK steady scanner browser: the actions under the dotted task and the can
   return rows;
  };
  const gaps=rows=>rows.flatMap(line=>line.slice(1).map((b,i)=>b.left-line[i].right));
+ // #2480: every shown key hint stays clear of its label and inside its button.
+ // With enlarged text growing every font, a hint whose room ignores its
+ // label's size runs into the label here, as #2460's pinned hint did.
+ const readHints=page=>page.evaluate(()=>[...document.querySelectorAll('.card.bench + * > button,.card.cand + * > button')].flatMap(el=>{
+  const r=el.getBoundingClientRect(),s=getComputedStyle(el),inner={left:r.left+parseFloat(s.borderLeftWidth),right:r.right-parseFloat(s.borderRightWidth)};
+  const range=document.createRange(),rects=[];
+  const walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT,{acceptNode:n=>n.parentElement.closest('.keyhint')||!n.textContent.trim()?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT});
+  for(let n;(n=walker.nextNode());){range.selectNodeContents(n);rects.push(...[...range.getClientRects()].filter(b=>b.width>0));}
+  const label={left:Math.min(...rects.map(b=>b.left)),right:Math.max(...rects.map(b=>b.right))};
+  return [...el.querySelectorAll('.keyhint')].filter(h=>getComputedStyle(h).visibility==='visible').map(h=>{
+   const glyph=document.createRange();glyph.selectNodeContents(h);const b=glyph.getBoundingClientRect();
+   return {act:el.dataset.act,text:h.textContent,hint:{left:b.left,right:b.right},label,inner,fontSize:parseFloat(getComputedStyle(h).fontSize),labelSize:parseFloat(s.fontSize)};
+  });
+ }));
+ const checkHints=(label,hints)=>{
+  assert.ok(hints.length>0,`${label}: positive control: shown key hints are measured`);
+  for(const h of hints){
+   assert.ok(h.hint.left>=h.label.right-0.5||h.hint.right<=h.label.left+0.5,`${label}: ${h.act}'s ${h.text} hint (${h.hint.left.toFixed(1)}-${h.hint.right.toFixed(1)}) stays clear of its label (${h.label.left.toFixed(1)}-${h.label.right.toFixed(1)})`);
+   assert.ok(h.hint.left>=h.inner.left-0.5&&h.hint.right<=h.inner.right+0.5,`${label}: ${h.act}'s ${h.text} hint stays inside its button: it ends at ${h.hint.right.toFixed(1)}, the button at ${h.inner.right.toFixed(1)}`);
+  }
+ };
  for(const [engineName,engine] of await steadyScannerEngines()){
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
   try{
@@ -24698,8 +24747,15 @@ test('RISK steady scanner browser: the actions under the dotted task and the can
       await page.reload({waitUntil:'domcontentloaded'});
       await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]'),null,{timeout:60000});
      }
-     if(spec.enlarged)await page.addStyleTag({content:spec.doubleText?STEADY_DOUBLE_TEXT:STEADY_ENLARGED_TEXT});
+     await page.waitForFunction(()=>!!document.querySelector('.card.cand + * .keyhint'),null,{timeout:15000});
+     const normalHints=await readHints(page);
+     if(spec.enlarged)await steadyScaleText(page,spec.doubleText?STEADY_DOUBLE_TEXT:STEADY_ENLARGED_TEXT);
      await page.waitForFunction(()=>!!document.querySelector('.card.bench')&&!!document.querySelector('.card.cand')&&!!document.querySelector('[data-act="cand-worked"]'),null,{timeout:15000});
+     // #2480 positive control: enlarged text grows every shown hint with its label.
+     if(spec.enlarged){
+      const scale=spec.doubleText?2:1.5;
+      for(const h of await readHints(page)){const was=normalHints.find(n=>n.act===h.act&&n.text===h.text);assert.ok(was&&Math.abs(h.fontSize-was.fontSize*scale)<=0.05&&Math.abs(h.labelSize-was.labelSize*scale)<=0.05,`${label}: positive control: ${scale*100}% text grows ${h.act}'s ${h.text} hint with its label: hint ${was?.fontSize} to ${h.fontSize} px, label ${was?.labelSize} to ${h.labelSize} px`);}
+     }
      await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(80);
      const loadedFonts=await page.evaluate(()=>[...document.fonts].filter(face=>face.status==='loaded').length);
      if(webFonts)assert.ok(loadedFonts>0,`${label}: positive control: the web fonts loaded, which needs the network`);
@@ -24730,6 +24786,7 @@ test('RISK steady scanner browser: the actions under the dotted task and the can
       assert.ok(seen.bench.opacity<1&&seen.bench.opacity===seen.cand.opacity,`${tl}: both rows dim alike while the candidate is weighed: ${seen.bench.opacity} and ${seen.cand.opacity}`);
      }
      assert.notEqual(candidateListens.light.paint,candidateListens.dark.paint,`${label}: the scanner pane paints differently by day and night: ${candidateListens.light.paint}`);
+     checkHints(`${label}, candidate listening`,await readHints(page));
      // Accessible names stay as they were: an unshown hint is not read out.
      const benchRow=page.locator('.card.bench + *'),candRow=page.locator('.card.cand + *');
      for(const [row,name,exact] of [[benchRow,'✓ Done',true],[benchRow,'Edit this task',true],[benchRow,/^Worked on it\s*w$/,false],[benchRow,'Delete',true],
@@ -24752,11 +24809,17 @@ test('RISK steady scanner browser: the actions under the dotted task and the can
       assert.equal(seen.bench.opacity,1,`${tl}: the dotted task's row is at full strength once scanning stops`);
      }
      assert.notEqual(benchListens.light.paint,benchListens.dark.paint,`${label}: with the dotted task listening, the scanner pane paints differently by day and night: ${benchListens.light.paint}`);
+     checkHints(`${label}, dotted task listening`,await readHints(page));
+     // #2480: at this view no row takes more lines than on the base build.
+     const sameLines=await compareCase(browser,{base:lineBase,candidate:steadyCandidateBuild()},{board:steadySeededBoard(spec),fonts:webFonts?'web':'blocked',views:[{width:spec.width,height:spec.height}],
+      touch:spec.touch!==false,selectors:STEADY_LINE_ROWS,scale:spec.enlarged?(spec.doubleText?STEADY_DOUBLE_TEXT:STEADY_ENLARGED_TEXT):1,label});
+     steadyNoMoreLinesThanBase(label,sameLines.findings);
      assert.deepEqual(errors,[],`${label}: no page errors`);
     }catch(error){failures.push(error.message.split('\n')[0]);}finally{await context.close();}
    }
   }finally{await browser.close();}
  }
+ await lineBase.close();
  assert.deepEqual(failures,[]);
 });
 
@@ -24873,13 +24936,9 @@ test("RISK steady scanner browser: a key hint never widens an action beside a ca
     const label=`${engineName} ${spec.name} ${webFonts?'with web fonts':'fonts blocked'}`;
     let profile=null,host=browser;
     if(spec.dpr)host={newContext:options=>browser.newContext({...options,deviceScaleFactor:spec.dpr})};
-    if(spec.chromeMinimum){
-     profile=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'hint-minimum-font-2460-'));
-     fs.mkdirSync(path.join(profile,'Default'));
-     fs.writeFileSync(path.join(profile,'Default','Preferences'),JSON.stringify({webkit:{webprefs:{minimum_font_size:spec.chromeMinimum,minimum_logical_font_size:spec.chromeMinimum}}}));
-     // The headless shell ignores the profile's setting; full Chromium reads it.
-     host={newContext:options=>engine.launchPersistentContext(profile,{...options,headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chromium'})};
-    }
+    // Chrome's real minimum font size, in a fresh profile per case and checked
+    // to take effect before the page opens (#2480's shared harness helper).
+    if(spec.chromeMinimum)host=chromeMinimumFontHost(engine,spec.chromeMinimum,{channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chromium'});
     const {page,context,errors}=await steadyScannerPage(host,steadySeededBoard(spec),spec);
     try{
      if(webFonts){
@@ -25110,7 +25169,7 @@ test('RISK steady scanner browser: the dot trail shows only the dots that fit wi
     const {page,context,errors}=await steadyScannerPage(browser,steadyTrailBoard(trail),{...view,touch:false});
     try{
      await page.waitForSelector('.crumbs',{timeout:15000});
-     if(view.enlarged)await page.addStyleTag({content:STEADY_ENLARGED_TEXT});
+     if(view.enlarged)await steadyScaleText(page,STEADY_ENLARGED_TEXT);
      await page.waitForTimeout(80);
      steadyAssertTrail(await steadyReadTrail(page),label);
      assert.deepEqual(errors,[],`${label}: no page errors`);
