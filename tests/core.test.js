@@ -25095,25 +25095,50 @@ test("RISK steady scanner browser: a key hint never widens an action beside a ca
 // When the next title is as long as the last, a second tap lands on the button
 // of the next candidate before anyone could have read it, so a physical press
 // inside 200 ms of the new task appearing is dropped.
-test('RISK steady scanner browser: a double tap or a repeated key answers only the shown task and the next answer after the window is accepted in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+test('RISK steady scanner browser: a double tap or a repeated key answers only the shown task and the next answer after the window is accepted in Chromium and WebKit, and in Chromium at 6x CPU',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[];
  for(const [engineName,engine] of await steadyScannerEngines()){
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
   try{
-   for(const input of ['two touch taps 60 ms apart','two touch taps 120 ms apart','mouse double click','two key presses']){
-    const label=`${engineName} ${input}`,touch=input.includes('touch');
+   // #2486: a busy machine slows the page between a double tap's two taps; in
+   // Chromium a page at 6x CPU stands in for it.
+   const rounds=[...['two touch taps 60 ms apart','two touch taps 120 ms apart','mouse double click','two key presses'].map(input=>({input,cpu:1})),
+    ...(engineName==='chromium'?['two touch taps 60 ms apart','two touch taps 120 ms apart'].map(input=>({input,cpu:6})):[])];
+   for(const {input,cpu} of rounds){
+    const label=`${engineName}${cpu>1?` at ${cpu}x CPU`:''} ${input}`,touch=input.includes('touch');
     // Titles of one length keep No in place from one candidate to the next, so a
     // second tap lands on the next candidate's No (#2422 review N1).
     const board=steadyScannerBoard({tasks:12,taskOver:i=>({title:'Same length title number '+String(i).padStart(2,'0')}),over:{chain:['steady-0','steady-1'],candidateId:'steady-2'}});
     const {page,context,errors}=await steadyScannerPage(browser,board,{width:390,height:844,touch});
     try{
+     const cdp=engineName==='chromium'?await context.newCDPSession(page):null;
+     if(cpu>1)await cdp.send('Emulation.setCPUThrottlingRate',{rate:cpu});
      await page.waitForSelector('[data-act="no"]',{timeout:15000});await page.waitForTimeout(400);
      const first=await steadyScannerControls(page),at=steadyScannerCenter(first.no);
-     await page.evaluate(()=>{window.steadyPresses=[];document.addEventListener('click',event=>steadyPresses.push({act:event.target.closest?.('[data-act]')?.dataset.act,candidate:state.candidateId}),true);});
+     await page.evaluate(()=>{window.steadyPresses=[];window.steadyStamps=[];
+      document.addEventListener('click',event=>{steadyPresses.push({act:event.target.closest?.('[data-act]')?.dataset.act,candidate:state.candidateId});steadyStamps.push(event.timeStamp);},true);
+      document.addEventListener('keydown',event=>{steadyStamps.push(event.timeStamp);},true);});
      if(input==='mouse double click')await page.mouse.click(at.x,at.y,{clickCount:2,delay:15});
      else if(input==='two key presses'){await page.keyboard.press('n');await page.waitForTimeout(40);await page.keyboard.press('n');}
+     else if(cdp){
+      // #2486: Playwright stamps a tap when the browser takes it, after the
+      // page has handled the last one, so on a busy machine its 120 ms pair
+      // reached the app 134–154 ms apart (184–192 ms at 6x CPU) and the second
+      // tap counted, as a deliberate one should. A finger's touch is stamped
+      // when it lands, so these touches carry their own times.
+      const gap=input.includes('120')?120:60,touchAt=async ms=>{const timestamp=ms/1000;
+       await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:at.x,y:at.y}],timestamp});
+       await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[],timestamp});};
+      const landed=Date.now();await touchAt(landed);
+      await new Promise(resolve=>setTimeout(resolve,Math.max(0,landed+gap-Date.now())));
+      await touchAt(landed+gap);
+     }
      else{await page.touchscreen.tap(at.x,at.y);await page.waitForTimeout(input.includes('120')?120:60);await page.touchscreen.tap(at.x,at.y);}
      await page.waitForFunction(prior=>state.candidateId!==prior,first.candidate,{timeout:5000});
+     // WebKit's taps cannot carry a time; they reached the app 130–133 ms
+     // apart for a 120 ms pair, with or without a busy machine.
+     const stamps=await page.evaluate(()=>steadyStamps);
+     assert.ok(stamps.length>=2&&stamps[1]-stamps[0]<150,`${label}: the two presses reached the app under 150 ms apart, a double tap: ${stamps.map(stamp=>stamp.toFixed(1))}`);
      await page.waitForTimeout(40);
      const seen=await page.evaluate(()=>({answered:Object.keys(state.considered),candidate:state.candidateId}));
      assert.deepEqual(seen.answered,[first.candidate],`${label}: only the task on screen was answered: ${seen.answered}`);
@@ -25171,6 +25196,47 @@ test('RISK steady scanner browser: a double tap on Postpone or Done acts once an
      await page.touchscreen.tap(x,y);await page.waitForTimeout(60);await page.touchscreen.tap(x,y);
      await page.waitForTimeout(450);
      assert.equal(await page.evaluate(()=>undoStack.length),before+1,`${label}: the double tap took one action`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(`${label}: ${error.message.split('\n')[0]}`);}finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+// #2486: Chromium gives the second of two touch taps 243 ms apart click
+// detail 2, and Done once dropped every such click. Chromium's touches here
+// carry their own times, as in the double-tap test above; WebKit's taps
+// cannot, and reach the app at least the 200 ms they are sent apart.
+test('RISK steady scanner browser: two Done taps 200 ms apart on the candidate or on the dotted task each complete the task shown in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const act of ['cand-done','bench-done']){
+    const label=`${engineName} ${act}`;
+    const board=steadyScannerBoard({tasks:12,taskOver:i=>({title:'Same length title number '+String(i).padStart(2,'0')}),over:{chain:['steady-0','steady-1','steady-3'],candidateId:'steady-2'}});
+    const {page,context,errors}=await steadyScannerPage(browser,board,{width:390,height:844,touch:true});
+    try{
+     const selector=`[data-act="${act}"]`;
+     await page.waitForSelector(selector,{timeout:15000});await page.waitForTimeout(500);
+     await page.locator(selector).first().scrollIntoViewIfNeeded();
+     const box=await page.locator(selector).first().boundingBox(),x=box.x+box.width/2,y=box.y+box.height/2;
+     await page.evaluate(()=>{window.doneClicks=[];document.addEventListener('click',event=>doneClicks.push({act:event.target.closest?.('[data-act]')?.dataset.act,detail:event.detail,at:event.timeStamp}),true);});
+     const doneBefore=await page.evaluate(()=>state.tasks.filter(task=>task.done).length);
+     if(engineName==='chromium'){
+      const cdp=await context.newCDPSession(page),touchAt=async ms=>{const timestamp=ms/1000;
+       await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}],timestamp});
+       await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[],timestamp});};
+      const landed=Date.now();await touchAt(landed);
+      await new Promise(resolve=>setTimeout(resolve,Math.max(0,landed+200-Date.now())));
+      await touchAt(landed+200);
+     }else{await page.touchscreen.tap(x,y);await page.waitForTimeout(200);await page.touchscreen.tap(x,y);}
+     await page.waitForTimeout(600);
+     const clicks=await page.evaluate(()=>doneClicks);
+     assert.deepEqual(clicks.map(click=>click.act),[act,act],`${label}: both taps landed on Done: ${JSON.stringify(clicks)}`);
+     assert.ok(clicks[1].at-clicks[0].at>=150,`${label}: they reached the app at least 150 ms apart: ${JSON.stringify(clicks)}`);
+     assert.equal(await page.evaluate(()=>state.tasks.filter(task=>task.done).length),doneBefore+2,`${label}: each tap completed a task (second tap's detail ${clicks[1].detail})`);
      assert.deepEqual(errors,[],`${label}: no page errors`);
     }catch(error){failures.push(`${label}: ${error.message.split('\n')[0]}`);}finally{await context.close();}
    }
@@ -43893,9 +43959,36 @@ test('Changelog #2481: the November 25 notes say quick Yes and No taps in a row 
  const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();
  const answer=app.shim.document.getElementById('modalRoot').innerHTML.match(/<dt>Why didn’t my second tap count\?<\/dt><dd>(.*?)<\/dd>/)?.[1]??'';
  assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the Help topic length');
- assert.match(answer,/After your own Yes or No brings up the next task, a Yes or No counts once it shows/,'Help says a Yes or No on your own next task waits only for it to show');
+ assert.match(answer,/After your own Yes, No or Done brings up the next task, any of them counts once it shows/,'Help says a Yes or No on your own next task waits only for it to show');
  assert.match(answer,/so quick taps each count/,'and that quick Yes and No taps in a row count');
  assert.match(answer,/With sync on, a large board’s next task can be slow to show, and a tap before it shows is ignored/,'and that with sync on a slow next task still holds a tap');
+});
+
+// #2486: quick Done taps each count once the press guard times them, so the
+// November 25 notes give them their own bullet, with the double tap that
+// still completes one task and the sync-on limit the Yes and No bullet keeps.
+// A tap in the moment between the next task being drawn and it showing is
+// now held: its own bullet, with the limit that the app can learn of the
+// task showing a little early. Help names Done beside Yes and No.
+test('Changelog #2486: the November 25 notes say quick Done taps each count and a double tap on Done still completes one task, and that a tap just before the next task shows is held, and Help names Done',async t=>{
+ const notes=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ const items=(notes.split('<h3>November 25, 2026</h3>')[1]?.split('</ul>')[0]||'').split('<li>').slice(1);
+ const done=items.filter(item=>/Quick Done taps in a row/.test(item));
+ assert.equal(done.length,1,'one bullet is about quick Done taps: '+items.join(' | '));
+ assert.match(done[0],/on the task you’re weighing and on the dotted task/,'it names both Done buttons the tests drive');
+ assert.match(done[0],/instead of every tap after the first being ignored without a sign/,'it says what changed');
+ assert.match(done[0],/A double tap on Done still completes only one task, and Done dims to show the second tap was held/,'with the double tap that still completes one task');
+ assert.match(done[0],/With sync on, the next task on a large board can take long enough to show that some quick taps are still held/,'and the sync-on limit');
+ assert.doesNotMatch(done[0],/Yes and No|timeStamp|paint|guard|frame|detail|\d\s*ms\b/i,'it is about Done alone and says what the person sees');
+ const appears=items.filter(item=>/between the next task being drawn and it appearing on the screen/.test(item));
+ assert.equal(appears.length,1,'one bullet is about a tap just before the next task shows: '+items.join(' | '));
+ assert.match(appears[0],/is now held, as a tap before it was drawn always was, instead of answering a task you could not see yet/,'it says what changed');
+ assert.match(appears[0],/Some browsers tell the app the task has appeared a few thousandths of a second early/,'with the limit measured in Chromium');
+ assert.doesNotMatch(appears[0],/Done|timeStamp|paint|guard|frame|\d\s*ms\b/i,'it is one feature and says what the person sees');
+ const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();
+ const answer=app.shim.document.getElementById('modalRoot').innerHTML.match(/<dt>Why didn’t my second tap count\?<\/dt><dd>(.*?)<\/dd>/)?.[1]??'';
+ assert.match(answer,/After your own Yes, No or Done brings up the next task, any of them counts once it shows, so quick taps each count/,'Help names Done beside Yes and No');
+ assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the Help topic length');
 });
 
 // #2455 review: the November 23 changelog has one feature per bullet: the

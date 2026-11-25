@@ -616,6 +616,11 @@
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
     {
+      "root": "RISK steady scanner browser: two Done taps 200 ms apart on the candidate or on the dotted task each complete the task shown in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
       "root": "RISK steady scanner browser: the trail labels keep every letter beside a dot at phone widths with long titles in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
@@ -631,7 +636,7 @@
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
     {
-      "root": "RISK steady scanner browser: a double tap or a repeated key answers only the shown task and the next answer after the window is accepted in Chromium and WebKit",
+      "root": "RISK steady scanner browser: a double tap or a repeated key answers only the shown task and the next answer after the window is accepted in Chromium and WebKit, and in Chromium at 6x CPU",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
