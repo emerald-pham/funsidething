@@ -1343,6 +1343,7 @@ window.formatScannerCalendarDate = (date,timeZone) => {
 let saveTimer = null;
 let saveTimerBackupId = null; // #2457: the backup id the save on saveTimer keeps from retirement
 let saveTimerDueAt = null; // #2490 review: when the save on saveTimer comes due (saveAfterDebounce)
+let saveTimerWaits = false; // #2490 review: whether that save is due and waits for an answer to catch up
 const SAVE_DEBOUNCE_MS = 350; // an edit's device save waits this long for another edit
 let saveRequestGeneration = 0;
 /* #2427 review: counts every change made to the live board in place, whether
@@ -5436,8 +5437,10 @@ function save(preserveBackupId=null,editedAt=null){
   sealUndoFrame();
   markBoardEdited(saveRequestGeneration-1);
   cloudPush();
-  // A save already due, still waiting for an answer to catch up, stays due.
-  const dueAt=saveTimer?saveTimerDueAt:null,drawn=!!state.chance&&state.chance.seed!==persistedChanceSeed;
+  // A save already due, still waiting for an answer to catch up, stays due,
+  // and so does one an answer's catch-up finds due. Any other edit restarts
+  // the debounce, as before #2484, even when its timer is late to run.
+  const dueAt=saveTimer&&(saveTimerWaits||editedAt!==null)?saveTimerDueAt:null,drawn=!!state.chance&&state.chance.seed!==persistedChanceSeed;
   // #2490 review: an answer's debounce started at its tap (startAnswerSave),
   // so its catch-up keeps that timer while it is not yet due.
   if(!drawn&&editedAt!==null&&dueAt===editedAt+SAVE_DEBOUNCE_MS&&dueAt>performance.now()&&saveTimerBackupId===preserveBackupId){debounceServedBy=null;return;}
@@ -5508,17 +5511,17 @@ function saveAfterDebounce(preserveBackupId,dueAt=null,runAt=dueAt,now=performan
       return served.done.then(saved=>saved===true||again(),again);
     return deviceSaveLane.request({preserveBackupId}).done;
   },delay));
-  saveTimer=timer;saveTimerBackupId=preserveBackupId;saveTimerDueAt=dueAt;debounceServedBy=null;
+  saveTimer=timer;saveTimerBackupId=preserveBackupId;saveTimerDueAt=dueAt;saveTimerWaits=runAt>dueAt;debounceServedBy=null;
 }
 /* #2490 review: an answer's device save debounce starts at its tap, a
    SAVE_DEBOUNCE_MS timer as before #2484, when its catch-up (which asks for
    the save) ran just after the tap; the catch-up then keeps it (save). A
-   save already due is not put off by a new answer: it waits only for
-   catch-ups, up to its longest wait. Returns the tap's time, which the
+   save already due and waiting for a catch-up is not put off by a new
+   answer: it waits only for catch-ups, up to its longest wait. Returns the tap's time, which the
    answer's catch-up gives its save. */
 function startAnswerSave(){
   const now=performance.now();
-  if(saveTimer&&saveTimerDueAt<=now)return now;
+  if(saveTimer&&saveTimerWaits)return now;
   if(saveTimer){clearSyncTimeout(saveTimer);saveTimer=null;}
   saveAfterDebounce(null,null,null,now);
   return now;
