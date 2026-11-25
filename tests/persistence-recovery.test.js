@@ -21577,15 +21577,24 @@ test('RISK scanner press guard (#2486): on the large board, two Done taps on the
  const quick=clickWithDetail2486(device,guard,'cand-done',2);
  assert.ok(!quick.classList.contains('held'),'a Done 200 ms after the last one, with detail 2, is not held');
  assert.deepEqual(doneTasks2486(ctx),[...doneBefore,first,second].sort(),'and completes the candidate shown');
+ // #2490 review (independent N2): inside the 100 ms grace after a card
+ // paints, a press on a card the person's own Done drew counts once it shows,
+ // as Help says. Its card paints 120 ms after the Done, and the next Done
+ // comes 50 ms after that paint, 170 ms after the last Done.
+ const graced=ctx.state.candidateId;assert.ok(graced&&graced!==second,'positive control: the next candidate is drawn');
+ await clock.advance(120);guard.paint();await clock.advance(50);
+ const inGrace=clickWithDetail2486(device,guard,'cand-done',2);
+ assert.ok(!inGrace.classList.contains('held'),'a Done 50 ms after the card its own Done drew paints is not held');
+ assert.deepEqual(doneTasks2486(ctx),[...doneBefore,first,second,graced].sort(),'and completes that candidate');
  // A double tap: the second tap lands 40 ms after the first, after the new card painted.
- const third=ctx.state.candidateId;assert.ok(third&&third!==second,'positive control: the next candidate is drawn');
+ const third=ctx.state.candidateId;assert.ok(third&&third!==graced,'positive control: the next candidate is drawn');
  await clock.advance(70);guard.paint();await clock.advance(1000);
  clickWithDetail2486(device,guard,'cand-done',1);
  const fourth=ctx.state.candidateId;
  await clock.advance(20);guard.paint();await clock.advance(20);
  const shown=answeredState2461(ctx);
  const double=clickWithDetail2486(device,guard,'cand-done',2);
- assert.deepEqual(doneTasks2486(ctx),[...doneBefore,first,second,third].sort(),'the double tap completes only the candidate its first tap landed on');
+ assert.deepEqual(doneTasks2486(ctx),[...doneBefore,first,second,graced,third].sort(),'the double tap completes only the candidate its first tap landed on');
  assert.equal(ctx.state.candidateId,fourth,'and leaves the next candidate showing');
  assert.deepEqual(answeredState2461(ctx),shown,'its second tap changes nothing');
  assert.ok(double.classList.contains('held'),'and Done shows that the second tap was held');
@@ -21608,13 +21617,20 @@ test('RISK scanner press guard (#2486): on the large board, two Done taps on the
  const quick=clickWithDetail2486(device,guard,'bench-done',2);
  assert.ok(!quick.classList.contains('held'),'a Done 200 ms after the last one, with detail 2, is not held');
  assert.deepEqual(doneTasks2486(ctx),[...doneBefore,first,second].sort(),'and completes the dotted task shown');
+ // #2490 review (independent N2): a Done 50 ms after the card its own Done
+ // drew paints, 170 ms after that Done, counts once the card shows.
+ const graced=ctx.state.chain.at(-1);assert.ok(graced&&graced!==second,'positive control: the dot before it is now the dotted task');
+ await clock.advance(120);guard.paint();await clock.advance(50);
+ const inGrace=clickWithDetail2486(device,guard,'bench-done',2);
+ assert.ok(!inGrace.classList.contains('held'),'a Done 50 ms after the card its own Done drew paints is not held');
+ assert.deepEqual(doneTasks2486(ctx),[...doneBefore,first,second,graced].sort(),'and completes that dotted task');
  const third=ctx.state.chain.at(-1);
  await clock.advance(70);guard.paint();await clock.advance(1000);
  clickWithDetail2486(device,guard,'bench-done',1);
  await clock.advance(20);guard.paint();await clock.advance(20);
  const shown=answeredState2461(ctx);
  const double=clickWithDetail2486(device,guard,'bench-done',2);
- assert.deepEqual(doneTasks2486(ctx),[...doneBefore,first,second,third].sort(),'the double tap completes only the dotted task its first tap landed on');
+ assert.deepEqual(doneTasks2486(ctx),[...doneBefore,first,second,graced,third].sort(),'the double tap completes only the dotted task its first tap landed on');
  assert.deepEqual(answeredState2461(ctx),shown,'its second tap changes nothing');
  assert.ok(double.classList.contains('held'),'and Done shows that the second tap was held');
 });
@@ -21771,7 +21787,7 @@ test('RISK scanner press guard (#2486): signed in on the large board, after a Ye
 // own clock. Measured 2026-11-25 on one machine, the builds interleaved:
 // that work took a median 110 ms here on the build before #2484 and 29 ms
 // with it, and Chromium at 4x CPU, through #2481's harness, put the next card
-// on the screen a median 167–175 ms after the tap on the build before and
+// on the screen a median 157–175 ms after the tap on the build before and
 // 87–93 ms with #2484 (three interleaved batches of 30 taps each). The rest
 // of the browser's figure, about 60 ms on both builds, is the browser's own
 // share of a tap: the touch's delivery (that harness stamps each touch 22 ms
@@ -21797,7 +21813,13 @@ function paintWatch2484(device){
 }
 const median2484=values=>{const sorted=[...values].sort((a,b)=>a-b),mid=sorted.length>>1;return sorted.length%2?sorted[mid]:(sorted[mid-1]+sorted[mid])/2;};
 
-test('RISK answer shows first (#2484): signed in on the large board, ten Yes taps 200 ms apart show the next card a median of at most 150 ms after the tap',{timeout:600000},async t=>{
+// #2490 review (independent N1): the time is reported, not asserted. It is
+// this process's CPU time, so a slower host fails it with nothing changed (a
+// median 303.5–306.5 ms on efficiency cores, against 88–92 ms on performance
+// cores), and responsiveness is counted in tests, never timed
+// (docs/agents/responsiveness.md). The work-count test and the late-frame
+// order test below pin #2484's change.
+test('RISK answer shows first (#2484): signed in on the large board, ten Yes taps 200 ms apart each show the next card, and the modeled tap-to-card time is reported',{timeout:600000},async t=>{
  const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
  const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
  await startAnswering2408(device);
@@ -21808,8 +21830,7 @@ test('RISK answer shows first (#2484): signed in on the large board, ten Yes tap
  assert.ok(watch.taps.every(tap=>ctx.state.chain.includes(tap.candidate)),'positive control: and dots it');
  assert.ok(work.every(Number.isFinite),'positive control: a frame shows each next card: '+JSON.stringify(work));
  const shown=work.map(ms=>Math.round(ms+BROWSER_SHARE_MS2484)),median=median2484(shown);
- t.diagnostic(JSON.stringify({appWorkBeforeFrameMs:work.map(Math.round),tapToCardMs:shown,median}));
- assert.ok(median<=150,'the next card shows a median '+median+' ms after the tap, at most 150 ms: '+JSON.stringify(shown));
+ t.diagnostic(JSON.stringify({appWorkBeforeFrameMs:work.map(Math.round),tapToCardMs:shown,median,goalMs:150}));
 });
 
 // What an answer's catch-up writes, as the person or a support report sees
@@ -21857,6 +21878,35 @@ test('RISK answer shows first (#2484): signed in on the large board, each of ten
  assert.deepEqual(answered.filter(id=>cloud.board.chain.includes(id)),answered,'the cloud copy holds all ten answers');
 });
 
+// #2490 review (sync N3): a page that is given no frame (a throttled or
+// covered tab) must not hold an answer's catch-up for good. Like the press
+// guard's start, it waits for a frame at most FRAME_WAIT_FALLBACK_MS, 1 s.
+test('RISK answer shows first (#2484): signed in on the large board, a Yes whose next card is never given a frame catches up 1 s after the tap, its record is saved and sent, and its device save follows',{timeout:600000},async t=>{
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock,counters}=device,guard=pressGuard2461(device),trail=catchUpTrail2484(device);
+ guard.paint();await clock.advance(1000);
+ const candidate=ctx.state.candidateId,benchmark=ctx.state.chain.at(-1),before=trail.mark([candidate,benchmark]);
+ guard.press('yes');
+ assert.ok(ctx.state.chain.includes(candidate),'positive control: the Yes answers the candidate shown');
+ // No frame comes: guard.paint() is never called again.
+ await clock.advance(999);
+ assert.deepEqual(trail.mark([candidate,benchmark]),before,'999 ms after the tap, with no frame, nothing of the answer’s catch-up has run');
+ await clock.advance(1);
+ const after=trail.mark([candidate,benchmark]);
+ assert.equal(after.histories[0],before.histories[0]+1,'1 s after the tap the answer records its History');
+ assert.ok(after.draws>before.draws,'samples the ranks');
+ assert.ok(after.rows>before.rows&&after.sent>before.sent,'and saves its change record on the device and sends it');
+ await clock.advance(350);
+ const saves=counters.commits.slice(before.commits);
+ assert.ok(saves.length>=1&&JSON.parse(saves[0].payload).chain.includes(candidate),'a device save holding the answer follows within 350 ms of the catch-up: '+saves.length+' saves');
+ await clock.settle();
+ const cloud=await device.cloud();
+ assert.ok(cloud.board.chain.includes(candidate),'the cloud copy holds the answer');
+ assert.equal(cloud.rev,ctx.state.syncRev,'at the revision this device was acknowledged at');
+});
+
 // Measured with #2481's harness in Chromium at 4x CPU, 2026-11-25: once the
 // catch-up waited for the frame, the debounced device save of an earlier
 // answer still came due while a later answer waited for its frame, and its
@@ -21892,6 +21942,91 @@ test('RISK answer shows first (#2484): signed in on the large board, when an ear
  const cloud=await device.cloud();
  assert.deepEqual([first,second].filter(id=>cloud.board.chain.includes(id)),[first,second],'the cloud copy holds both answers');
  assert.equal(cloud.rev,ctx.state.syncRev,'at the revision this device was acknowledged at');
+});
+
+// #2490 review (sync N1): signed out there are no change records, so an
+// answer survives the page closing only once a whole-board device save holds
+// it. Before #2484 an answer's catch-up ran just after its tap, so its save
+// came 350 ms after the tap unless another answer came first. With the
+// catch-up after the frame, an earlier answer's save that came due while the
+// next answer waited for its frame waited a whole debounce again, and the
+// next answer's catch-up then put it off once more: the sync specialist's
+// probe (8 Yes taps 420 ms apart, frames 120 ms late, the page closed 360 ms
+// after the last tap) reopened with 0 of 8 answers, and 8 of 8 on main.
+test('RISK answer shows first (#2484): signed out on the large board, at Yes taps 300 to 500 ms apart whose next card’s frame comes 16 to 250 ms late, each answer is saved on the device within 350 ms of its tap unless another answer comes first, as before #2484, and a page closed 360 ms after the last tap reopens with every answer',{timeout:900000},async t=>{
+ const fixture=await largeBoardFixture(),rows=[];
+ for(const [gap,frame] of [[300,16],[380,60],[420,120],[440,120],[500,250]]){
+  const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,signedIn:false});
+  await startAnswering2408(device);
+  const {ctx,clock,counters,shim}=device,guard=pressGuard2461(device);
+  guard.paint();await clock.advance(1000);
+  const commitsBefore=counters.commits.length,taps=[];
+  for(let i=0;i<8;i++){
+   const candidate=ctx.state.candidateId;taps.push({candidate,at:clock.now});
+   guard.press('yes');
+   assert.ok(ctx.state.chain.includes(candidate),'positive control: Yes '+(i+1)+' answers the candidate shown ('+gap+'/'+frame+')');
+   await clock.advance(frame);guard.paint();await clock.advance((i<7?gap:360)-frame);
+  }
+  // The page hides and closes: nothing the app has not started runs.
+  shim.document.hidden=true;shim.document.dispatchEvent({type:'visibilitychange'});shim.window.dispatchEvent({type:'pagehide'});
+  const saves=counters.commits.slice(commitsBefore).map(commit=>({at:commit.at,chain:JSON.parse(commit.payload).chain}));
+  await device.close();
+  const reopened=await answeringDevice2408(t,{indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,signedIn:false,dropDatabase:true});
+  const kept=taps.filter(tap=>reopened.ctx.state.chain.includes(tap.candidate)).length;
+  await reopened.close();
+  // An answer followed by another within 350 ms is saved with that one, as
+  // before; the last of each such run is saved, with every answer up to it,
+  // within 350 ms of its tap.
+  const late=taps.filter((tap,i)=>!(taps[i+1]&&taps[i+1].at-tap.at<350)
+    &&!saves.some(save=>save.at<=tap.at+350&&taps.slice(0,i+1).every(earlier=>save.chain.includes(earlier.candidate))))
+   .map(tap=>tap.at-taps[0].at);
+  rows.push({gap,frame,saves:saves.map(save=>save.at-taps[0].at),late,kept});
+ }
+ t.diagnostic(JSON.stringify(rows));
+ for(const {gap,frame,late,kept} of rows){
+  assert.deepEqual(late,[],'taps '+gap+' ms apart, frames '+frame+' ms late: every answer is saved within 350 ms of its tap or with an answer given within 350 ms after it; late at '+JSON.stringify(late));
+  assert.equal(kept,8,'taps '+gap+' ms apart, frames '+frame+' ms late: the page reopens with all 8 answers');
+ }
+});
+
+// #2490 review (sync N1): the longest wait. A frame that comes later than
+// the debounce leaves the next answer waiting for its catch-up whenever the
+// save of the one before comes due; waiting each time for that catch-up, the
+// save was put off for the whole run. A due save waits for it at most
+// FRAME_WAIT_FALLBACK_MS, 1 s, so every answer is saved on the device within
+// 1.35 s of its tap while the answers go on (350 ms before #2484, whose
+// catch-up ran just after the tap). These are the app's own Yes, as in the
+// ten-answers test below, since each comes before the card's frame.
+test('RISK answer shows first (#2484): signed out on the large board, at Yes answers 420 ms apart whose next card’s frame comes 600 ms late, a device save that came due waits at most 1 s for an answer still catching up, so each answer is saved within 1.35 s of its tap while the answers go on',{timeout:600000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ await startAnswering2408(device);
+ const {ctx,clock,counters}=device,guard=pressGuard2461(device);
+ guard.paint();await clock.advance(1000);
+ // Each frame runs 600 ms after the work that asked for it.
+ const frames=[];ctx.requestAnimationFrame=fn=>{frames.push({fn,at:clock.now});return frames.length;};
+ const run=async ms=>{
+  for(let left=ms;left>0;left-=20){
+   await clock.advance(20);
+   const at=vm.runInContext('performance.now()',ctx);
+   for(const frame of frames.filter(row=>clock.now-row.at>=600)){frames.splice(frames.indexOf(frame),1);frame.fn(at);}
+  }
+ };
+ const commitsBefore=counters.commits.length,taps=[];
+ for(let i=0;i<8;i++){
+  const candidate=ctx.state.candidateId;
+  taps.push({candidate,at:clock.now,behind:vm.runInContext('answerCatchUp.pending()',ctx)});
+  ctx.onAction('yes',guard.button('yes'));
+  assert.ok(ctx.state.chain.includes(candidate),'positive control: Yes '+(i+1)+' answers the candidate shown');
+  await run(420);
+ }
+ await run(2000);
+ const saves=counters.commits.slice(commitsBefore).map(commit=>({at:commit.at,chain:JSON.parse(commit.payload).chain}));
+ t.diagnostic(JSON.stringify({taps:taps.map(tap=>tap.at-taps[0].at),behind:taps.map(tap=>tap.behind),saves:saves.map(save=>save.at-taps[0].at)}));
+ assert.ok(taps.filter(tap=>tap.behind).length>=4,'positive control: most answers come while the one before still waits for its frame');
+ assert.ok(saves.some(save=>save.at<taps.at(-1).at),'a device save runs while the answers go on');
+ const late=taps.filter((tap,i)=>!saves.some(save=>save.at<=tap.at+1350&&taps.slice(0,i+1).every(earlier=>save.chain.includes(earlier.candidate)))).map(tap=>tap.at-taps[0].at);
+ assert.deepEqual(late,[],'every answer is saved on the device, with every answer before it, within 1.35 s of its tap');
 });
 
 // What an answer's own tap serializes and parses, counted where the app turns
