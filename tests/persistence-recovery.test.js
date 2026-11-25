@@ -17291,7 +17291,11 @@ test('RISK change records: a record is saved on the device before it is sent, a 
  const other=await loadApp({indexedDBProvider:shared.indexedDB,deviceDbName:shared.dbName,sharedStorage:shared.storage});
  t.after(()=>other.dispose());
  other.ctx.addTask('Added in another tab');assert.equal(await other.ctx.persist(),true,'another copy: positive control: the other tab saves');
- shared.tap('no');await shared.clock.advance(0);
+ // #2484: an answer's catch-up, which saves its record on the device and
+ // sends it, runs in the task after the frame that shows the next card: on
+ // the fake clock, 16 ms after the tap.
+ shared.tap('no');await shared.clock.advance(16);
+ assert.ok(!vm.runInContext('answerCatchUp.pending()',shared.ctx),'another copy writing: positive control: the answer has caught up');
  assert.equal(recordsWritten2417(shared),0,'another copy writing: the record is not sent');
  // This device's own save commits just before the record is saved: that is
  // no other copy writing, so the record goes up, after its device save.
@@ -17307,7 +17311,8 @@ test('RISK change records: a record is saved on the device before it is sent, a 
  // A save of this device has committed, and its reply is still on its way.
  hold=deferredSyncFixture();
  own.ctx.state.tasks[0].title+=' edited';own.ctx.save();await own.clock.advance(400);
- own.tap('no');await own.clock.advance(0);
+ own.tap('no');await own.clock.advance(16);
+ assert.deepEqual(order,['device','cloud','device','cloud'],'positive control: the second record is saved on the device and sent before this device’s own save returns');
  hold.resolve();await own.clock.settle();
  assert.equal(recordsWritten2417(own),2,'the record is sent while this device’s own save completes');
  assert.deepEqual(order,['device','cloud','device','cloud'],'each record is saved on the device before it is sent');
@@ -17614,7 +17619,9 @@ test('RISK change records: a record whose device row is still saving when the ac
  const {clock,backend,ctx,docs}=device,store=ctx.window.ScannerDeviceStore,put=store.putChangeRecord,gate=deferredSyncFixture();
  let saving=0;
  store.putChangeRecord=async options=>{if(saving++===0)await gate.promise;return put(options);};
- device.tap('no');await clock.advance(0);
+ // #2484: the answer's catch-up, which saves its record's device row, starts
+ // after the frame that shows the next card, 16 ms after the tap here.
+ device.tap('no');await clock.advance(16);
  assert.equal(saving,1,'positive control: the first answer’s device row is still saving');
  // The owner signs out and another account signs in; the page reads its cloud.
  backend.emitAuth(null);await clock.advance(1000);
