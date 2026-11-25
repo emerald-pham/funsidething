@@ -24965,7 +24965,7 @@
       "RISK scanner press guard: on the large board, a press within the guard of a new candidate first painting that no press of the person drew, by touch click or by key, is held with a visible acknowledgement on its button and changes nothing, though the frame waited behind a long task",
       "RISK scanner press guard: on the large board, a deliberate Yes or n key 150 ms after a new candidate no press of the person drew painted answers it, while one 50 ms after is held",
       "RISK scanner press guard: a press 120 ms after the last Yes that acted is held though the new candidate painted 110 ms before it, and one 150 ms after acts",
-      "Changelog #2481: the November 25 notes say quick taps in a row on Yes, No and the other scanner buttons each count while a double tap still answers once, and Help says the same"
+      "Changelog #2481: the November 25 notes say quick Yes and No taps in a row each count, that with sync on some can still be held on a large board, and that a double tap still answers once, and Help says the same"
     ],
     "preservedCoverage": [
       "Every press before the new card paints is still held, by click and by key, however long the frame waits (the #2461 unpainted and no-frame tests are unchanged and green).",

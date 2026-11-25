@@ -43670,7 +43670,7 @@ test('Changelog #2481: the November 25 notes say quick Yes and No taps in a row 
  assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the Help topic length');
  assert.match(answer,/After your own Yes or No brings up the next task, a Yes or No counts once it shows/,'Help says a Yes or No on your own next task waits only for it to show');
  assert.match(answer,/so quick taps each count/,'and that quick Yes and No taps in a row count');
- assert.match(answer,/With sync on, a large board’s next task can be slow, and a tap before it shows is ignored/,'and that with sync on a slow next task still holds a tap');
+ assert.match(answer,/With sync on, a large board’s next task can be slow to show, and a tap before it shows is ignored/,'and that with sync on a slow next task still holds a tap');
 });
 
 // #2455 review: the November 23 changelog has one feature per bullet: the
