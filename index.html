@@ -12181,13 +12181,29 @@ function noteTasksOnScreen(){
   if(shown===tasksOnScreen)return;
   tasksOnScreen=shown;tasksOnScreenChanges++;
   if(typeof requestAnimationFrame!=="function"){tasksOnScreenSince=performance.now();return;}
-  // A frame's callbacks run just before it paints, after any scenery drawn
-  // in it, so the clock read there is the latest a page can read before the
-  // paint without waiting past it. A hidden page paints no frame and takes no
-  // presses; its first frame back is when these tasks appear.
+  // These tasks are on the screen once the frame that draws them is
+  // presented. A hidden page paints no frame and takes no presses; its first
+  // frame back is when these tasks appear.
+  // #2486: a frame's callbacks run before it is presented. Since #2481 the
+  // person's own next card holds presses only until it shows, so the clock
+  // read there let a tap answer a card not yet on the screen: in headless
+  // Chromium the frame was presented 5–22 ms after its callbacks (Element
+  // Timing, large board, 1x and 4x CPU). No page signal marks the
+  // presentation itself in time to judge a press: Element Timing reports it
+  // later and only in Chromium. The task after the frame is the closest the
+  // page reads: after the presentation in every frame at 4x and in WebKit
+  // (Event Timing, 8 ms steps), and within 5.6 ms before it at 1x. Until
+  // that task runs every press is too soon.
   tasksOnScreenSince=Infinity;
   const frame=++tasksOnScreenFrame,drawnAt=performance.now();
-  requestAnimationFrame(()=>{if(frame===tasksOnScreenFrame)tasksOnScreenSince=performance.now();});
+  requestAnimationFrame(()=>{
+    if(frame!==tasksOnScreenFrame)return;
+    const shown=()=>{if(frame===tasksOnScreenFrame)tasksOnScreenSince=performance.now();};
+    if(typeof MessageChannel!=="function")return shown();
+    const channel=new MessageChannel();
+    channel.port1.onmessage=()=>{channel.port1.close();shown();};
+    channel.port2.postMessage(null);
+  });
   // A page that is never given a frame must not hold every press for good:
   // after a second the grace is timed from when the panel was drawn instead.
   setTimeout(()=>{if(frame===tasksOnScreenFrame&&tasksOnScreenSince===Infinity)tasksOnScreenSince=drawnAt;},FRAME_WAIT_FALLBACK_MS);

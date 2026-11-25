@@ -21572,3 +21572,45 @@ test('RISK scanner press guard (#2486): on the large board, two Done taps on the
  assert.deepEqual(answeredState2461(ctx),shown,'its second tap changes nothing');
  assert.ok(double.classList.contains('held'),'and Done shows that the second tap was held');
 });
+
+// A frame's callbacks run before it is presented. Measured 2026-11-25 on
+// largeBoardFixture() (Playwright 1.62.1, 45 new cards each): headless
+// Chromium presented the frame 11.6–21.8 ms after its callback at 4x CPU and
+// 5.3–11.0 ms at 1x (Element Timing presentationTime). The task the page runs
+// after the frame came 16.2–34.5 ms after the callback at 4x. Here the page's
+// tasks after a frame are the test's: each runs when the test says, as the
+// frames do in pressGuard2461.
+function tasksAfterFrames2486(ctx){
+ const queued=[];
+ ctx.MessageChannel=class{constructor(){const port1={onmessage:null,close(){}};this.port1=port1;this.port2={postMessage:()=>{queued.push(()=>port1.onmessage?.({data:null}));}};}};
+ return {run(){for(const fn of queued.splice(0))fn();}};
+}
+
+test('RISK scanner press guard (#2486): on the large board, after a Yes that acted, a press after its card’s frame callbacks but before that frame has finished is held, by touch click and by key, and one after the frame finished answers it',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,guard=pressGuard2461(device),frames=tasksAfterFrames2486(ctx);
+ guard.paint();frames.run();await clock.advance(1000);
+ const first=ctx.state.candidateId;
+ guard.press('yes');
+ assert.ok(ctx.state.chain.includes(first),'positive control: the Yes answers its candidate');
+ const second=ctx.state.candidateId;assert.ok(second&&second!==first,'positive control: a new candidate is drawn');
+ // The new card's frame runs its callbacks 160 ms after the Yes, past the
+ // double tap; the frame is presented about 15 ms later, as at 4x CPU.
+ await clock.advance(160);guard.paint();
+ await clock.advance(10);
+ const shown=answeredState2461(ctx);
+ const early=guard.press('yes');
+ assert.ok(early.classList.contains('held'),'a Yes 10 ms after the frame’s callbacks, before the frame finished, is held');
+ assert.deepEqual(answeredState2461(ctx),shown,'and changes nothing');
+ guard.key('n');
+ assert.deepEqual(answeredState2461(ctx),shown,'the n key at that moment is held too');
+ // The frame is presented and the page's next task runs.
+ await clock.advance(10);frames.run();
+ await clock.advance(5);
+ const before=answeredState2461(ctx);
+ guard.press('yes');
+ assert.deepEqual([...ctx.state.chain],[...before.chain,second],'a Yes once the frame finished answers the candidate it shows');
+ assert.equal(ctx.state.decisionEvents.length,before.decisions+1,'with one decision');
+});
