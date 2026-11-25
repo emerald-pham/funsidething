@@ -40,12 +40,18 @@ milliseconds the header needs. Write `Verdict: approved` only with no blocking
 findings, otherwise `Verdict: changes-requested`. Tag each finding blocking or
 non-blocking as release-and-review.md defines.
 
+Specialist with `memory-cloud-sync` only: also write the receipt's Memory scope
+to `<release directory>/memory-scope.json` as
+`{"memory":{"affected":…,"rationale":"…","tests":[…]},"cloud":…,"sync":…}`,
+every test name exact and unabbreviated, and run
+`npm run release:memory-scope -- <release directory>/memory-scope.json` until it
+passes. `release:prepare` fills the receipt from that file.
+
 Reply with:
 
 - the full SHA of the head you reviewed, and the verdict;
 - each blocking finding, one line each;
 - a one-sentence receipt summary;
 - the focused tests you ran, each name exact and unabbreviated;
-- specialist only: the Memory scope as compact JSON, which the receipt uses as
-  is, with every test name exact and unabbreviated:
-  `{"memory":{"affected":…,"rationale":"…","tests":[…]},"cloud":…,"sync":…}`.
+- specialist with `memory-cloud-sync` only: the path of the validated
+  `memory-scope.json`.

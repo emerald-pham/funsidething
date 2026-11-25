@@ -111,6 +111,26 @@ function hasFocusedMemoryCloudSyncTests(scope) {
   return Object.values(scope).some(entry => entry.tests.length > 0);
 }
 
+// The memory-cloud-sync specialist writes the receipt's memory scope to this
+// file (#2488): about 5 KB of JSON that coordinators used to retype from the
+// reviewer's reply. It is checked with the rules record applies, so a scope
+// that would fail record fails here, naming the file.
+export const MEMORY_SCOPE_FILE = 'memory-scope.json';
+
+export function readMemoryScopeFile(file) {
+  let scope;
+  try {
+    scope = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (error) {
+    throw new Error(MEMORY_SCOPE_FILE + ' at ' + file + ' is not readable JSON: ' + error.message);
+  }
+  const assessed = memoryCloudSyncScope(scope, MEMORY_SCOPE_FILE);
+  if (!hasFocusedMemoryCloudSyncTests(assessed)) {
+    throw new Error(MEMORY_SCOPE_FILE + ' needs at least one focused memory, cloud or sync test.');
+  }
+  return assessed;
+}
+
 function normalizeAdditionalSpecialistDomains(domains, field = 'additionalSpecialistDomains') {
   if (!Array.isArray(domains)) throw new Error(field + ' must be an array of known specialist domains.');
   const normalized = domains.map(domain => {
@@ -266,6 +286,23 @@ const changedLinePolicyMarker = 'Review plans classify changed code, not prose.'
 
 function hasChangedLinePolicy(repoRoot, sha) {
   return (gitShow(repoRoot, sha, 'AGENTS.md') || '').replace(/\s+/g, ' ').includes(changedLinePolicyMarker);
+}
+
+// Spec #2488: specialist reviews come from app changes. A test name saying
+// "saved" and a Firebase line beside a test-helper edit summoned two
+// max-effort specialists for a one-value CSS change (#2487). Test files and
+// the test-group assignments still get the code review, and a weakened test
+// still needs the test-first gate's rationale. Committed at both base and head
+// like the policies above, so receipts recorded before it keep verifying.
+const appChangeSpecialistPolicyMarker = 'Specialist reviews come from app changes, not test files or test-group assignments.';
+
+function hasAppChangeSpecialistPolicy(repoRoot, sha) {
+  return (gitShow(repoRoot, sha, 'AGENTS.md') || '').replace(/\s+/g, ' ').includes(appChangeSpecialistPolicyMarker);
+}
+
+function isTestOrAssignmentPath(file) {
+  const normalized = file.replaceAll('\\', '/');
+  return isTestSurfacePath(normalized) || /\.test\.[cm]?js$/i.test(normalized) || normalized === 'scripts/test-group-assignments.json';
 }
 
 function reviewDomainsForPath(file, scaled = false) {
@@ -546,6 +583,7 @@ export function deriveReleaseReviewPlan(repoRoot, commitSha, baseSha, options = 
   // approve itself under that plan.
   const scaled = hasScaledReviewPolicy(repoRoot, commitSha) && hasScaledReviewPolicy(repoRoot, baseSha);
   const changedLines = scaled && hasChangedLinePolicy(repoRoot, commitSha) && hasChangedLinePolicy(repoRoot, baseSha);
+  const appChangeSpecialists = changedLines && hasAppChangeSpecialistPolicy(repoRoot, commitSha) && hasAppChangeSpecialistPolicy(repoRoot, baseSha);
   let requiresCodeReview = false;
   let changesProduct = false;
   let requiresTypographyReview = false;
@@ -558,7 +596,7 @@ export function deriveReleaseReviewPlan(repoRoot, commitSha, baseSha, options = 
     if (scaled && !commentsOnly && !requiresTypographyReview) {
       requiresTypographyReview = changesTypography(repoRoot, baseSha, commitSha, file, changedLines);
     }
-    if (!commentsOnly) {
+    if (!commentsOnly && !(appChangeSpecialists && isTestOrAssignmentPath(file))) {
       for (const domain of reviewDomainsForPath(file, scaled)) specialistDomains.add(domain);
       for (const domain of reviewDomainsFromDiff(repoRoot, baseSha, commitSha, file, scaled, changedLines)) specialistDomains.add(domain);
     }
@@ -968,6 +1006,10 @@ export function prepareReleaseInput(repoRoot, commitSha, baseSha, reportDirector
   };
   const withScope = ({ evidence, ...fields }, scope, details = {}) => ({ ...fields, scope, ...details, ...evidence });
   const unassessed = () => ({ affected: null, rationale: '', tests: [] });
+  const scopePath = path.resolve(reportDirectory, MEMORY_SCOPE_FILE);
+  const memoryScope = plan.specialistDomains.includes('memory-cloud-sync') && fs.existsSync(scopePath)
+    ? readMemoryScopeFile(scopePath)
+    : { memory: unassessed(), cloud: unassessed(), sync: unassessed() };
   const input = {
     schemaVersion: 2,
     candidate: { commitSha, treeSha, baseSha },
@@ -983,7 +1025,7 @@ export function prepareReleaseInput(repoRoot, commitSha, baseSha, reportDirector
         {
           domains: plan.specialistDomains,
           ...(plan.specialistDomains.includes('memory-cloud-sync') ? {
-            memoryScope: { memory: unassessed(), cloud: unassessed(), sync: unassessed() },
+            memoryScope,
             sources: candidateSources(root, commitSha, plan.changedFiles),
           } : {}),
         }),
@@ -1501,6 +1543,13 @@ async function main() {
     process.stdout.write(JSON.stringify(deriveReleaseReviewPlan(gitCommonDir(repoRoot).root, commitSha, baseSha), null, 2) + '\n');
     return;
   }
+  if (command === 'memory-scope') {
+    const scopePath = process.argv[3];
+    if (!scopePath) throw new Error('Usage: node scripts/release-evidence.mjs memory-scope <release-directory>/' + MEMORY_SCOPE_FILE);
+    readMemoryScopeFile(scopePath);
+    process.stdout.write(MEMORY_SCOPE_FILE + ' at ' + path.resolve(scopePath) + ' passes the memory scope checks record applies.\n');
+    return;
+  }
   if (command === 'prepare') {
     const [commitSha, baseSha, reportDirectory, issue] = process.argv.slice(3);
     if (!commitSha || !baseSha || !reportDirectory || !issue) {
@@ -1510,7 +1559,7 @@ async function main() {
     process.stdout.write('Wrote ' + inputPath + '. Add the empty authored fields, then run release:record.\n');
     return;
   }
-  throw new Error('Commands: plan, prepare, record, verify, pre-push, publish, verify-deployment.');
+  throw new Error('Commands: plan, prepare, memory-scope, record, verify, pre-push, publish, verify-deployment.');
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

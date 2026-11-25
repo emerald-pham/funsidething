@@ -57,8 +57,10 @@ async function createAppFixture(t, suffix) {
   return { fixtureRoot, base: runGit(fixtureRoot, ['rev-parse', 'HEAD']), fixtureFiles: [...fixtureFiles, 'TEST_CHANGE_RATIONALES.json'] };
 }
 
-async function runPreflight(fixture, evidenceName) {
-  const args = [preflight, '--base', fixture.base];
+// The upstream comparison runs only without --base (#2488), so the upstream
+// tests pass no arguments and take the default branch merge base.
+async function runPreflight(fixture, evidenceName, options = ['--base', fixture.base]) {
+  const args = [preflight, ...options];
   const startedAt = new Date().toISOString();
   const result = spawnSync(process.execPath, args, {
     cwd: fixture.fixtureRoot,
@@ -308,7 +310,7 @@ test('preflight checks each distinct local comparison once without fetching its 
     runGit(fixture.fixtureRoot, ['add', 'notes.md']);
     runGit(fixture.fixtureRoot, ['commit', '-m', 'candidate prose']);
     const before = runGit(fixture.fixtureRoot, ['show-ref']);
-    const { result, output } = await runPreflight(fixture, distinct ? 'distinct-upstream' : 'duplicate-upstream');
+    const { result, output } = await runPreflight(fixture, distinct ? 'distinct-upstream' : 'duplicate-upstream', []);
     assert.equal(result.status, 0, output);
     assert.equal((output.match(/Test-first diff gate passed\./g) ?? []).length, distinct ? 2 : 1);
     assert.equal((output.match(/^✔ Landscape location:/gm) ?? []).length, 1);
@@ -316,6 +318,30 @@ test('preflight checks each distinct local comparison once without fetching its 
     if (distinct) assert.match(output, /published upstream refs\/remotes\/origin\/task/);
     assert.equal(runGit(fixture.fixtureRoot, ['show-ref']), before, 'local refs remain unchanged');
   });
+});
+
+// #2488: an explicit --base is the whole comparison. A branch whose last push
+// still held a since-removed test failed preflight against that push even
+// though the comparison asked for, main, was clean.
+test('preflight with an explicit base compares only with that base, not the branch last push', async t => {
+  const fixture = await createAppFixture(t, 'explicit-only');
+  runGit(fixture.fixtureRoot, ['switch', '-c', 'task']);
+  const coreTests = path.join(fixture.fixtureRoot, 'tests/core.test.js');
+  const original = await readFile(coreTests, 'utf8');
+  await writeFile(coreTests, `${original}\ntest('draft check pushed and later dropped', () => { if (1 !== 1) throw new Error('draft'); });\n`);
+  runGit(fixture.fixtureRoot, ['commit', '-qam', 'pushed draft test']);
+  const remote = path.join(fixture.fixtureRoot, 'remote.git');
+  runGit(fixture.fixtureRoot, ['init', '--bare', '-q', remote]);
+  runGit(fixture.fixtureRoot, ['remote', 'add', 'origin', remote]);
+  runGit(fixture.fixtureRoot, ['push', '-q', '-u', 'origin', 'task']);
+  await rm(remote, { recursive: true });
+  await writeFile(coreTests, original);
+  runGit(fixture.fixtureRoot, ['commit', '-qam', 'drop the draft test before merging']);
+  const { result, output } = await runPreflight(fixture, 'explicit-base-only');
+  assert.equal(result.status, 0, output);
+  assert.equal((output.match(/Test-first diff gate passed\./g) ?? []).length, 1, 'one comparison, with the explicit base');
+  assert.doesNotMatch(output, /published upstream/, 'the branch last push is not compared when --base is given');
+  assert.match(output, new RegExp(`selected base, base ${fixture.base}`));
 });
 
 test('preflight rejects an invalid explicit comparison with its ref name', async t => {
@@ -335,7 +361,7 @@ test('preflight does not reinterpret an unavailable configured upstream as an un
   runGit(fixture.fixtureRoot, ['remote', 'add', 'origin', remote]);
   runGit(fixture.fixtureRoot, ['push', '-u', 'origin', 'main']);
   runGit(fixture.fixtureRoot, ['update-ref', '-d', 'refs/remotes/origin/main']);
-  const { result, output } = await runPreflight(fixture, 'missing-upstream');
+  const { result, output } = await runPreflight(fixture, 'missing-upstream', []);
   assert.equal(result.status, 2, output);
   assert.match(output, /published upstream comparison refs\/remotes\/origin\/main/);
   assert.doesNotMatch(output, /Preflight passed/);
@@ -365,7 +391,7 @@ test('preflight rejects configured upstreams that Git cannot map to a tracking r
     }
     runGit(fixture.fixtureRoot, ['config', 'branch.main.remote', 'origin']);
     runGit(fixture.fixtureRoot, ['config', 'branch.main.merge', 'refs/heads/main']);
-    const { result, output } = await runPreflight(fixture, 'unmapped-upstream-' + missing.replace(' ', '-'));
+    const { result, output } = await runPreflight(fixture, 'unmapped-upstream-' + missing.replace(' ', '-'), []);
     assert.equal(result.status, 2, output);
     assert.match(output, /configured upstream/i, 'distinguish broken branch configuration from no upstream');
     assert.doesNotMatch(output, /Preflight passed/);
