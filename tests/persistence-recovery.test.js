@@ -18108,7 +18108,9 @@ test('RISK full copies off the answer path: a record’s reply counts toward Syn
  let sends=0;
  backend.CS.appendChangeRecord=async record=>{if(sends++===0){entered.resolve();await gate.promise;}return append(record);};
  const uploadsBefore=counters.uploads.length;
- device.tap('no');await clock.advance(0);
+ // #2484: the answer's catch-up, which sends its record, starts once the
+ // frame that shows the next candidate has run, 16 ms after the tap here.
+ device.tap('no');await clock.advance(16);
  await fixtureDeadline(entered.promise,'obsolete: positive control: the record is being sent');
  const owner=session.snapshot().owner;
  const pulled=ctx.cloudPull();await clock.advance(100);await pulled;
@@ -21844,4 +21846,145 @@ test('RISK answer shows first (#2484): signed in on the large board, each of ten
  await clock.settle();
  const cloud=await device.cloud();
  assert.deepEqual(answered.filter(id=>cloud.board.chain.includes(id)),answered,'the cloud copy holds all ten answers');
+});
+
+// Measured with #2481's harness in Chromium at 4x CPU, 2026-11-25: once the
+// catch-up waited for the frame, the debounced device save of an earlier
+// answer still came due while a later answer waited for its frame, and its
+// save ran that answer's catch-up first (a whole-board save holds every
+// answer given) and then saved, one task of 263–269 ms that held the next tap.
+test('RISK answer shows first (#2484): signed in on the large board, when an earlier answer’s device save comes due while the next answer’s frame is late, that save waits for the answer to show and catch up, and one save then holds both answers',{timeout:600000},async t=>{
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock,counters}=device,guard=pressGuard2461(device),trail=catchUpTrail2484(device);
+ guard.paint();await clock.advance(1000);
+ const first=ctx.state.candidateId,commitsBefore=counters.commits.length,firstHistory=trail.history(first);
+ guard.press('yes');
+ await clock.advance(150);guard.paint();await clock.advance(10);
+ assert.equal(trail.history(first),firstHistory+1,'positive control: the first answer caught up after its frame');
+ assert.ok(vm.runInContext('saveTimer!==null',ctx),'positive control: its device save waits on its debounce');
+ assert.equal(counters.commits.length,commitsBefore,'positive control: nothing is saved yet');
+ // The second Yes, once its card shows; then the page is busy for 400 ms,
+ // past the first answer's debounce, before its own card's frame.
+ const second=ctx.state.candidateId,before=trail.mark([second,first]);
+ guard.press('yes');
+ assert.ok(ctx.state.chain.includes(second),'positive control: the second Yes answers the candidate shown');
+ await clock.advance(400);
+ assert.deepEqual(trail.mark([second,first]),before,'the second answer’s catch-up waits for its frame though a save came due');
+ assert.equal(counters.commits.length,commitsBefore,'and no device save has started');
+ guard.paint();await clock.advance(10);
+ assert.equal(trail.history(second),before.histories[0]+1,'the second answer then catches up');
+ await clock.advance(1000);
+ const saves=counters.commits.slice(commitsBefore);
+ assert.equal(saves.length,1,'one device save follows, for both answers');
+ assert.deepEqual([first,second].filter(id=>JSON.parse(saves[0].payload).chain.includes(id)),[first,second],'and it holds both');
+ await clock.settle();
+ const cloud=await device.cloud();
+ assert.deepEqual([first,second].filter(id=>cloud.board.chain.includes(id)),[first,second],'the cloud copy holds both answers');
+ assert.equal(cloud.rev,ctx.state.syncRev,'at the revision this device was acknowledged at');
+});
+
+// What an answer's own tap serializes and parses, counted where the app turns
+// a value into text or text into a value. The app's JSON is this process's,
+// so it is counted only while the tap runs. Each task's text is its own call;
+// a whole cloud copy is a text of a megabyte or more.
+function tapWork2484(ctx){
+ const json=vm.runInContext('JSON',ctx),{stringify,parse}=json;
+ return act=>{
+  const tasks=new Set(ctx.state.tasks),work={tasks:tasks.size,taskTexts:0,largeTexts:0,largeParses:0};
+  json.stringify=function(value,...rest){
+   if(tasks.has(value))work.taskTexts++;
+   const text=stringify.call(this,value,...rest);
+   if(typeof text==='string'&&text.length>=1_000_000)work.largeTexts++;
+   return text;
+  };
+  json.parse=function(text,...rest){if(typeof text==='string'&&text.length>=1_000_000)work.largeParses++;return parse.call(this,text,...rest);};
+  try{act();}finally{json.stringify=stringify;json.parse=parse;}
+  return work;
+ };
+}
+
+// Measured in Chromium at 4x CPU, 2026-11-25 (#2481's profile, sync on, 200
+// ms rhythm): each Yes's own handler spent about 26 ms on every whole-board
+// Undo capture, two of them when the previous answer had not caught up (it
+// sealed that answer's frame, then took its own from the same board), and
+// about 28 ms checking the acknowledged decision base, which parsed that
+// base's whole cloud copy twice per answer.
+test('RISK answer shows first (#2484): signed in on the large board, a Yes’s own tap serializes each task at most once for its Undo, and neither parses nor serializes the decision base’s whole cloud copy, also when the previous answer has not caught up',{timeout:600000},async t=>{
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,guard=pressGuard2461(device),measure=tapWork2484(ctx);
+ assert.ok(ctx.state.decisionBase?.payload?.length>=1_000_000,'positive control: the acknowledged decision base holds a whole cloud copy of the large board');
+ guard.paint();await clock.advance(1000);
+ // A first Yes, which catches up.
+ guard.press('yes');await clock.advance(16);guard.paint();await clock.advance(200);
+ const answered=[ctx.state.candidateId];
+ const caughtUp=measure(()=>guard.press('yes'));
+ // Its card shows; the app's own Yes then answers the next card before the
+ // catch-up of the answer before it has run, as a press does in a browser
+ // while that catch-up's steps wait behind other work.
+ answered.push(ctx.state.candidateId);
+ await clock.advance(16);guard.paint();
+ assert.ok(vm.runInContext('answerCatchUp.pending()',ctx),'positive control: the previous answer has not caught up');
+ const behind=measure(()=>ctx.onAction('yes',guard.button('yes')));
+ t.diagnostic(JSON.stringify({caughtUp,behind}));
+ assert.ok(answered.every(id=>ctx.state.chain.includes(id)),'positive control: both Yes answers dot the candidates they were tapped on');
+ for(const [label,work] of [['a Yes after the previous answer caught up',caughtUp],['a Yes before it caught up',behind]]){
+  assert.equal(work.largeParses,0,label+' parses no whole cloud copy');
+  assert.equal(work.largeTexts,0,label+' serializes no whole cloud copy');
+  assert.ok(work.taskTexts<=work.tasks,label+' serializes each task at most once: '+work.taskTexts+' task texts for '+work.tasks+' tasks');
+ }
+});
+
+// Answers faster than their catch-up: each card's frame comes 150 ms after
+// its answer, and the next Yes is taken as soon as that card shows, before
+// the catch-up of the answer before it runs (the app's own Yes, as above).
+// Every catch-up then runs in tap order, and the device's saves wait for it.
+test('RISK answer shows first (#2484): signed in on the large board, after ten Yes answers each given before the one before it caught up, the device saves them together, the cloud takes every answer in tap order, and Undo then restores each answer in turn on the device and in the cloud',{timeout:600000},async t=>{
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock,counters}=device,guard=pressGuard2461(device);
+ guard.paint();await clock.advance(1000);
+ const commitsBefore=counters.commits.length,answered=[],shown=[];
+ for(let i=0;i<10;i++){
+  shown.push({candidate:ctx.state.candidateId,chain:[...ctx.state.chain]});answered.push(ctx.state.candidateId);
+  if(i===0)guard.press('yes');
+  else{
+   assert.ok(vm.runInContext('answerCatchUp.pending()',ctx),'positive control: Yes '+(i+1)+' comes before the answer before it caught up');
+   ctx.onAction('yes',guard.button('yes'));
+  }
+  await clock.advance(150);guard.paint();
+ }
+ assert.deepEqual([...ctx.state.chain].slice(-10),answered,'positive control: each Yes dotted the candidate it was given on, in tap order');
+ // Every answer catches up, and its device save follows 350 ms after the last.
+ await clock.advance(1000);
+ const saves=counters.commits.slice(commitsBefore);
+ t.diagnostic(JSON.stringify({saves:saves.map(save=>save.at)}));
+ assert.ok(saves.length>=1&&saves.length<10,'the ten answers are saved on the device together, not one save each: '+saves.length);
+ assert.deepEqual(answered.filter(id=>JSON.parse(saves.at(-1).payload).chain.includes(id)),answered,'the last save holds every answer');
+ await clock.settle();
+ let cloud=await device.cloud();
+ assert.deepEqual(cloud.board.chain.slice(-10),answered,'the cloud copy holds every answer, in tap order');
+ assert.deepEqual((cloud.board.decisionEvents||[]).filter(event=>event.kind==='comparison'&&answered.includes(event.taskId)).map(event=>event.taskId),answered,'and its decisions are in tap order');
+ assert.equal(cloud.rev,ctx.state.syncRev,'this device is acknowledged at the cloud’s revision');
+ // Undo, from the last answer back to the first.
+ for(let i=9;i>=0;i--){
+  assert.equal(await ctx.onAction('undo',{}),true,'Undo '+(10-i)+' runs');
+  assert.equal(ctx.state.candidateId,shown[i].candidate,'Undo '+(10-i)+' offers the candidate of Yes '+(i+1)+' again');
+  assert.deepEqual([...ctx.state.chain],shown[i].chain,'and the chain is as it was before that Yes');
+  await clock.advance(200);
+ }
+ await clock.settle();
+ cloud=await device.cloud();
+ const head=JSON.parse((await ctx.window.ScannerDeviceStore.readHead()).payload);
+ for(const [where,board] of [['on the device',head],['in the cloud',cloud.board]]){
+  assert.deepEqual(board.chain,shown[0].chain,'every Yes is undone '+where);
+  const yes=(board.decisionEvents||[]).filter(event=>event.kind==='comparison'&&answered.includes(event.taskId));
+  assert.equal(yes.length,10,'each Yes stays recorded '+where);
+  assert.ok(yes.every(event=>(board.decisionEvents||[]).some(undo=>undo.kind==='undo'&&undo.targetEventIds.includes(event.id))),'with its Undo '+where);
+ }
+ assert.equal(cloud.rev,ctx.state.syncRev,'and this device is acknowledged at the cloud’s revision');
 });

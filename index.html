@@ -5425,25 +5425,41 @@ function save(preserveBackupId=null){
   // #2408: both go through this tab's one device-save lane, so neither runs
   // beside an earlier save; the draw's save skips the debounce, as before.
   if(state.chance && state.chance.seed !== persistedChanceSeed) deviceSaveLane.request({preserveBackupId});
-  else{
-    const timer=countSyncTimer("save-debounce",setTimeout(()=>{
-      endSyncTimer(timer);
-      if(saveTimer!==timer)return;
-      // Settles as persist() does: true once the board is durable here.
-      saveTimer=null;
-      // #2457: an Add's save that started after this edit and saved it, with
-      // nothing changed since it started, has saved this board. One still
-      // waiting for its frame will save the board as it is then, this edit
-      // included, so this waits for it instead of saving beside it.
-      const served=debounceServedBy;debounceServedBy=null;
-      const again=()=>deviceSaveLane.request({preserveBackupId}).done;
-      if(served?.timer===timer&&served.job&&afterFrameSave===served.job)return served.job.done.then(saved=>saved===true||again(),again);
-      if(served?.timer===timer&&!served.job&&served.generation===saveRequestGeneration&&served.edits===boardEditSerial)
-        return served.done.then(saved=>saved===true||again(),again);
-      return deviceSaveLane.request({preserveBackupId}).done;
-    },350));
-    saveTimer=timer;saveTimerBackupId=preserveBackupId;debounceServedBy=null;
-  }
+  else saveAfterDebounce(preserveBackupId);
+}
+/* An edit's device save, once no other edit has come for 350 ms.
+   #2484: an answer shown but not caught up yet (answerCatchUp.pending) is an
+   edit still coming, and its own catch-up asks for this save again once it
+   runs, after the frame that shows it. Started now, the save ran that
+   catch-up first (a device save holds every answer given) and then saved
+   the board: one long task in the middle of quick taps, and the next tap
+   was held (Chromium at 4x CPU, large signed-in board: 263-269 ms). So the
+   debounce waits again instead, and the saves of quick answers come
+   together, 350 ms after the last of them has caught up. Hiding the page
+   runs that catch-up at once, and with it the save it asks for. */
+function saveAfterDebounce(preserveBackupId){
+  const timer=countSyncTimer("save-debounce",setTimeout(()=>{
+    endSyncTimer(timer);
+    if(saveTimer!==timer)return;
+    if(answerCatchUp.pending()){
+      const served=debounceServedBy;saveAfterDebounce(preserveBackupId);
+      if(served?.timer===timer)debounceServedBy={...served,timer:saveTimer};
+      return;
+    }
+    // Settles as persist() does: true once the board is durable here.
+    saveTimer=null;
+    // #2457: an Add's save that started after this edit and saved it, with
+    // nothing changed since it started, has saved this board. One still
+    // waiting for its frame will save the board as it is then, this edit
+    // included, so this waits for it instead of saving beside it.
+    const served=debounceServedBy;debounceServedBy=null;
+    const again=()=>deviceSaveLane.request({preserveBackupId}).done;
+    if(served?.timer===timer&&served.job&&afterFrameSave===served.job)return served.job.done.then(saved=>saved===true||again(),again);
+    if(served?.timer===timer&&!served.job&&served.generation===saveRequestGeneration&&served.edits===boardEditSerial)
+      return served.done.then(saved=>saved===true||again(),again);
+    return deviceSaveLane.request({preserveBackupId}).done;
+  },350));
+  saveTimer=timer;saveTimerBackupId=preserveBackupId;debounceServedBy=null;
 }
 /* #2457: an Add's device save runs once the frame that draws the new task
    has painted, in this tab's one device-save lane (#2408), as an answer's
@@ -9060,7 +9076,25 @@ function acknowledgedDecisionBaseOffThread(){
   return Promise.race([decisionBaseIdentityOffThread(base.account,base.revision,base.payload),
     new Promise(resolve=>{timer=setTimeout(resolve,ACKNOWLEDGED_BASE_WORKER_WAIT_MS,null);})]).finally(()=>clearTimeout(timer));
 }
+/* #2484: every answer's gesture asks whether the acknowledged decision base
+   is valid (captureDecisionGesture), and the check parsed the base's whole
+   cloud copy twice: about 28 ms of each Yes before its card showed (Chromium
+   at 4x CPU, large signed-in board). A base is replaced, never changed in
+   place (bindDecisionBase), so its verdict is kept with the base object,
+   beside the account and revision it was asked about and the base's own
+   fields as they were then. Any other question, or a field changed since,
+   is checked in full again. */
+const decisionBaseVerdicts=new WeakMap();
 function validDecisionBase(base,account,revision){
+  if(!base||typeof base!=="object")return checkDecisionBase(base,account,revision);
+  const kept=decisionBaseVerdicts.get(base);
+  if(kept&&kept.account===account&&kept.revision===revision&&kept.v===base.v&&kept.id===base.id
+    &&kept.baseAccount===base.account&&kept.baseRevision===base.revision&&kept.payload===base.payload)return kept.valid;
+  const valid=checkDecisionBase(base,account,revision);
+  decisionBaseVerdicts.set(base,{account,revision,v:base.v,id:base.id,baseAccount:base.account,baseRevision:base.revision,payload:base.payload,valid});
+  return valid;
+}
+function checkDecisionBase(base,account,revision){
   if(!base || typeof base!=="object" || Array.isArray(base) || base.v!==1
     || typeof base.account!=="string" || !base.account || !Number.isSafeInteger(base.revision) || base.revision<0
     || typeof base.payload!=="string" || base.account!==account || base.revision!==revision
@@ -11297,7 +11331,9 @@ function captureUndoBoard(board,prior){
       for(let i=0;i<value.length;i++)rows[i]=JSON.stringify(value[i])??"null";
       part=reuseUndoRows(rows,earlier);
     }else{
-      part=JSON.stringify(value);
+      // #2484: the decision base holds a whole cloud copy, and its text is
+      // made once per base (decisionBaseText) instead of in every capture.
+      part=key==="decisionBase"&&value&&typeof value==="object"?decisionBaseText(value):JSON.stringify(value);
       if(part===undefined)continue;
       if(part===earlier)part=earlier;
     }
@@ -11320,8 +11356,13 @@ function sealTopUndoFrame(){
 function pushUndo(kind="ordinary"){
   // #2407: the next answer does not wait for the previous one's catch-up. Its
   // frame is sealed here, on the board that answer left, as before.
+  // #2484: nothing changes the board between that seal and this frame's own
+  // snapshot, so the copy the seal just made is the snapshot (a capture from
+  // it would return that very copy); taking it again was a second
+  // whole-board capture in the tap.
+  const top=undoStack.at(-1),sealedHere=!!top&&!top.after;
   sealTopUndoFrame();
-  undoStack.push({snapshot:captureUndoBoard(state,undoStack.at(-1)?.after), generation:chanceGeneration,kind});
+  undoStack.push({snapshot:sealedHere&&top.after?top.after:captureUndoBoard(state,undoStack.at(-1)?.after), generation:chanceGeneration,kind});
   if(undoStack.length > 30) undoStack.shift();
 }
 function scopedUndoState(frame){
