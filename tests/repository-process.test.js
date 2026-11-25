@@ -2379,7 +2379,10 @@ test('RISK repository process boundary: visual test requirements live in the ren
  assert.match(policy,/changed controls or layout.*rendered-evidence\.md/i,'the always-loaded instructions must still route changed controls or layout to the requirements');
  assert.match(policy,/computed color scheme and paint/i,'theme labels must not substitute for actual applied colors');assert.match(policy,/theme labels alone.*not.*coverage/i);
 });
-test('RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes',async t=>{
+// #2488: an explicit --base became the whole comparison, so the outgoing
+// upstream check is exercised on the default path and --base is checked to
+// leave the branch's last push alone.
+test('RISK repository process: preflight without --base catches outgoing upstream rationale gaps after the default base passes, and an explicit --base compares only with that base',async t=>{
  const os=await import('node:os'),fixture=fs.mkdtempSync(path.join(os.tmpdir(),'chain-preflight-outgoing-'));
  t.after(()=>fs.rmSync(fixture,{recursive:true,force:true}));
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
@@ -2401,11 +2404,16 @@ test('RISK repository process: preflight catches outgoing upstream rationale gap
  assert.equal(selectedGate.status,0,selectedGate.stderr);assert.equal(outgoingGate.status,1,outgoingGate.stderr);
  assert.match(outgoingGate.stderr,/without an exact-diff rationale/,'real existing rationale gate distinguishes the outgoing delta');
  const before={refs:git('show-ref'),head:git('rev-parse','HEAD'),status:git('status','--porcelain','--untracked-files=no'),config:git('config','--local','--list')};
- const result=run(path.join(__dirname,'scripts/agent-tools/preflight.mjs'),'--base',selectedBase),output=result.stdout+result.stderr;
+ const result=run(path.join(__dirname,'scripts/agent-tools/preflight.mjs')),output=result.stdout+result.stderr;
  assert.equal(result.status,1,`selected-base validation passed, but preflight must reject the missing outgoing rationale:\n${output}`);
  assert.match(output,/upstream/i,'failure identifies the outgoing upstream comparison');assert.match(output,/without an exact-diff rationale/);
  assert.equal((output.match(/^✔ Landscape location:/gm)||[]).length,1);assert.equal((output.match(/^✔ RISK Quick start content:/gm)||[]).length,1);
  assert.equal((output.match(/Test-first diff gate passed\./g)||[]).length,1,'selected-base rationale runs once before upstream rejects');
+ assert.match(output,new RegExp(`selected base, base ${selectedBase}`),'with no --base the selected comparison is the main merge base');
+ const explicit=run(path.join(__dirname,'scripts/agent-tools/preflight.mjs'),'--base',selectedBase),explicitOutput=explicit.stdout+explicit.stderr;
+ assert.equal(explicit.status,0,`an explicit --base is the only comparison, so the outgoing delta is not checked:\n${explicitOutput}`);
+ assert.doesNotMatch(explicitOutput,/upstream/i,'the branch last push is not compared when --base is given');
+ assert.equal((explicitOutput.match(/Test-first diff gate passed\./g)||[]).length,1,'the explicit base runs once');
  assert.deepEqual({refs:git('show-ref'),head:git('rev-parse','HEAD'),status:git('status','--porcelain','--untracked-files=no'),config:git('config','--local','--list')},before,'preflight preserves local refs, HEAD, tracked files and configuration');
 });
 
