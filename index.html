@@ -12309,7 +12309,15 @@ function recordDecisionTime(){
    rank refresh, a whole-board replacement, an export or the page hiding. The
    queue is sync work, so the Settled signal (#2378) waits for it, and the
    board is marked unsaved before the paint, so nothing shows it saved or
-   synced before the save and the Cloud acknowledgement happen. */
+   synced before the save and the Cloud acknowledgement happen.
+   #2484: "after the paint" was a zero-delay timer, which a browser may run
+   before the frame: with sync on, a large board's catch-up steps ran ahead
+   of the next card's frame, and the press guard (#2312) held quick taps made
+   while that card was not yet on the screen (Chromium at 4x CPU: the next
+   card a median 165-181 ms after the tap, 7 of 10 taps 200 ms apart counted).
+   Each answer's catch-up now starts in the task after the frame that shows
+   it (afterNextPaint), behind the press guard's own task for that frame, as
+   an Add's ranks wait. A flush still runs it at once, painted or not. */
 const RANK_PART_DRAWS=16384;
 /* #2455 review: true while the app handles a person's press, a click, key or
    paste that reaches the document. An Add, an import, a Delete and an editor
@@ -12378,7 +12386,8 @@ const answerCatchUp=(()=>{
     const ranked=!!(answer.before||answer.ranking);
     answer.after=ranked?captureRatingInputs(answer.ids):null;
     answer.frame=undoStack.at(-1)||null;
-    Object.assign(answer,{save:doSave,immediate:!!immediate,deferRanks,steps:[seal,store,draw]});
+    // #2484: painted once the frame that shows this answer has run.
+    Object.assign(answer,{save:doSave,immediate:!!immediate,deferRanks,steps:[seal,store,draw],painted:false});
     if(ranked){answer.steps.unshift(ratings);takeOverRanks(answer);}
     queue.push(answer);
     if(!work)work=trackSyncWork("answer-catch-up");
@@ -12388,7 +12397,7 @@ const answerCatchUp=(()=>{
     listRowBuilds.answered(answer.kind,answer.ids);
     listRanksDeferred=deferRanks;listRowsReuse=LIST_ROWS_ANSWER;
     try{render();}finally{listRanksDeferred=false;listRowsReuse=null;}
-    schedule();
+    afterNextPaint(()=>{answer.painted=true;schedule();});
   }
   /* #2455 review: an Add, an import or a Delete changes which tasks are open
      but moves no rating and records no History, so only its ranks catch up:
@@ -12441,8 +12450,9 @@ const answerCatchUp=(()=>{
     };
     answer.steps.unshift(earlierRanks);
   }
-  // The entry a step runs next: ranks wait for their frame.
-  const runnable=entry=>!entry.ranksOnly||entry.painted;
+  // The entry a step runs next: each waits for the frame that shows it, an
+  // Add's ranks and (#2484) an answer's catch-up alike.
+  const runnable=entry=>entry.painted;
   function runStep(answer){
     const next=answer.steps.shift();
     try{next(answer);}finally{if(!answer.steps.length){const index=queue.indexOf(answer);if(index>=0)queue.splice(index,1);}}
