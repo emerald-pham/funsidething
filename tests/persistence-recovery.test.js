@@ -21502,3 +21502,73 @@ test('RISK scanner press guard (#2481): signed in on the large board, ten Yes ta
  for(const id of [...answered,tapped])assert.equal(decisionsAbout2417(cloud,[id]).length,decisionsAbout2417(opened,[id]).length+1,'the cloud holds one new answer about '+id);
  assert.ok(answered.every(id=>cloud.chain.includes(id))&&cloud.chain.includes(tapped),'and its chain holds every dotted candidate');
 });
+
+// ---------- #2486: quick Done taps, and the press guard's remaining gaps ----------
+// A quick second tap reaches the page as a click with detail 2: Chromium gave
+// detail 2 for two touch taps 243 ms apart, and any mouse click inside the
+// OS double-click interval has it too. Before #2486 a Done click with detail 2
+// was dropped before the guard, with no dim.
+function clickWithDetail2486(device,guard,act,detail,{at=guard.now()}={}){
+ const target=guard.button(act);
+ device.shim.document.dispatchEvent({type:'click',detail,isTrusted:true,timeStamp:at,target});
+ return target;
+}
+const doneTasks2486=ctx=>ctx.state.tasks.filter(task=>task.done).map(task=>task.id).sort();
+
+test('RISK scanner press guard (#2486): on the large board, two Done taps on the candidate 200 ms apart, the second with click detail 2, each complete the candidate shown, while a 40 ms pair completes one and dims the second',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,guard=pressGuard2461(device);
+ guard.paint();await clock.advance(1000);
+ const first=ctx.state.candidateId,doneBefore=doneTasks2486(ctx);
+ clickWithDetail2486(device,guard,'cand-done',1);
+ assert.deepEqual(doneTasks2486(ctx),[...doneBefore,first].sort(),'positive control: the first Done completes the candidate it landed on');
+ const second=ctx.state.candidateId;assert.ok(second&&second!==first,'positive control: a new candidate is drawn');
+ // The new card paints 70 ms after the tap, as on this board; the second tap
+ // comes 200 ms after the first, a deliberate rhythm.
+ await clock.advance(70);guard.paint();await clock.advance(130);
+ const quick=clickWithDetail2486(device,guard,'cand-done',2);
+ assert.ok(!quick.classList.contains('held'),'a Done 200 ms after the last one, with detail 2, is not held');
+ assert.deepEqual(doneTasks2486(ctx),[...doneBefore,first,second].sort(),'and completes the candidate shown');
+ // A double tap: the second tap lands 40 ms after the first, after the new card painted.
+ const third=ctx.state.candidateId;assert.ok(third&&third!==second,'positive control: the next candidate is drawn');
+ await clock.advance(70);guard.paint();await clock.advance(1000);
+ clickWithDetail2486(device,guard,'cand-done',1);
+ const fourth=ctx.state.candidateId;
+ await clock.advance(20);guard.paint();await clock.advance(20);
+ const shown=answeredState2461(ctx);
+ const double=clickWithDetail2486(device,guard,'cand-done',2);
+ assert.deepEqual(doneTasks2486(ctx),[...doneBefore,first,second,third].sort(),'the double tap completes only the candidate its first tap landed on');
+ assert.equal(ctx.state.candidateId,fourth,'and leaves the next candidate showing');
+ assert.deepEqual(answeredState2461(ctx),shown,'its second tap changes nothing');
+ assert.ok(double.classList.contains('held'),'and Done shows that the second tap was held');
+});
+
+test('RISK scanner press guard (#2486): on the large board, two Done taps on the dotted task 200 ms apart, the second with click detail 2, each complete the dotted task shown, while a 40 ms pair completes one and dims the second',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,guard=pressGuard2461(device);
+ guard.paint();await clock.advance(1000);
+ // Three Yes answers, a second apart, give the chain dots to complete.
+ for(let i=0;i<3;i++){guard.press('yes');await clock.advance(70);guard.paint();await clock.advance(930);}
+ assert.ok(ctx.state.chain.length>=5,'positive control: the chain holds five dots: '+ctx.state.chain.length);
+ const doneBefore=doneTasks2486(ctx),first=ctx.state.chain.at(-1);
+ clickWithDetail2486(device,guard,'bench-done',1);
+ assert.deepEqual(doneTasks2486(ctx),[...doneBefore,first].sort(),'positive control: the first Done completes the dotted task it landed on');
+ const second=ctx.state.chain.at(-1);assert.ok(second&&second!==first,'positive control: the dot before it is now the dotted task');
+ await clock.advance(70);guard.paint();await clock.advance(130);
+ const quick=clickWithDetail2486(device,guard,'bench-done',2);
+ assert.ok(!quick.classList.contains('held'),'a Done 200 ms after the last one, with detail 2, is not held');
+ assert.deepEqual(doneTasks2486(ctx),[...doneBefore,first,second].sort(),'and completes the dotted task shown');
+ const third=ctx.state.chain.at(-1);
+ await clock.advance(70);guard.paint();await clock.advance(1000);
+ clickWithDetail2486(device,guard,'bench-done',1);
+ await clock.advance(20);guard.paint();await clock.advance(20);
+ const shown=answeredState2461(ctx);
+ const double=clickWithDetail2486(device,guard,'bench-done',2);
+ assert.deepEqual(doneTasks2486(ctx),[...doneBefore,first,second,third].sort(),'the double tap completes only the dotted task its first tap landed on');
+ assert.deepEqual(answeredState2461(ctx),shown,'its second tap changes nothing');
+ assert.ok(double.classList.contains('held'),'and Done shows that the second tap was held');
+});

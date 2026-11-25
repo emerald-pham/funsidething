@@ -22958,8 +22958,13 @@ document.addEventListener("click", e=>{
   if(back){ closeModal(); return; }
   const el = e.target.closest("[data-act]");
   if(!el) return;
-  // The second physical click can land on the replacement card at the same spot.
-  if(e.detail>1 && ["cand-done","bench-done","done-task"].includes(el.dataset.act)) return;
+  // The editor's Done closes its pane, so a second click of a double-click
+  // can only land on another pane's Done. #2486: the scanner's Done buttons
+  // are timed by the press guard below instead, like Yes and No: Chromium
+  // gives detail 2 to touch taps 243 ms apart and a mouse to any click inside
+  // the double-click interval, so detail dropped deliberate quick taps
+  // silently, while the guard holds a double tap and dims it.
+  if(e.detail>1 && el.dataset.act==="done-task") return;
   if(SCANNER_TASK_ACTIONS.has(el.dataset.act)){
     const at=pressedAt(e);
     if(answerBeforeCandidateCouldBeRead(at)){acknowledgeHeldPress(el.dataset.act,el);return;}
