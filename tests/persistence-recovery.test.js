@@ -21762,12 +21762,14 @@ test('RISK scanner press guard (#2486): signed in on the large board, after a Ye
 // the clock stands still while the app works, so the app's work from the tap
 // to the frame that first shows the card it drew is read on this process's
 // own clock. Measured 2026-11-25 on one machine, the builds interleaved:
-// that work took a median 110 ms here on the build before #2484 and 28 ms
+// that work took a median 110 ms here on the build before #2484 and 29 ms
 // with it, and Chromium at 4x CPU, through #2481's harness, put the next card
-// on the screen a median 165–181 ms and 86–87 ms after the tap. The rest of
-// the browser's figure, about 60 ms on both builds, is the browser's own
-// share of a tap: the touch's delivery, drawing the frame and the task after
-// it. So the tap to the next card is the app's work here plus that share.
+// on the screen a median 165–181 ms and 86–90 ms after the tap (three batches
+// of 30 taps each). The rest of the browser's figure, about 60 ms on both
+// builds, is the browser's own share of a tap: the touch's delivery (that
+// harness stamps each touch 22 ms before sending it), drawing the frame and
+// the task after it. So the tap to the next card is the app's work here plus
+// that share.
 const BROWSER_SHARE_MS2484=60;
 // The app's work from each tap until the frame that first shows the card it
 // drew (the press guard's own frame callback), with everything the app runs
@@ -21803,9 +21805,6 @@ test('RISK answer shows first (#2484): signed in on the large board, ten Yes tap
  assert.ok(median<=150,'the next card shows a median '+median+' ms after the tap, at most 150 ms: '+JSON.stringify(shown));
 });
 
-// A frame that comes late: the page was busy. Each Yes here is tapped once
-// the card before it shows, and its own card's frame comes 150 ms later. The
-// frames run when the test says, as in pressGuard2461.
 // What an answer's catch-up writes, as the person or a support report sees
 // it: History rows of the answered tasks, draws of the rank sampling (the
 // app's seeded random source, counted without changing it), its change
@@ -21821,6 +21820,9 @@ function catchUpTrail2484(device){
  return {mark:ids=>({histories:ids.map(history),draws:counts.draws,rows:counts.rows,sent:counts.sent,commits:counters.commits.length,uploads:counters.uploads.length}),history};
 }
 
+// A frame that comes late: the page was busy. Each Yes here is tapped once
+// the card before it shows, and its own card's frame comes 150 ms later. The
+// frames run when the test says, as in pressGuard2461.
 test('RISK answer shows first (#2484): signed in on the large board, each of ten Yes taps whose next card’s frame comes late shows that card before any of the answer’s History, rank sampling, change record or save, which then catch up',{timeout:600000},async t=>{
  const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
  const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
