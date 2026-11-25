@@ -58,6 +58,7 @@ import { openApp } from "./shared.js"; // #2378 app driver
 import { rewriteGenerationFixture } from "./shared.js";
 import { coldRelaunch2198 } from "./shared.js";
 import { appFixtureScope } from "./shared.js";
+import { scannerDataAttributeLayoutRules } from "./shared.js"; // #2480
 import { woopFields2421, woopBoard2421, woopSnapshot2421 } from "./shared.js"; // #2421 saved WOOP data
 import { backupRowsWithText } from "./shared.js";
 import { releaseKnownCloudCopy2377 } from "./shared.js";
@@ -14938,6 +14939,38 @@ test("UI: the header carries the title alone, without the tagline", () => {
   assert.ok(!/ranked FVP — dot, compare, execute/.test(html), "the tagline should be gone from the header");
   assert.ok(!/class="sub"/.test(html), "and its span with it");
   assert.match(html, /<h1>Chain Scanner<\/h1>/, "the title itself stays");
+});
+
+// #2480: the saved view kept from the last session keeps classes but drops
+// data-* attributes, so a layout rule that selects on one renders the scanner
+// differently before and after the app loads. #2460's hidden hint glyph, picked
+// by data-act, left the saved scanner up to 117 px shorter than live. The
+// scanner's classes come from its own rendered markup in each state it shows.
+test('RISK scanner styles: no layout rule under the scanner selects on a data-* attribute, which the saved view drops, so the scanner lays out alike before and after the app loads',async()=>{
+ const {ctx,shim}=await loadApp({seed:2480});
+ ctx.state.settings.showPostpone=true;
+ const markup=[];
+ addTaskAged(ctx,'Oldest',900000);addTaskAged(ctx,'Middle',500000);addTaskAged(ctx,'Newest',1000);
+ markup.push(scanHtmlOf(ctx,shim));
+ ctx.startScan('descending');markup.push(scanHtmlOf(ctx,shim));
+ ctx.decide('yes');markup.push(scanHtmlOf(ctx,shim));
+ ctx.onAction('start-working',{});markup.push(scanHtmlOf(ctx,shim));
+ assert.ok(markup.some(h=>/class="card cand"/.test(h))&&markup.some(h=>/class="siderail/.test(h))&&markup.some(h=>/class="actionrow/.test(h)),'positive control: the scanner showed the candidate and both action rows');
+ // #scan sits in the shell's .wrap, which the saved view copies too.
+ const classes=new Set(['wrap',...markup.flatMap(h=>[...h.matchAll(/class="([^"]*)"/g)].flatMap(m=>m[1].split(/\s+/)))].filter(Boolean));
+ assert.deepEqual(scannerDataAttributeLayoutRules(styleSrc,classes),[],'no scanner layout rule selects on a data-* attribute; style by class instead');
+ // The check sees a layout rule added under the scanner, in a media query too,
+ // and #2460's own data-act glyph rule.
+ const flagged=extra=>scannerDataAttributeLayoutRules(styleSrc+'\n'+extra,classes);
+ assert.deepEqual(flagged('.siderail .btn.sm[data-act="cand-done"]{padding-inline-end:20px}'),['.siderail .btn.sm[data-act="cand-done"] { padding-inline-end }']);
+ assert.deepEqual(flagged('@media (min-width:768px){.decide>[data-act=yes]{margin:0;color:red}}'),['.decide>[data-act=yes] { margin }']);
+ assert.deepEqual(flagged('.btn.sm[data-act$="done"]:has(> .keyhint)::before{content:"d";content:"d"/""}'),['.btn.sm[data-act$="done"]:has(> .keyhint)::before { content }']);
+ assert.deepEqual(flagged('[data-act="edit"]{font-size:20px}'),['[data-act="edit"] { font-size }'],'a bare data-* selector reaches scanner buttons too');
+ // Paint alone can't move anything, and a rule scoped outside the scanner
+ // never meets the saved scanner.
+ assert.deepEqual(flagged('.btn.sm[data-act="edit"]{color:red;opacity:.5;background:var(--line)}'),[]);
+ assert.deepEqual(flagged('#modalRoot .x[data-act="cancel-file-restore"]{padding:4px}'),[]);
+ assert.deepEqual(flagged('.help-faq[data-help-changelog] .kv{margin:0}'),[]);
 });
 
 test("CSS: the retired .sub style is gone too", () => {
