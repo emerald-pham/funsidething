@@ -210,12 +210,20 @@ function onlyReleaseBookkeeping(base,file){
 }
 
 if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
-  const base=process.argv[2];
-  if(!base || !/^[0-9a-f]{40}$/.test(base)){
-    process.stderr.write('Pass the 40-character base commit SHA.\n');process.exitCode=2;
-  }else if(/^0+$/.test(base)){
+  const requested=process.argv[2];
+  // Any ref (origin/main, a branch, a short SHA) resolves to its full commit
+  // SHA, which the gate reports so the record names what it compared (#2469).
+  // Agents used to look origin/main's SHA up by hand first.
+  const resolveBase=ref=>{try{return execFileSync('git',['rev-parse','--verify','--quiet','--end-of-options',`${ref}^{commit}`],{encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim();}catch{return null;}};
+  let base=null;
+  if(!requested){
+    process.stderr.write('Pass the base commit: a ref such as origin/main, or a commit SHA.\n');process.exitCode=2;
+  }else if(/^0{40}$/.test(requested)){
     process.stderr.write('A zero base SHA has no commit to compare. Resolve the base against the default branch before running the gate.\n');process.exitCode=2;
+  }else if(!(base=resolveBase(requested))){
+    process.stderr.write(`Could not resolve ${requested} to a commit. Fetch it, or pass a ref or SHA this checkout has.\n`);process.exitCode=2;
   }else{
+    process.stdout.write(`Test-first gate base: ${base}${requested===base?'':` (${requested})`}.\n`);
     try{
       const uncommitted=uncommittedGateFiles(execFileSync('git',['status','--porcelain=v1','-z','--untracked-files=all'],{encoding:'utf8',maxBuffer:64*1024*1024}).split('\0'));
       if(uncommitted.length){
