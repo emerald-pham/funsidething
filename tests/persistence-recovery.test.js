@@ -21614,3 +21614,32 @@ test('RISK scanner press guard (#2486): on the large board, after a Yes that act
  assert.deepEqual([...ctx.state.chain],[...before.chain,second],'a Yes once the frame finished answers the candidate it shows');
  assert.equal(ctx.state.decisionEvents.length,before.decisions+1,'with one decision');
 });
+
+// #2481 asks deliberate taps 150 ms and more apart to count (ten in two
+// seconds); a double tap's second tap comes sooner (the #2312 browser pair
+// measured 126–143 ms in the app at 1x). The line is pinned from both sides,
+// by click and by key, on a card that painted long before.
+test('RISK scanner press guard (#2486): a press 149 ms after the last one that acted is held as a double tap and one 150 ms after counts, by touch click and by key',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,guard=pressGuard2461(device);
+ guard.paint();await clock.advance(1000);
+ for(const [label,first,second] of [['touch click',()=>guard.press('yes'),()=>guard.press('yes')],['key',()=>guard.key('n'),()=>guard.key('y')]]){
+  const answered=ctx.state.candidateId,decisions=ctx.state.decisionEvents.length;
+  first();
+  assert.equal(ctx.state.decisionEvents.length,decisions+1,label+': positive control: the first press answers');
+  const next=ctx.state.candidateId;assert.ok(next&&next!==answered,label+': positive control: a new candidate is drawn');
+  // Its card paints 10 ms later, as on a small board.
+  await clock.advance(10);guard.paint();await clock.advance(139);
+  const shown=answeredState2461(ctx);
+  second();
+  assert.deepEqual(answeredState2461(ctx),shown,label+': a press 149 ms after the last one that acted is held and changes nothing');
+  await clock.advance(1);
+  const before=answeredState2461(ctx);
+  second();
+  assert.equal(ctx.state.decisionEvents.length,before.decisions+1,label+': a press 150 ms after it counts');
+  assert.ok(ctx.state.chain.includes(next),label+': and its Yes dots the candidate shown');
+  await clock.advance(10);guard.paint();await clock.advance(1000);
+ }
+});
