@@ -24977,5 +24977,28 @@
       "command": "node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <git-common-dir>/agent-test-runs/issue-2481 --purpose preimplementation-red --summary -- node --test --test-name-pattern=2481 tests/persistence-recovery.test.js",
       "failure": "Record 2026-11-25T01-16-37-620Z-3f544407 on 15a8bc80 before the guard change: 'RISK scanner press guard (#2481): on the large board with sync off, ten Yes taps ...' failed with 'steady 200 ms: every one of ten Yes taps records one answer', recorded [1,0,1,0,1,0,...]: every other tap held. Later baseline sensitivity, record 2026-11-25T01-20-50-445Z-3c14cc15 (main's index.html with this diff's tests): the sync-off and sync-on #2481 tests and the 120/150 ms round-2 test fail ('a Yes 150 ms after the last one that acted is not held'), while the four reworked #2461 tests pass on main. Changelog RED: record 2026-11-25T01-23-02-611Z-8753e0b6, 'the newest release comes first'."
     }
+  },
+  {
+    "baseCommit": "2b6a089fb97e79a41d66191c8cf75665591c2c7b",
+    "weakenedTestLines": [
+      "tests/core.test.js:-assert.ok(Math.abs(line.at(-1).right-row.contentRight)<=1,`${label}: every line ends at the row's right edge: ${line.map(b=>b.act+'@'+b.right.toFixed(1)).join(', ')} vs ${row.contentRight.toFixed(1)}`);",
+      "tests/core.test.js:-return {buttons,contentRight:rr.right-parseFloat(rs.paddingRight),opacity:+rs.opacity};",
+      "tests/shared.js:-const actionRowRects=root=>[...root.querySelectorAll('.siderail > button,.actionrow > button')].map(button=>{const r=button.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};});"
+    ],
+    "reason": "#2482 (owner request, 2026-11-25: \"I would like those recently fixed buttons left justified\"). The #2460 action-row parity test pinned the old right alignment: it required every line of the dotted task's and the candidate's action rows to end at the row's right edge. The owner asked for both rows to line up on the left instead, so that one assertion now requires every line, wrapped lines too, to start at the row's left edge, and its row reader also reports the row's left content edge. The saved-view helper actionRowRects gains each action's row index and that row's left content edge so the saved copy can be checked the same way; its existing x, y, width and height fields are unchanged.",
+    "previousBehavior": "Both action rows (.actionrow under the dotted task, .siderail under the candidate) used justify-content:flex-end, so each line, including a wrapped second line, was pushed to the row's right edge, and the parity test asserted that.",
+    "intendedBehavior": "Both rows share justify-content:flex-start: every line of each row, wrapped lines included, starts at the row's left edge, live and in the saved view, in Chromium and WebKit at every width and text size the parity test covers. Line breaks are unchanged (justify-content does not affect where a flex row wraps).",
+    "replacementTests": [
+      "RISK saved view invisible active scanner: every line of the actions under the dotted task and the candidate, wrapped ones too, starts at its row's left edge in the saved view as live, on a phone with the rows at 200% text and at tablet and desktop width"
+    ],
+    "preservedCoverage": [
+      "The #2460 parity test keeps every other assertion: same width, height, type, radius and colours for each shared action in both rows whichever card the hints sit on, Delete last and at the end of the last line, one top per line, equal gaps, both rows ending at one right edge (row boxes still share their extent), dimming, accessible names, no overflow, theme attribute, computed scheme and paint, across its 10 views, web fonts loaded and blocked, Chromium and WebKit.",
+      "The #2460 saved-view geometry test is unchanged and still requires every action's x, y, width and height and the scanner height in the saved view to match live within 1 px; actionRowRects only adds fields.",
+      "The #2460 hint test (a key hint never widens an action, label centred, candidate row one line on 412-430 px phones) is unchanged and green."
+    ],
+    "redEvidence": {
+      "command": "LANDSCAPE_BROWSER_URL=<served candidate> node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <git-common-dir>/agent-test-runs/issue-2482 --purpose preimplementation-red --summary -- node --test --test-name-pattern \"share one alignment and keep Delete last\" --test-name-pattern \"action rows keep their live geometry\" tests/core.test.js",
+      "failure": "Record 2026-11-25T04-52-18-829Z-bce9c442 on 2b6a089f before the CSS change: the parity test failed in all 40 Chromium and WebKit cases, e.g. \"chromium common phone with web fonts light, candidate listening: dotted task's row: every line starts at the row's left edge: bench-done@94.5, edit@173.4, worked@245.4 vs 27.0\"; the saved-view check (then inside the geometry test) failed at 375 px 200% text (81.0 vs 27.0 px), 768 px (187.1 vs 37.0) and 1100 px (353.1 vs 203.0). The check then moved into its own RISK test; later-baseline-sensitivity record 2026-11-25T05-01-08-594Z-16cfffd7 (this diff's tests against a served copy of main) fails it for both the saved and live copies at all three sizes. GREEN record 2026-11-25T05-01-19-821Z-1f01b178."
+    }
   }
 ]

@@ -586,6 +586,11 @@
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
     {
+      "root": "RISK saved view invisible active scanner: every line of the actions under the dotted task and the candidate, wrapped ones too, starts at its row's left edge in the saved view as live, on a phone with the rows at 200% text and at tablet and desktop width",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
       "root": "RISK FAQs menu browser: Chromium and WebKit show every section closed on each open and each section still opens and closes by pointer and keyboard",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."

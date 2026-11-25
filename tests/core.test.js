@@ -17127,6 +17127,35 @@ test('RISK saved view invisible active scanner: the action rows keep their live 
  assert.deepEqual(failures,[]);
 });
 
+// #2482: the action rows line up on the left, as asked on 2026-11-25. The saved
+// view, the copy of the screen shown before the app loads, keeps the rows'
+// classes but not their data-* attributes (#2460), so it has to start every
+// line at the left edge too, or the buttons would jump sideways as it loads.
+test("RISK saved view invisible active scanner: every line of the actions under the dotted task and the candidate, wrapped ones too, starts at its row's left edge in the saved view as live, on a phone with the rows at 200% text and at tablet and desktop width",{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [name,viewport,initStyle] of [['375 px phone, rows at 200% text',{width:375,height:812},SAVED_VIEW_ENLARGED_ROWS],['768 px tablet',{width:768,height:1024},''],['1100 px desktop',{width:1100,height:1000},'']]){
+  const view=await invisibleSavedViewBrowser('light',false,false,viewport,true,{initStyle,actionRows:true});
+  try{
+   assert.equal(view.early.settled,false,`${name}: the local read is still pending, so the saved view is what shows`);
+   // The saved copy is checked first and on its own, so its result is seen whatever live does.
+   for(const [copy,actions] of [['saved',view.early.actionRows],['live',view.before.actionRows]])try{
+    const rows=[...new Set(actions.map(a=>a.row))];
+    assert.equal(rows.length,2,`${name}: ${copy}: positive control: both action rows are measured: ${actions.length} actions in ${rows.length} rows`);
+    for(const row of rows){
+     const inRow=actions.filter(a=>a.row===row),tops=[...new Set(inRow.map(a=>Math.round(a.y)))].sort((a,b)=>a-b);
+     for(const top of tops){
+      const first=inRow.filter(a=>Math.abs(Math.round(a.y)-top)<=1).sort((a,b)=>a.x-b.x)[0];
+      assert.ok(Math.abs(first.x-first.rowLeft)<=1,`${name}: ${copy} row ${row}, line ${tops.indexOf(top)+1} of ${tops.length}, starts at the row's left edge: ${first.x.toFixed(1)} vs ${first.rowLeft.toFixed(1)} px`);
+     }
+    }
+   }catch(error){failures.push(error.message.split('\n')[0]);}
+   if(name.startsWith('375'))assert.ok(new Set(view.early.actionRows.map(a=>Math.round(a.y))).size>2,`${name}: positive control: at 200% text the saved rows wrap, so a wrapped line is checked`);
+   assert.deepEqual(view.errors,[],`${name}: no page errors`);
+  }catch(error){failures.push(error.message.split('\n')[0]);}finally{await view.browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
 test('RISK saved view invisible large window: a tall viewport retains all visible rows with bounded projection work',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const view=await invisibleSavedViewBrowser('light',false,false,{width:1280,height:2160});
  try{
@@ -24575,6 +24604,8 @@ test('RISK steady scanner browser: Yes No and Cant share one width and no scanne
 // changed width as its key hint moved between cards. Each row is found by its
 // card, not its class: the actions under both cards must look like one family,
 // whichever card the keys act on, with Delete last in each row.
+// #2482: both rows line up on the left, as asked on 2026-11-25, so every line
+// of each row, wrapped ones too, starts at the row's left edge.
 const STEADY_SHARED_ACTIONS=[['Done','bench-done','cand-done'],['Edit','edit','edit'],['Worked on it','worked','cand-worked'],['Delete','delete-task','delete-task']];
 test('RISK steady scanner browser: the actions under the dotted task and the candidate match in size type and colour whichever card the key hints sit on, share one alignment and keep Delete last, across phone enlarged short-landscape tablet and desktop views in day and night with web fonts and blocked in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[];
@@ -24587,7 +24618,7 @@ test('RISK steady scanner browser: the actions under the dotted task and the can
     return {act:el.dataset.act,width:r.width,height:r.height,left:r.left,right:r.right,top:r.top,fontSize:s.fontSize,fontWeight:s.fontWeight,fontFamily:s.fontFamily,radius:s.borderTopLeftRadius,background:s.backgroundColor,color:s.color,
      hints:[...el.querySelectorAll('.keyhint')].map(h=>({text:h.textContent,shown:getComputedStyle(h).visibility==='visible'&&h.getClientRects().length>0,ariaHidden:!!h.closest('[aria-hidden="true"]')}))};
    });
-   return {buttons,contentRight:rr.right-parseFloat(rs.paddingRight),opacity:+rs.opacity};
+   return {buttons,contentLeft:rr.left+parseFloat(rs.borderLeftWidth)+parseFloat(rs.paddingLeft),contentRight:rr.right-parseFloat(rs.paddingRight),opacity:+rs.opacity};
   };
   const root=document.documentElement;
   return {bench:rowAfter('.card.bench'),cand:rowAfter('.card.cand'),theme:root.dataset.theme,scheme:getComputedStyle(root).colorScheme,paint:getComputedStyle(document.getElementById('scan')).backgroundColor,mode:state.mode,viewportWidth:innerWidth,overflow:root.scrollWidth-innerWidth};
@@ -24605,7 +24636,7 @@ test('RISK steady scanner browser: the actions under the dotted task and the can
   const rows=lines(row),last=rows.at(-1);
   assert.equal(last.at(-1).act,'delete-task',`${label}: Delete sits at the end of the last line`);
   for(const line of rows){
-   assert.ok(Math.abs(line.at(-1).right-row.contentRight)<=1,`${label}: every line ends at the row's right edge: ${line.map(b=>b.act+'@'+b.right.toFixed(1)).join(', ')} vs ${row.contentRight.toFixed(1)}`);
+   assert.ok(Math.abs(line[0].left-row.contentLeft)<=1,`${label}: every line starts at the row's left edge: ${line.map(b=>b.act+'@'+b.left.toFixed(1)).join(', ')} vs ${row.contentLeft.toFixed(1)}`);
    assert.ok(Math.max(...line.map(b=>b.top))-Math.min(...line.map(b=>b.top))<=1,`${label}: a line's buttons share one top`);
   }
   return rows;
@@ -24659,6 +24690,7 @@ test('RISK steady scanner browser: the actions under the dotted task and the can
       for(const b of [...seen.bench.buttons,...seen.cand.buttons])for(const h of b.hints)if(!h.shown)assert.equal(h.ariaHidden,true,`${tl}: ${b.act}'s unshown ${h.text} hint is kept out of the accessibility tree`);
       const benchLines=checkRow(`${tl}: dotted task's row`,seen.bench),candLines=checkRow(`${tl}: candidate's row`,seen.cand);
       assert.ok(Math.abs(seen.bench.contentRight-seen.cand.contentRight)<=1,`${tl}: both rows end at one right edge: ${seen.bench.contentRight.toFixed(1)} vs ${seen.cand.contentRight.toFixed(1)}`);
+      assert.ok(Math.abs(seen.bench.contentLeft-seen.cand.contentLeft)<=1,`${tl}: both rows start at one left edge: ${seen.bench.contentLeft.toFixed(1)} vs ${seen.cand.contentLeft.toFixed(1)}`);
       const allGaps=[...gaps(benchLines),...gaps(candLines)];
       if(allGaps.length)assert.ok(Math.max(...allGaps)-Math.min(...allGaps)<=1,`${tl}: both rows space their buttons alike: ${allGaps.map(g=>g.toFixed(1)).join(', ')}`);
       assert.ok(seen.overflow<=0,`${tl}: no sideways page overflow: ${seen.overflow}`);
