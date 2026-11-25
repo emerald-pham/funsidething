@@ -25133,5 +25133,53 @@
       "command": "LANDSCAPE_BROWSER_URL=<served worktree> node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <git-common-dir>/agent-test-runs/issue-2486 --purpose preimplementation-red -- node --test --test-name-pattern=\"a double tap or a repeated key answers only\" tests/core.test.js",
       "failure": "Record 2026-11-25T10-28-21-234Z-0b9f7a01 (the Chromium 6x CPU rounds added, taps still Playwright's): \"chromium at 6x CPU two touch taps 120 ms apart: only the task on screen was answered: steady-2,steady-3\". GREEN record 2026-11-25T10-28-53-964Z-d4f3b848 after the touches carried their own timestamps; the test then passed 3 of 3 runs with 22 busy processes on the 11-core host. Help: preimplementation-red record 2026-11-25T10-34-08-154Z-51bd5d60 failed the #2481 changelog test on the new Help sentence (\"Help says a Yes or No on your own next task waits only for it to show\") and the new #2486 changelog test on its missing Done bullet, before index.html changed; GREEN record 2026-11-25T10-34-28-449Z-efce13c3 (224 text and guard tests, 223 pass, 1 env-gated skip)."
     }
+  },
+  {
+    "baseCommit": "49c89b54e57cc601307e18a091097ddf8c070f5c",
+    "weakenedTestLines": [
+      "tests/core.test.js:-assert.match(answer,/After your own Yes or No brings up the next task, a Yes or No counts once it shows/,'Help says a Yes or No on your own next task waits only for it to show');",
+      "tests/core.test.js:-await page.evaluate(()=>{window.steadyPresses=[];document.addEventListener('click',event=>steadyPresses.push({act:event.target.closest?.('[data-act]')?.dataset.act,candidate:state.candidateId}),true);});",
+      "tests/core.test.js:-const STEADY_DOUBLE_TEXT=STEADY_ENLARGED_TEXT.replace('.btn{font-size:21px','.btn{font-size:28px');",
+      "tests/core.test.js:-const STEADY_ENLARGED_TEXT='.btn{font-size:21px!important}.crumbs{font-size:19px!important}.card .title{font-size:23px!important}.qline{font-size:28px!important}';",
+      "tests/core.test.js:-const label=`${engineName} ${input}`,touch=input.includes('touch');",
+      "tests/core.test.js:-for(const input of ['two touch taps 60 ms apart','two touch taps 120 ms apart','mouse double click','two key presses']){",
+      "tests/core.test.js:-fs.mkdirSync(path.join(profile,'Default'));",
+      "tests/core.test.js:-fs.writeFileSync(path.join(profile,'Default','Preferences'),JSON.stringify({webkit:{webprefs:{minimum_font_size:spec.chromeMinimum,minimum_logical_font_size:spec.chromeMinimum}}}));",
+      "tests/core.test.js:-host={newContext:options=>engine.launchPersistentContext(profile,{...options,headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chromium'})};",
+      "tests/core.test.js:-if(spec.chromeMinimum){",
+      "tests/core.test.js:-if(spec.enlarged)await page.addStyleTag({content:STEADY_ENLARGED_TEXT});",
+      "tests/core.test.js:-if(spec.enlarged)await page.addStyleTag({content:spec.doubleText?STEADY_DOUBLE_TEXT:STEADY_ENLARGED_TEXT});",
+      "tests/core.test.js:-if(spec.enlarged)await page.addStyleTag({content:spec.doubleText?STEADY_DOUBLE_TEXT:STEADY_ENLARGED_TEXT});",
+      "tests/core.test.js:-if(view.enlarged)await page.addStyleTag({content:STEADY_ENLARGED_TEXT});",
+      "tests/core.test.js:-profile=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'hint-minimum-font-2460-'));",
+      "tests/core.test.js:-test('RISK steady scanner browser: a double tap or a repeated key answers only the shown task and the next answer after the window is accepted in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{",
+      "tests/core.test.js:-}",
+      "tests/persistence-recovery.test.js:-assert.ok(cloud.tasks.some(task=>task.title==='Added on the release'),'and syncs it');",
+      "tests/persistence-recovery.test.js:-cloud=JSON.parse((await backend.CS.pull()).payload);",
+      "tests/repository-process.test.js:-const result=run(path.join(__dirname,'scripts/agent-tools/preflight.mjs'),'--base',selectedBase),output=result.stdout+result.stderr;",
+      "tests/repository-process.test.js:-test('RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes',async t=>{"
+    ],
+    "reason": "Integration branch integration/slice-2026-11-25 (PR #2490) after merging #2486: one entry must cover every weakened line of the branch diff against main. It combines the two entries just above unchanged in substance: the integration entry (the #2480 fixture lines, the #2488 preflight lines, and the backward-compatibility poll that now treats a payload-less cloud read as not yet) and the #2486 entry (the steady-scanner double-tap browser test now sends stamped touches and is renamed for its 6x CPU rounds, and the #2481 changelog test now expects Help to name Yes, No or Done). See those entries for each line’s reason.",
+    "previousBehavior": "As described in the two entries above: fixed-px enlarged-text fixtures and a per-test Chrome-minimum profile (#2480); preflight compared an explicit --base with the upstream too (#2488); the compatibility poll parsed every cloud read unguarded; the double-tap browser test relied on Playwright’s own tap spacing; Help named only Yes or No.",
+    "intendedBehavior": "As described in the two entries above: scale fixtures and one checked Chrome-minimum helper; --base compares only with that base; a payload-less read is polled again within the same bound; stamped touches land exactly 120 ms apart and each pair first asserts it reached the app under 150 ms apart; Help says a Yes, No or Done counts once the person’s own next task shows.",
+    "replacementTests": [
+      "RISK steady scanner browser: no row of actions beside a card or of choices takes more lines than on the base build at any phone width from 320 to 480 px or at tablet and desktop width, at 100% 150% and 200% text and Chrome's minimum font size, with web fonts and blocked and Postpone on and off, in Chromium and WebKit",
+      "RISK steady scanner browser: a double tap or a repeated key answers only the shown task and the next answer after the window is accepted in Chromium and WebKit, and in Chromium at 6x CPU",
+      "RISK steady scanner browser: two Done taps 200 ms apart on the candidate or on the dotted task each complete the task shown in Chromium and WebKit",
+      "Changelog #2486: the November 25 notes say quick Done taps each count and a double tap on Done still completes one task, and that a tap just before the next task shows is held, and Help names Done"
+    ],
+    "preservedCoverage": [
+      "Every steady-scanner test that used the fixtures keeps all its assertions and views: reachability (every choice reachable, unclipped, inside the box), the #2449 shared-width test, the #2460 parity test, the dot trail test; all are GREEN with the corrected fixtures on 49c89b54 in Chromium and WebKit with web fonts loaded and blocked (record 2026-11-25T10-24-40-739Z).",
+      "The #2460 hint test keeps its Chrome 16 px minimum cases and its positive control that the candidate's key hint computes at 16 px; only the profile setup moved into the shared helper, which adds a probe check before use.",
+      "The parity test gains assertions: the enlarged-text positive control, hint clearance in both listening states, and no more lines than the base build at each of its views.",
+      "The backward-compatibility test keeps every assertion: the release opens the board with the answer on the right revision, its first cloud read reconciles with no error and holds nothing, it saves an edit and syncs it to the cloud, and the candidate then reopens the board the release saved.",
+      "Every assertion of the double-tap browser test is kept: only the task on screen was answered, both presses reached the page, the second landed on the next candidate's No, a later answer after the window is accepted, no page errors, for 60 and 120 ms touch pairs, a mouse double click and two key presses in Chromium and WebKit.",
+      "The persistence-recovery seam tests keep the guard's timing contract on the fake clock: the #2461 and #2481 tests, and #2486's 149 ms held / 150 ms counted test, which fails with DOUBLE_TAP_MS at 125 or 175.",
+      "The #2481 changelog test keeps every other assertion: one Yes and No bullet, no other scanner buttons in it, ten taps in two seconds, the sync-on limit, the double tap, no mechanism words, Help within 130 words, quick taps each count and the sync-on sentence in Help."
+    ],
+    "redEvidence": {
+      "command": "LANDSCAPE_BROWSER_URL=<served worktree> node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <git-common-dir>/agent-test-runs/issue-2486 --purpose preimplementation-red -- node --test --test-name-pattern=\"a double tap or a repeated key answers only\" tests/core.test.js",
+      "failure": "Record 2026-11-25T10-28-21-234Z-0b9f7a01 (the Chromium 6x CPU rounds added, taps still Playwright's): \"chromium at 6x CPU two touch taps 120 ms apart: only the task on screen was answered: steady-2,steady-3\". GREEN record 2026-11-25T10-28-53-964Z-d4f3b848 after the touches carried their own timestamps; the test then passed 3 of 3 runs with 22 busy processes on the 11-core host. Help: preimplementation-red record 2026-11-25T10-34-08-154Z-51bd5d60 failed the #2481 changelog test on the new Help sentence (\"Help says a Yes or No on your own next task waits only for it to show\") and the new #2486 changelog test on its missing Done bullet, before index.html changed; GREEN record 2026-11-25T10-34-28-449Z-efce13c3 (224 text and guard tests, 223 pass, 1 env-gated skip)."
+    }
   }
 ]
