@@ -446,6 +446,47 @@ test('RISK test-first gate: initial branch pushes cannot skip the diff compariso
  assert.match(workflow,/git merge-base origin\/main/i,'branch creation must compare against the existing default branch');
 });
 
+// Agents run the gate against origin/main and had to look its SHA up first,
+// because the gate rejected anything but 40 hex characters (#2469).
+test('RISK test-first gate: a ref such as origin/main resolves to its full SHA, which the gate reports, and an unknown ref fails closed',async t=>{
+ const root=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'chain-gate-ref-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const git=(...args)=>{const r=spawnSync('git',args,{cwd:root,encoding:'utf8'});assert.equal(r.status,0,r.stderr);return r.stdout.trim();};
+ const write=(file,text)=>{fs.mkdirSync(path.dirname(path.join(root,file)),{recursive:true});fs.writeFileSync(path.join(root,file),text);};
+ write('scripts/test-first-gate.mjs',fs.readFileSync(path.join(__dirname,'scripts/test-first-gate.mjs'),'utf8'));
+ write('docs/notes.md','old\n');write('TEST_CHANGE_RATIONALES.json','[]\n');
+ git('init','-q','-b','main');git('config','user.email','gate@example.invalid');git('config','user.name','Gate fixture');git('add','.');git('commit','-qm','base');
+ const base=git('rev-parse','HEAD');
+ git('update-ref','refs/remotes/origin/main',base);
+ git('checkout','-q','-b','work');write('docs/notes.md','new\n');git('add','.');git('commit','-qm','docs');
+ const gate=ref=>spawnSync(process.execPath,['scripts/test-first-gate.mjs',ref],{cwd:root,encoding:'utf8'});
+ for(const ref of ['origin/main',base]){
+  const result=gate(ref);
+  assert.equal(result.status,0,`${ref}: a clean branch passes against its base: ${result.stdout}${result.stderr}`);
+  assert.ok(result.stdout.includes(base),`${ref}: the gate reports the full base SHA it compared with: ${result.stdout}`);
+  assert.match(result.stdout,/Test-first diff gate passed\./);
+ }
+ const unknown=gate('origin/no-such-branch');
+ assert.equal(unknown.status,2,`an unknown ref fails closed: ${unknown.stdout}${unknown.stderr}`);
+ assert.match(unknown.stderr,/origin\/no-such-branch/,'the refusal names the ref it could not resolve');
+ assert.doesNotMatch(unknown.stdout,/passed/);
+ // The commit-first refusal (#2488) still applies when the base is a ref.
+ write('tests/core.test.js',"test('core: uncommitted',()=>{});\n");
+ const uncommitted=gate('origin/main');
+ assert.equal(uncommitted.status,1,`an uncommitted test file still stops the gate: ${uncommitted.stdout}${uncommitted.stderr}`);
+ assert.match(uncommitted.stderr,/Commit first/);
+});
+
+// #2469: agents guessed release:record's argument, so every release:* command
+// in package.json has a usage line, with its arguments, in RELEASE_GATES.md.
+test('Repository process: RELEASE_GATES.md gives a usage line for every release command',()=>{
+ const scripts=Object.keys(JSON.parse(fs.readFileSync(path.join(__dirname,'package.json'),'utf8')).scripts).filter(name=>name.startsWith('release:'));
+ assert.ok(scripts.length>=7,'positive control: the release commands are read from package.json: '+scripts.join(', '));
+ const gates=fs.readFileSync(path.join(__dirname,'RELEASE_GATES.md'),'utf8');
+ for(const name of scripts)assert.ok(gates.includes('`npm run '+name+'`')||gates.includes('`npm run '+name+' -- '),`RELEASE_GATES.md shows how to run ${name}`);
+ assert.match(gates,/`npm run release:record -- [^`]*receipt-input\.json`/,'release:record takes the input file path');
+});
+
 test('RISK repository process: review policy derives code and specialist roles from the exact diff',async()=>{
  const {deriveReleaseReviewPlan}=await import('../scripts/release-evidence.mjs');
  assert.equal(typeof deriveReleaseReviewPlan,'function','the release gate must expose its exact-diff policy classifier');

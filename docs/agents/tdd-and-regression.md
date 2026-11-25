@@ -144,7 +144,8 @@ protections intact. Update the entry only when the diff weakens another line.
 weakened tests without this record, including test-only changes and deletion of
 a test file. It checks commits, so it refuses to run while a test, app,
 enforcement or rationale file has uncommitted changes and asks you to commit
-first (#2488). A pure insertion still counts as weakening when it can stop existing
+first (#2488). Pass its base as a ref, such as `origin/main`, or a SHA; it
+prints the full SHA it compared with (#2469). A pure insertion still counts as weakening when it can stop existing
 assertions from running: a bare `return;`, `if(false)`/`if(0)`, a block-comment
 delimiter at the start or end of a line, `process.exit`/`process.exitCode`, or
 a `.skip(`/`.todo(` call. Blank lines and single-line `//` comments are
