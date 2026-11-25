@@ -25004,6 +25004,61 @@
   {
     "baseCommit": "49c89b54e57cc601307e18a091097ddf8c070f5c",
     "weakenedTestLines": [
+      "tests/repository-process.test.js:-const result=run(path.join(__dirname,'scripts/agent-tools/preflight.mjs'),'--base',selectedBase),output=result.stdout+result.stderr;",
+      "tests/repository-process.test.js:-test('RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes',async t=>{"
+    ],
+    "reason": "#2488 (retrospective of #2481/#2482): preflight with --base also compared with the branch's last push, so a branch whose pushed tip held a since-dropped test failed preflight even though the comparison asked for, main, was clean. The issue makes an explicit --base the whole comparison. This test pinned the old rule by running preflight with --base and requiring the outgoing upstream failure, so it now runs preflight without --base for that failure and adds an explicit --base run that must pass with one comparison and no upstream check; the test is renamed to say both.",
+    "previousBehavior": "preflight.mjs --base <ref> ran the test-first gate against the selected base and then against the branch's published upstream tip, failing on an outgoing rationale gap the selected base did not have.",
+    "intendedBehavior": "preflight.mjs --base <ref> runs the gate only against that base. Without --base it still uses the first available default-branch merge base and also the branch's published upstream tip, so the outgoing upstream rationale gap is still caught on that path.",
+    "replacementTests": [
+      "RISK repository process: preflight without --base catches outgoing upstream rationale gaps after the default base passes, and an explicit --base compares only with that base"
+    ],
+    "preservedCoverage": [
+      "The same fixture still requires preflight (now without --base) to fail on the outgoing upstream rationale gap after the default base passes, name the upstream comparison, run each focused copy check once and the selected-base gate once, and leave refs, HEAD, tracked files and configuration unchanged.",
+      "scripts/agent-tools/preflight.test.mjs keeps its distinct/duplicate upstream, unavailable upstream and unmapped upstream cases, now run without --base where the upstream comparison applies, and adds 'preflight with an explicit base compares only with that base, not the branch last push'."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <git-common-dir>/agent-test-runs/issue-2488/preflight-base --purpose preimplementation-red -- node --test --test-name-pattern=^preflight with an explicit base compares only with that base scripts/agent-tools/preflight.test.mjs",
+      "failure": "Record 2026-11-25T10-10-06-324Z-7a741332, before the preflight change: with --base the selected base passed, then 'test-first/rationale validator (published upstream refs/remotes/origin/task, ...)' failed with 'Existing tests were changed or removed without an exact-diff rationale', exit 1 != 0. This repository test was updated after the fix, when the full file run failed on its old expectation; later-baseline-sensitivity record 2026-11-25T10-16-24-616Z-c2da22a9 runs the updated test against the pre-fix preflight.mjs and it fails with 'an explicit --base is the only comparison, so the outgoing delta is not checked'."
+    }
+  },
+  {
+    "baseCommit": "49c89b54e57cc601307e18a091097ddf8c070f5c",
+    "weakenedTestLines": [
+      "tests/core.test.js:-const STEADY_DOUBLE_TEXT=STEADY_ENLARGED_TEXT.replace('.btn{font-size:21px','.btn{font-size:28px');",
+      "tests/core.test.js:-const STEADY_ENLARGED_TEXT='.btn{font-size:21px!important}.crumbs{font-size:19px!important}.card .title{font-size:23px!important}.qline{font-size:28px!important}';",
+      "tests/core.test.js:-fs.mkdirSync(path.join(profile,'Default'));",
+      "tests/core.test.js:-fs.writeFileSync(path.join(profile,'Default','Preferences'),JSON.stringify({webkit:{webprefs:{minimum_font_size:spec.chromeMinimum,minimum_logical_font_size:spec.chromeMinimum}}}));",
+      "tests/core.test.js:-host={newContext:options=>engine.launchPersistentContext(profile,{...options,headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chromium'})};",
+      "tests/core.test.js:-if(spec.chromeMinimum){",
+      "tests/core.test.js:-if(spec.enlarged)await page.addStyleTag({content:STEADY_ENLARGED_TEXT});",
+      "tests/core.test.js:-if(spec.enlarged)await page.addStyleTag({content:spec.doubleText?STEADY_DOUBLE_TEXT:STEADY_ENLARGED_TEXT});",
+      "tests/core.test.js:-if(spec.enlarged)await page.addStyleTag({content:spec.doubleText?STEADY_DOUBLE_TEXT:STEADY_ENLARGED_TEXT});",
+      "tests/core.test.js:-if(view.enlarged)await page.addStyleTag({content:STEADY_ENLARGED_TEXT});",
+      "tests/core.test.js:-profile=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'hint-minimum-font-2460-'));",
+      "tests/core.test.js:-}",
+      "tests/repository-process.test.js:-const result=run(path.join(__dirname,'scripts/agent-tools/preflight.mjs'),'--base',selectedBase),output=result.stdout+result.stderr;",
+      "tests/repository-process.test.js:-test('RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes',async t=>{"
+    ],
+    "reason": "#2480 (issue acceptance: \"The 150% and 200% steady-scanner fixtures scale every font size inside the scanner, not only the button's own, so a child like a key hint grows with its label. The harness gets one helper that applies Chrome's real minimum font size in a fresh profile per case and checks that it took effect.\"). STEADY_ENLARGED_TEXT and STEADY_DOUBLE_TEXT were CSS strings that set .btn, .crumbs, .card .title and .qline to fixed px sizes, so a key hint (7.5 px beside a card) never grew and a hint rule that ignored its label's size could not fail any steady-scanner test. They become scale factors (1.5 and 2) applied by the shared scaleText helper in scripts/agent-tools/layout-sweep.mjs, which multiplies every computed font size under #scan, generated content included; each addStyleTag call site calls it instead. The #2460 hint test's inline Chrome-minimum profile code moves into the shared chromeMinimumFontHost helper, which also checks on a probe that the minimum took effect before handing the context back. The entry also lists the two tests/repository-process.test.js lines #2488 weakened, which reach this branch through the integration merge; #2488's own entry records their reason and evidence.",
+    "previousBehavior": "At 150% the fixture set .btn to 21 px (13 px side-rail buttons to 162%), crumbs 19 px, card titles 23 px and the question 28 px; at 200% only .btn went to 28 px and the rest stayed at the 150% sizes. Key hints, chips, the finish row and everything else in the scanner kept their normal size. The #2460 hint test built its own Chrome profile with minimum_font_size inline and relied on a later keyhint assertion to see it applied.",
+    "intendedBehavior": "At 150% and 200% every font size inside the scanner is its normal computed size times 1.5 or 2, a key hint's and the hidden ::before glyph's included, and new elements of a known shape (a re-render, an added choice) take the scaled size as they are inserted. The parity test checks this positive control (each shown hint and its label grow by the scale) and that every shown hint stays clear of its label and inside its button. Chrome's minimum font size is applied by one helper with a fresh profile per case, checked on a 1 px probe.",
+    "replacementTests": [
+      "RISK steady scanner browser: no row of actions beside a card or of choices takes more lines than on the base build at any phone width from 320 to 480 px or at tablet and desktop width, at 100% 150% and 200% text and Chrome's minimum font size, with web fonts and blocked and Postpone on and off, in Chromium and WebKit"
+    ],
+    "preservedCoverage": [
+      "Every steady-scanner test that used the fixtures keeps all its assertions and views: reachability (every choice reachable, unclipped, inside the box), the #2449 shared-width test, the #2460 parity test, the dot trail test; all are GREEN with the corrected fixtures on 49c89b54 in Chromium and WebKit with web fonts loaded and blocked (record 2026-11-25T10-24-40-739Z).",
+      "The #2460 hint test keeps its Chrome 16 px minimum cases and its positive control that the candidate's key hint computes at 16 px; only the profile setup moved into the shared helper, which adds a probe check before use.",
+      "The parity test gains assertions: the enlarged-text positive control, hint clearance in both listening states, and no more lines than the base build at each of its views."
+    ],
+    "redEvidence": {
+      "command": "LANDSCAPE_BROWSER_URL=<served 49c89b54 worktree> node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <git-common-dir>/agent-test-runs/issue-2480 --purpose preimplementation-red --summary -- node --test --test-name-pattern \"share one alignment and keep Delete last\" tests/core.test.js",
+      "failure": "Record 2026-11-25T10-17-12-039Z, with the parity test's new positive control and the old fixtures: 12 cases failed in Chromium and WebKit, e.g. \"chromium large phone at 200% text with Postpone with web fonts: positive control: 200% text grows worked's w hint with its label: hint 7.5 to 7.5 px, label 13 to 28 px\". GREEN with the scale fixtures: record 2026-11-25T10-18-22-204Z. A hint rule that ignores its label's size (the hint pinned absolutely 2 px from the edge) passes with the old fixtures (record 2026-11-25T10-21-02-258Z) and fails at 200% with the new ones (record 2026-11-25T10-20-12-863Z: \"w hint (195.7-208.2) stays clear of its label (45.0-198.2)\")."
+    }
+  },
+  {
+    "baseCommit": "49c89b54e57cc601307e18a091097ddf8c070f5c",
+    "weakenedTestLines": [
       "tests/core.test.js:-assert.match(answer,/After your own Yes or No brings up the next task, a Yes or No counts once it shows/,'Help says a Yes or No on your own next task waits only for it to show');",
       "tests/core.test.js:-test('RISK steady scanner browser: a double tap or a repeated key answers only the shown task and the next answer after the window is accepted in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{",
       "tests/core.test.js:-for(const input of ['two touch taps 60 ms apart','two touch taps 120 ms apart','mouse double click','two key presses']){",
@@ -25016,12 +25071,12 @@
     "replacementTests": [
       "RISK steady scanner browser: a double tap or a repeated key answers only the shown task and the next answer after the window is accepted in Chromium and WebKit, and in Chromium at 6x CPU",
       "RISK steady scanner browser: two Done taps 200 ms apart on the candidate or on the dotted task each complete the task shown in Chromium and WebKit",
-    "Changelog #2486: the November 25 notes say quick Done taps each count and a double tap on Done still completes one task, and that a tap just before the next task shows is held, and Help names Done"
+      "Changelog #2486: the November 25 notes say quick Done taps each count and a double tap on Done still completes one task, and that a tap just before the next task shows is held, and Help names Done"
     ],
     "preservedCoverage": [
       "Every assertion of the double-tap browser test is kept: only the task on screen was answered, both presses reached the page, the second landed on the next candidate's No, a later answer after the window is accepted, no page errors, for 60 and 120 ms touch pairs, a mouse double click and two key presses in Chromium and WebKit.",
       "The persistence-recovery seam tests keep the guard's timing contract on the fake clock: the #2461 and #2481 tests, and #2486's 149 ms held / 150 ms counted test, which fails with DOUBLE_TAP_MS at 125 or 175.",
-    "The #2481 changelog test keeps every other assertion: one Yes and No bullet, no other scanner buttons in it, ten taps in two seconds, the sync-on limit, the double tap, no mechanism words, Help within 130 words, quick taps each count and the sync-on sentence in Help."
+      "The #2481 changelog test keeps every other assertion: one Yes and No bullet, no other scanner buttons in it, ten taps in two seconds, the sync-on limit, the double tap, no mechanism words, Help within 130 words, quick taps each count and the sync-on sentence in Help."
     ],
     "redEvidence": {
       "command": "LANDSCAPE_BROWSER_URL=<served worktree> node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <git-common-dir>/agent-test-runs/issue-2486 --purpose preimplementation-red -- node --test --test-name-pattern=\"a double tap or a repeated key answers only\" tests/core.test.js",

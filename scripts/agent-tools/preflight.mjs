@@ -122,6 +122,7 @@ function runNode(args) {
 function printUsage() {
   process.stdout.write('Usage: node scripts/agent-tools/preflight.mjs [--base <ref>]\n');
   process.stdout.write('Runs the existing visible default-sky and Quick start FAQ contracts, then scripts/test-first-gate.mjs.\n');
+  process.stdout.write('Without --base it compares with the default branch merge base and the branch\'s published upstream; with --base, only that base.\n');
 }
 
 async function main() {
@@ -162,7 +163,9 @@ async function main() {
   let comparisons;
   try {
     const base = resolveBase(options.base);
-    const upstream = resolveUpstream();
+    // An explicit --base is the whole comparison (#2488). The branch's last
+    // push may hold work since dropped, which would fail a diff nobody asked for.
+    const upstream = options.base ? null : resolveUpstream();
     comparisons = [{ sha: base, label: 'selected base' }];
     if (upstream && upstream.sha !== base) comparisons.push(upstream);
   } catch (error) {
