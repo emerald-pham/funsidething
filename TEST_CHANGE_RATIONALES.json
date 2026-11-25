@@ -25000,5 +25000,37 @@
       "command": "LANDSCAPE_BROWSER_URL=<served candidate> node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <git-common-dir>/agent-test-runs/issue-2482 --purpose preimplementation-red --summary -- node --test --test-name-pattern \"share one alignment and keep Delete last\" --test-name-pattern \"action rows keep their live geometry\" tests/core.test.js",
       "failure": "Record 2026-11-25T04-52-18-829Z-bce9c442 on 2b6a089f before the CSS change: the parity test failed in all 40 Chromium and WebKit cases, e.g. \"chromium common phone with web fonts light, candidate listening: dotted task's row: every line starts at the row's left edge: bench-done@94.5, edit@173.4, worked@245.4 vs 27.0\"; the saved-view check (then inside the geometry test) failed at 375 px 200% text (81.0 vs 27.0 px), 768 px (187.1 vs 37.0) and 1100 px (353.1 vs 203.0). The check then moved into its own RISK test; later-baseline-sensitivity record 2026-11-25T05-01-08-594Z-16cfffd7 (this diff's tests against a served copy of main) fails it for both the saved and live copies at all three sizes. GREEN record 2026-11-25T05-01-19-821Z-1f01b178."
     }
+  },
+  {
+    "baseCommit": "49c89b54e57cc601307e18a091097ddf8c070f5c",
+    "weakenedTestLines": [
+      "tests/core.test.js:-const STEADY_DOUBLE_TEXT=STEADY_ENLARGED_TEXT.replace('.btn{font-size:21px','.btn{font-size:28px');",
+      "tests/core.test.js:-const STEADY_ENLARGED_TEXT='.btn{font-size:21px!important}.crumbs{font-size:19px!important}.card .title{font-size:23px!important}.qline{font-size:28px!important}';",
+      "tests/core.test.js:-fs.mkdirSync(path.join(profile,'Default'));",
+      "tests/core.test.js:-fs.writeFileSync(path.join(profile,'Default','Preferences'),JSON.stringify({webkit:{webprefs:{minimum_font_size:spec.chromeMinimum,minimum_logical_font_size:spec.chromeMinimum}}}));",
+      "tests/core.test.js:-host={newContext:options=>engine.launchPersistentContext(profile,{...options,headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chromium'})};",
+      "tests/core.test.js:-if(spec.chromeMinimum){",
+      "tests/core.test.js:-if(spec.enlarged)await page.addStyleTag({content:STEADY_ENLARGED_TEXT});",
+      "tests/core.test.js:-if(spec.enlarged)await page.addStyleTag({content:spec.doubleText?STEADY_DOUBLE_TEXT:STEADY_ENLARGED_TEXT});",
+      "tests/core.test.js:-if(spec.enlarged)await page.addStyleTag({content:spec.doubleText?STEADY_DOUBLE_TEXT:STEADY_ENLARGED_TEXT});",
+      "tests/core.test.js:-if(view.enlarged)await page.addStyleTag({content:STEADY_ENLARGED_TEXT});",
+      "tests/core.test.js:-profile=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'hint-minimum-font-2460-'));",
+      "tests/core.test.js:-}"
+    ],
+    "reason": "#2480 (issue acceptance: \"The 150% and 200% steady-scanner fixtures scale every font size inside the scanner, not only the button's own, so a child like a key hint grows with its label. The harness gets one helper that applies Chrome's real minimum font size in a fresh profile per case and checks that it took effect.\"). STEADY_ENLARGED_TEXT and STEADY_DOUBLE_TEXT were CSS strings that set .btn, .crumbs, .card .title and .qline to fixed px sizes, so a key hint (7.5 px beside a card) never grew and a hint rule that ignored its label's size could not fail any steady-scanner test. They become scale factors (1.5 and 2) applied by the shared scaleText helper in scripts/agent-tools/layout-sweep.mjs, which multiplies every computed font size under #scan, generated content included; each addStyleTag call site calls it instead. The #2460 hint test's inline Chrome-minimum profile code moves into the shared chromeMinimumFontHost helper, which also checks on a probe that the minimum took effect before handing the context back.",
+    "previousBehavior": "At 150% the fixture set .btn to 21 px (13 px side-rail buttons to 162%), crumbs 19 px, card titles 23 px and the question 28 px; at 200% only .btn went to 28 px and the rest stayed at the 150% sizes. Key hints, chips, the finish row and everything else in the scanner kept their normal size. The #2460 hint test built its own Chrome profile with minimum_font_size inline and relied on a later keyhint assertion to see it applied.",
+    "intendedBehavior": "At 150% and 200% every font size inside the scanner is its normal computed size times 1.5 or 2, a key hint's and the hidden ::before glyph's included, and new elements of a known shape (a re-render, an added choice) take the scaled size as they are inserted. The parity test checks this positive control (each shown hint and its label grow by the scale) and that every shown hint stays clear of its label and inside its button. Chrome's minimum font size is applied by one helper with a fresh profile per case, checked on a 1 px probe.",
+    "replacementTests": [
+      "RISK steady scanner browser: no row of actions beside a card or of choices takes more lines than on the base build at any phone width from 320 to 480 px or at tablet and desktop width, at 100% 150% and 200% text and Chrome's minimum font size, with web fonts and blocked and Postpone on and off, in Chromium and WebKit"
+    ],
+    "preservedCoverage": [
+      "Every steady-scanner test that used the fixtures keeps all its assertions and views: reachability (every choice reachable, unclipped, inside the box), the #2449 shared-width test, the #2460 parity test, the dot trail test; all are GREEN with the corrected fixtures on 49c89b54 in Chromium and WebKit with web fonts loaded and blocked (record 2026-11-25T10-24-40-739Z).",
+      "The #2460 hint test keeps its Chrome 16 px minimum cases and its positive control that the candidate's key hint computes at 16 px; only the profile setup moved into the shared helper, which adds a probe check before use.",
+      "The parity test gains assertions: the enlarged-text positive control, hint clearance in both listening states, and no more lines than the base build at each of its views."
+    ],
+    "redEvidence": {
+      "command": "LANDSCAPE_BROWSER_URL=<served 49c89b54 worktree> node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <git-common-dir>/agent-test-runs/issue-2480 --purpose preimplementation-red --summary -- node --test --test-name-pattern \"share one alignment and keep Delete last\" tests/core.test.js",
+      "failure": "Record 2026-11-25T10-17-12-039Z, with the parity test's new positive control and the old fixtures: 12 cases failed in Chromium and WebKit, e.g. \"chromium large phone at 200% text with Postpone with web fonts: positive control: 200% text grows worked's w hint with its label: hint 7.5 to 7.5 px, label 13 to 28 px\". GREEN with the scale fixtures: record 2026-11-25T10-18-22-204Z. A hint rule that ignores its label's size (the hint pinned absolutely 2 px from the edge) passes with the old fixtures (record 2026-11-25T10-21-02-258Z) and fails at 200% with the new ones (record 2026-11-25T10-20-12-863Z: \"w hint (195.7-208.2) stays clear of its label (45.0-198.2)\")."
+    }
   }
 ]
