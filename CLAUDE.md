@@ -18,8 +18,8 @@ Domain docs: single-context; see [domain rules](docs/agents/domain.md) before ex
 Before publishing or triaging issues/specs, read the
 [GitHub tracker](docs/agents/issue-tracker.md) and
 [triage labels](docs/agents/triage-labels.md).
-For command-line evidence collection, coordination, audits, CI automation, or PR
-body updates (`gh pr edit` fails on Projects (classic)), use
+To read a failed CI run's logs, or for command-line evidence, coordination, audits, CI
+automation or PR body updates (`gh pr edit` fails on Projects (classic)), use
 [agent evidence tools](docs/agents/agent-evidence.md).
 For app-opening responsiveness, visible action feedback, or optional/background
 work, read [responsiveness guidance](docs/agents/responsiveness.md).
@@ -41,10 +41,10 @@ Before browser interaction or rendered web review, follow
 Read [AGENTS.md](AGENTS.md) for maintenance authorization, FAQ duties, holds and
 the maintainer approval new process needs; read it before adding any required
 gate, reviewer, CI group, receipt field or issue rule.
-Before release, read [release and review](docs/agents/release-and-review.md), the
+Before opening a PR, read [release and review](docs/agents/release-and-review.md), the
 authority for which reviews the exact diff requires, and
-[RELEASE_GATES.md](RELEASE_GATES.md) for the evidence they record. Local GREEN
-alone is not shipment.
+[RELEASE_GATES.md](RELEASE_GATES.md) for the evidence they record: a merge to main
+needs the exact-SHA review receipt. Local GREEN alone is not shipment.
 
 Verify the applied theme attribute, computed color scheme and paint before
 accepting each theme capture; theme labels alone do not establish coverage.

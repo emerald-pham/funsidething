@@ -16,3 +16,12 @@ safe default. Specs gate the automatic step on the proof instead of adding a
 control; reviews flag a needless prompt. For errors, retries, reconnects or
 stale reads, [Safe automatic recovery](error-recovery.md) sets the limits and
 says when the person must act.
+
+## Searching index.html for a UI label
+
+The changelog sits on two lines of `index.html` of about 87 KB, which mention
+nearly every feature name. Drop them from a label search:
+
+```sh
+grep -n 'Worked on it' index.html | grep -v '^[0-9]*:<template id="appChangelog'
+```

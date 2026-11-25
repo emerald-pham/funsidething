@@ -133,6 +133,13 @@ require separate explicit authorization.
 For error handling, retries, reconnects or stale reads, follow
 [Safe automatic recovery](error-recovery.md).
 
+## Spec and changelog claims
+
+- A layout claim in a spec or changelog cites a rendered measurement, and a
+  layout decision is checked against the base build's line breaks (#2460).
+- Changelog and Help text promise only what the tests exercise, and keep a
+  measured limit in its feature's bullet (#2483).
+
 ## Finish and hand off
 
 Review the exact final diff against requirements and standards. Obtain the
