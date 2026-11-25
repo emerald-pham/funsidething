@@ -247,6 +247,52 @@ test('RISK test-first gate: an app change paired with an edit to any split test 
  assert.match(weakened.stderr,/without an exact-diff rationale/);
 });
 
+// Spec #2488: the gate compares commits. In #2483 it passed on the previous
+// commit while the uncommitted test edit failed once committed, so it now
+// refuses to report on a tree whose tests, app or rationale are uncommitted.
+test('RISK test-first gate: uncommitted test, app or rationale changes are refused with a request to commit first',async t=>{
+ const os=await import('node:os'),root=fs.mkdtempSync(path.join(os.tmpdir(),'chain-dirty-gate-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const git=(...args)=>{const r=spawnSync('git',args,{cwd:root,encoding:'utf8'});assert.equal(r.status,0,r.stderr);return r.stdout.trim();};
+ const write=(file,text)=>{fs.mkdirSync(path.dirname(path.join(root,file)),{recursive:true});fs.writeFileSync(path.join(root,file),text);};
+ write('scripts/test-first-gate.mjs',fs.readFileSync(path.join(__dirname,'scripts/test-first-gate.mjs'),'utf8'));
+ const weighted="test('scan: weight',()=>{\n assert.equal(weight(),2);\n});\n";
+ write('index.html','<p>old</p>\n');write('tests/core.test.js',weighted);write('TEST_CHANGE_RATIONALES.json','[]\n');write('notes.md','base\n');
+ git('init','-q');git('config','user.email','gate@example.invalid');git('config','user.name','Gate fixture');git('add','.');git('commit','-qm','base');
+ const base=git('rev-parse','HEAD');
+ write('index.html','<p>new</p>\n');write('tests/core.test.js',weighted+"test('RISK scan: new boundary',()=>{});\n");git('add','.');git('commit','-qm','app change with a test');
+ const gate=()=>spawnSync(process.execPath,['scripts/test-first-gate.mjs',base],{cwd:root,encoding:'utf8'});
+ const clean=gate();
+ assert.equal(clean.status,0,'positive control: the committed change passes: '+clean.stdout+clean.stderr);
+ write('notes.md','an unrelated note\n');
+ const unrelated=gate();
+ assert.equal(unrelated.status,0,'an uncommitted file the gate does not classify leaves the check alone: '+unrelated.stdout+unrelated.stderr);
+ // The #2483 shape: the assertion is dropped but not yet committed.
+ write('tests/core.test.js',"test('scan: weight',()=>{\n});\ntest('RISK scan: new boundary',()=>{});\n");
+ const dirtyTest=gate();
+ assert.notEqual(dirtyTest.status,0,'an uncommitted weakened test cannot pass on the previous commit: '+dirtyTest.stdout);
+ assert.match(dirtyTest.stderr,/commit/i);assert.match(dirtyTest.stderr,/tests\/core\.test\.js/);
+ assert.doesNotMatch(dirtyTest.stdout,/gate passed/);
+ git('checkout','--','tests/core.test.js');
+ write('TEST_CHANGE_RATIONALES.json','[{"reason":"draft"}]\n');
+ const dirtyRationale=gate();
+ assert.notEqual(dirtyRationale.status,0,'an uncommitted rationale is not the one the commit carries');
+ assert.match(dirtyRationale.stderr,/TEST_CHANGE_RATIONALES\.json/);
+ git('checkout','--','TEST_CHANGE_RATIONALES.json');
+ write('landscape.js','const hue = 30;\n');write('tests/scenery.test.js',"test('sky: hue',()=>{});\n");
+ const untracked=gate();
+ assert.notEqual(untracked.status,0,'new app and test files that are not committed yet are refused too');
+ assert.match(untracked.stderr,/landscape\.js/);assert.match(untracked.stderr,/tests\/scenery\.test\.js/);
+ fs.rmSync(path.join(root,'landscape.js'));fs.rmSync(path.join(root,'tests/scenery.test.js'));
+ write('tests/core.test.js',"test('scan: weight',()=>{\n});\ntest('RISK scan: new boundary',()=>{});\n");git('commit','-qam','drop the assertion');
+ const committed=gate();
+ assert.equal(committed.status,1,'once committed, the weakened test is checked and needs its rationale');
+ assert.match(committed.stderr,/without an exact-diff rationale/);
+ const {uncommittedGateFiles}=await import('../scripts/test-first-gate.mjs');
+ assert.deepEqual(uncommittedGateFiles(['R  tests/scenery.test.js','tests/core.test.js',' M notes.md','?? docs/plan.md','']),['tests/core.test.js','tests/scenery.test.js'],
+  'a staged rename names both its paths, and unclassified files are left out');
+});
+
 test('RISK test-first gate: a root tests.js is no longer a test file and adding or editing one is rejected',async t=>{
  const {validateTestFirst}=await import('../scripts/test-first-gate.mjs');
  const risk=['+test("RISK eligibility: boundary",()=>{})'];
