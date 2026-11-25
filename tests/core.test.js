@@ -44000,7 +44000,9 @@ test('Changelog #2484: the November 25 notes say that with sync on the next task
  const items=(notes.split('<h3>November 25, 2026</h3>')[1]?.split('</ul>')[0]||'').split('<li>').slice(1);
  const sooner=items.filter(item=>/With sync on, the next task now shows sooner after a Yes on a large board/.test(item));
  assert.equal(sooner.length,1,'one bullet is about the next task showing sooner with sync on: '+items.join(' | '));
- assert.match(sooner[0],/ten Yes taps a fifth of a second apart all counted/,'it says what was measured');
+ // Two interleaved batches of three ten-tap runs each, against #2484's base
+ // and against main: 30 and 29 of 30 counted, against 21 and 21 before.
+ assert.match(sooner[0],/Yes taps a fifth of a second apart counted 59 times out of 60, against 42 out of 60 before/,'it says what was measured');
  assert.match(sooner[0],/A slower phone can still hold some quick taps/,'and keeps the limit with its feature');
  assert.doesNotMatch(sooner[0],/\bNo\b|Done|Can’t|catch|paint|frame|guard|debounce|\d\s*ms\b/i,'it promises Yes alone and says what the person sees, not how it works');
 });
