@@ -22,6 +22,7 @@
     "release:install-hook": "node scripts/install-release-hook.mjs",
     "release:plan": "node scripts/release-evidence.mjs plan",
     "release:prepare": "node scripts/release-evidence.mjs prepare",
+    "release:memory-scope": "node scripts/release-evidence.mjs memory-scope",
     "release:record": "node scripts/release-evidence.mjs record",
     "release:verify": "node scripts/release-evidence.mjs verify",
     "release:publish": "node scripts/release-evidence.mjs publish",

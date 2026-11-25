@@ -750,6 +750,70 @@ test('RISK repository process: release prepare takes specialist domains from the
  }finally{cleanupReleaseGateFixture(fixture);}
 });
 
+// Spec #2488: the specialist writes the receipt's memory scope to
+// memory-scope.json in the release directory, so nobody retypes ~5 KB of JSON
+// from the reviewer's reply.
+test('RISK repository process: release prepare fills the memory scope from memory-scope.json and refuses an invalid one',()=>{
+ const fixture=datedReleaseFixture({candidate:{'scripts/cloud-sync.mjs':'export const cloudValue = 2;\n'}});
+ try{
+  const header=(completed,body='The review of the exact diff.\n')=>releaseReportHeader(fixture.candidateSha,'approved',completed)+body;
+  const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z','The owner read the exact diff.\n'),
+   'independent-review.md':header('2026-11-01T11:53:58.000Z'),'specialist-review.md':header('2026-11-01T12:05:26.000Z')});
+  const inputPath=path.join(reports,'receipt-input.json'),scopePath=path.join(reports,'memory-scope.json');
+  const prepare=()=>releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  const missing=prepare();
+  assert.equal(missing.status,0,missing.stdout+missing.stderr);
+  const unassessed={affected:null,rationale:'',tests:[]};
+  assert.deepEqual(JSON.parse(fs.readFileSync(inputPath,'utf8')).specialistReview.memoryScope,{memory:unassessed,cloud:unassessed,sync:unassessed},
+   'with no memory-scope.json the scope stays empty for a person to fill');
+  fs.rmSync(inputPath);
+  const scope={
+   memory:{affected:false,rationale:'The candidate changes no in-memory board state.',tests:[]},
+   cloud:{affected:true,rationale:'The cloud value constant changes what the tool reports.',tests:['RISK cloud sync tool: reports the cloud value']},
+   sync:{affected:false,rationale:'No sync ordering or revision code changes.',tests:[]},
+  };
+  for(const [invalid,named] of [['{"memory":',/memory-scope\.json/],[JSON.stringify({...scope,sync:{affected:false,rationale:'short',tests:[]}}),/memory-scope\.json[\s\S]*sync/]]){
+   fs.writeFileSync(scopePath,invalid);
+   const refused=prepare();
+   assert.notEqual(refused.status,0,'an invalid memory-scope.json cannot enter the receipt input');
+   assert.match(refused.stderr,named);
+   assert.equal(fs.existsSync(inputPath),false,'nothing is written from an invalid scope');
+  }
+  fs.writeFileSync(scopePath,JSON.stringify(scope,null,2)+'\n');
+  const filled=prepare();
+  assert.equal(filled.status,0,filled.stdout+filled.stderr);
+  const input=JSON.parse(fs.readFileSync(inputPath,'utf8'));
+  assert.deepEqual(input.specialistReview.memoryScope,scope,'the receipt input carries the specialist\'s scope as written');
+  input.ownerReview.summary='The owner read every line of the exact candidate diff.';
+  input.ownerReview.scope.rationale='A cloud tooling change fits the derived code and specialist reviews.';
+  input.independentReview.summary='The reviewer read the full diff and its tests and found no defect.';
+  input.specialistReview.summary='The specialist read the full diff and found no cloud or sync defect.';
+  fs.writeFileSync(inputPath,JSON.stringify(input,null,2)+'\n');
+  const recorded=releaseCommand(fixture,'record',inputPath);
+  assert.equal(recorded.status,0,recorded.stdout+recorded.stderr);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: the specialist checks memory-scope.json with the validator record uses',()=>{
+ const fixture=makeScaledReviewFixture({candidate:{'scripts/cloud-sync.mjs':'export const cloudValue = 2;\n'}});
+ try{
+  const scopePath=path.join(fixture.root,'memory-scope.json');
+  const entry=(tests=[])=>({affected:false,rationale:'This candidate leaves this area of saved data unchanged.',tests});
+  fs.writeFileSync(scopePath,JSON.stringify({memory:entry(['RISK cloud sync tool: keeps the saved board']),cloud:entry(),sync:entry()}));
+  const valid=releaseCommand(fixture,'memory-scope',scopePath);
+  assert.equal(valid.status,0,valid.stdout+valid.stderr);
+  assert.match(valid.stdout,/memory-scope\.json/);
+  fs.writeFileSync(scopePath,JSON.stringify({memory:entry(),cloud:entry(),sync:entry()}));
+  const untested=releaseCommand(fixture,'memory-scope',scopePath);
+  assert.notEqual(untested.status,0,'an all-unaffected scope still needs one focused preservation test, as record requires');
+  assert.match(untested.stderr,/memory-scope\.json.*focused/);
+  fs.writeFileSync(scopePath,JSON.stringify({memory:entry(),cloud:{affected:true,rationale:'The cloud constant changes.',tests:[]},sync:entry(['RISK cloud sync tool: keeps order'])}));
+  const unproven=releaseCommand(fixture,'memory-scope',scopePath);
+  assert.notEqual(unproven.status,0,'an affected area needs its own focused tests');
+  assert.match(unproven.stderr,/memory-scope\.json\.cloud/);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
 test('RISK repository process: release prepare refuses a source file that differs from the exact commit',()=>{
  const fixture=datedReleaseFixture({candidate:{'scripts/cloud-sync.mjs':'export const cloudValue = 2;\n'}});
  try{
@@ -1942,6 +2006,42 @@ test('RISK repository process: changed-line review plan fails closed on large pa
   'moving the changelog end marker over a script edit cannot hide it');
  assert.deepEqual(plan({'icon.svg':'<svg><script>start()</script></svg>\n'},{'icon.svg':'<svg><script>localStorage.clear()</script></svg>\n'}).specialistDomains,['memory-cloud-sync'],
   'script inside an SVG is code');
+});
+
+// Spec #2488: specialist reviews come from app changes. Like the earlier
+// policies, the committed AGENTS.md sentence must be at both base and head.
+const APP_CHANGE_SPECIALIST_POLICY_TEXT_2488=CHANGED_LINE_POLICY_TEXT_2234+'Specialist reviews come from app changes, not test files or test-group assignments.\n';
+test('RISK repository process: test files and test-group assignments derive no specialist domain, while app storage code still does',async()=>{
+ const {deriveReleaseReviewPlan}=await import('../scripts/release-evidence.mjs');
+ const plan=(base,candidate,policy=APP_CHANGE_SPECIALIST_POLICY_TEXT_2488)=>{
+  const f=makeScaledReviewFixture({base,candidate,agentsBase:policy,agentsHead:policy});
+  try{return deriveReleaseReviewPlan(f.repo,f.candidateSha,f.baseSha);}finally{cleanupReleaseGateFixture(f);}
+ };
+ // The #2487 shape: one CSS value in the app, a new test whose name says
+ // "saved", a helper edit beside a Firebase line, and a test-assignment row.
+ const page=justify=>`<!doctype html>\n<style>\n.actionrow{display:flex;justify-content:${justify}}\n</style>\n<body>\n<script>\nfunction boot(){ start(); }\n</script>\n</body>\n`;
+ const helper=probe=>`export async function savedViewBrowser(page){\n  if(options.holdConfiguredFirebaseImports)await page.evaluate(()=>localStorage.setItem('hold','true'));\n  const rects=root=>${probe};\n  return rects;\n}\n`;
+ const assignments=rows=>JSON.stringify({environmentSkips:rows},null,2)+'\n';
+ const base={'index.html':page('flex-end'),'tests/shared.js':helper('[]'),'tests/core.test.js':"test('scan: rows',()=>{});\n",
+  'tests/persistence-recovery.test.js':"test('recovery: keeps the saved board',()=>{});\n",
+  'scripts/agent-tools/cloud-sync.test.mjs':"test('cloud sync: pull',()=>{});\n",'scripts/test-group-assignments.json':assignments([])};
+ const tests={'tests/shared.js':helper("[...root.querySelectorAll('.actionrow > button')].map(b=>b.getBoundingClientRect().left)"),
+  'tests/core.test.js':"test('scan: rows',()=>{});\ntest('RISK saved view: action rows start at the left edge after a localStorage reload',()=>{ localStorage.getItem('fvp:chain-scanner:v1'); });\n",
+  'tests/persistence-recovery.test.js':"test('recovery: keeps the saved board',()=>{});\ntest('recovery: a cloud sync session restores the backup',()=>{ firestore.saveBoard(); });\n",
+  'scripts/agent-tools/cloud-sync.test.mjs':"test('cloud sync: pull',()=>{});\ntest('cloud sync: signIn token persists',()=>{});\n",
+  'scripts/test-group-assignments.json':assignments([{root:'RISK saved view: action rows start at the left edge after a localStorage reload',environment:'LANDSCAPE_BROWSER_URL'}])};
+ const cssOnly=plan(base,{...tests,'index.html':page('flex-start')});
+ assert.deepEqual(cssOnly.specialistDomains,[],'one CSS line plus test-file and test-assignment edits derives no specialist domain');
+ assert.equal(cssOnly.mode,'independent-review','the test edits still get the independent code review');
+ assert.equal(cssOnly.requiresTypographyReview,true,'the CSS value still gets the typography review');
+ assert.deepEqual(plan(base,tests).specialistDomains,[],'a test-only diff derives no specialist domain');
+ const storagePage=page('flex-start').replace('start();','localStorage.setItem("fvp:chain-scanner:v1", "{}"); start();');
+ assert.deepEqual(plan(base,{...tests,'index.html':storagePage}).specialistDomains,['memory-cloud-sync'],
+  'an app diff that touches storage code still derives the persistence specialist');
+ assert.deepEqual(plan({'cloud-store.js':'export const rev = 1;\n'},{'cloud-store.js':'export const rev = 2;\n','tests/core.test.js':"test('RISK cloud store: rev',()=>{});\n"}).specialistDomains,
+  ['memory-cloud-sync'],'an app sync module still derives the persistence specialist by its path');
+ assert.deepEqual(plan(base,{...tests,'index.html':page('flex-start')},CHANGED_LINE_POLICY_TEXT_2234).specialistDomains,['memory-cloud-sync','security-deployment','shared-session-state'],
+  'a candidate whose base predates the policy keeps its earlier classification, so its receipt still verifies');
 });
 
 test('RISK repository process: changed-line review plan skips typography for text-only edits inside existing elements',async()=>{
