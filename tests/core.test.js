@@ -24902,7 +24902,7 @@ test("RISK steady scanner browser: a key hint never widens an action beside a ca
 // When the next title is as long as the last, a second tap lands on the button
 // of the next candidate before anyone could have read it, so a physical press
 // inside 200 ms of the new task appearing is dropped.
-test('RISK steady scanner browser: a double tap or a repeated key answers only the shown task and the next answer after the window is accepted in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+test('RISK steady scanner browser: a double tap or a repeated key answers only the shown task and the next answer after the window is accepted in Chromium and WebKit, and in Chromium at 6x CPU',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[];
  for(const [engineName,engine] of await steadyScannerEngines()){
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
