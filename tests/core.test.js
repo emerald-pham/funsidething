@@ -17121,11 +17121,35 @@ test('RISK saved view invisible active scanner: the action rows keep their live 
    assert.ok(Math.abs(saved-live)<=1,`${name}: the saved scanner is as tall as the live one: ${saved?.toFixed(1)} vs ${live.toFixed(1)} px`);
    assert.equal(view.early.actionRows.length,view.before.actionRows.length,`${name}: the saved view keeps every action`);
    view.before.actionRows.forEach((r,i)=>{const e=view.early.actionRows[i];for(const key of ['x','y','width','height'])assert.ok(Math.abs(e[key]-r[key])<=1,`${name}: action ${i} ${key} in the saved view matches live: ${e[key].toFixed(1)} vs ${r[key].toFixed(1)} px`);});
-   // #2482: in the saved view as live, every line of each row starts at its left edge.
-   for(const [copy,actions] of [['live',view.before.actionRows],['saved',view.early.actionRows]])for(const row of new Set(actions.map(a=>a.row))){
-    const inRow=actions.filter(a=>a.row===row),tops=[...new Set(inRow.map(a=>Math.round(a.y)))];
-    for(const top of tops){const first=inRow.filter(a=>Math.abs(Math.round(a.y)-top)<=1).sort((a,b)=>a.x-b.x)[0];assert.ok(Math.abs(first.x-first.rowLeft)<=1,`${name}: ${copy} row ${row}'s line at ${top} px starts at the row's left edge: ${first.x.toFixed(1)} vs ${first.rowLeft.toFixed(1)} px`);}
-   }
+   assert.deepEqual(view.errors,[],`${name}: no page errors`);
+  }catch(error){failures.push(error.message.split('\n')[0]);}finally{await view.browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+// #2482: the action rows line up on the left, as asked on 2026-11-25. The saved
+// view, the copy of the screen shown before the app loads, keeps the rows'
+// classes but not their data-* attributes (#2460), so it has to start every
+// line at the left edge too, or the buttons would jump sideways as it loads.
+test("RISK saved view invisible active scanner: every line of the actions under the dotted task and the candidate, wrapped ones too, starts at its row's left edge in the saved view as live, on a phone with the rows at 200% text and at tablet and desktop width",{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [name,viewport,initStyle] of [['375 px phone, rows at 200% text',{width:375,height:812},SAVED_VIEW_ENLARGED_ROWS],['768 px tablet',{width:768,height:1024},''],['1100 px desktop',{width:1100,height:1000},'']]){
+  const view=await invisibleSavedViewBrowser('light',false,false,viewport,true,{initStyle,actionRows:true});
+  try{
+   assert.equal(view.early.settled,false,`${name}: the local read is still pending, so the saved view is what shows`);
+   // The saved copy is checked first and on its own, so its result is seen whatever live does.
+   for(const [copy,actions] of [['saved',view.early.actionRows],['live',view.before.actionRows]])try{
+    const rows=[...new Set(actions.map(a=>a.row))];
+    assert.equal(rows.length,2,`${name}: ${copy}: positive control: both action rows are measured: ${actions.length} actions in ${rows.length} rows`);
+    for(const row of rows){
+     const inRow=actions.filter(a=>a.row===row),tops=[...new Set(inRow.map(a=>Math.round(a.y)))].sort((a,b)=>a-b);
+     for(const top of tops){
+      const first=inRow.filter(a=>Math.abs(Math.round(a.y)-top)<=1).sort((a,b)=>a.x-b.x)[0];
+      assert.ok(Math.abs(first.x-first.rowLeft)<=1,`${name}: ${copy} row ${row}, line ${tops.indexOf(top)+1} of ${tops.length}, starts at the row's left edge: ${first.x.toFixed(1)} vs ${first.rowLeft.toFixed(1)} px`);
+     }
+    }
+   }catch(error){failures.push(error.message.split('\n')[0]);}
+   if(name.startsWith('375'))assert.ok(new Set(view.early.actionRows.map(a=>Math.round(a.y))).size>2,`${name}: positive control: at 200% text the saved rows wrap, so a wrapped line is checked`);
    assert.deepEqual(view.errors,[],`${name}: no page errors`);
   }catch(error){failures.push(error.message.split('\n')[0]);}finally{await view.browser.close();}
  }
