@@ -283,6 +283,9 @@ Reused group records claim zero current cases, artifacts or test-child execution
 The aggregate accepts a mixture of original coverage and actual current groups,
 reobserves original proof immediately before acceptance, and counts only current
 execution as current cases. Changed or missing final proof fails the aggregate.
+When the final recheck no longer verifies a pass the first routing reused, the
+failure names both routing decisions and their reused gates, plus the recheck's
+reason when it recorded one; rerun the whole workflow (#2489).
 Actual emulator consumer outcomes decide whether retained emulator proof is still
 needed after a runtime fallback. Each covered emulator consumer fingerprints its complete original reference;
 the final recheck must match that exact original, including its run/attempt/job,

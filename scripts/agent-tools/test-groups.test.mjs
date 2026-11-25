@@ -1235,6 +1235,35 @@ test('test group input aggregation rejects stale missing and fabricated coverage
     assert.notEqual(result.status,0,name+' must fail the required aggregate');
   });
 });
+// Run 45428791832 attempt 1 (#2489): cohort-routing decided full and reused
+// every gate, the regression and event-gates jobs consumed those passes, and the
+// final recheck then verified none. The aggregate reported the covered-mode
+// error although the run was never in covered mode.
+test('test group aggregate names both routing decisions when the final routing no longer verifies the reused passes', async parent => {
+  const fixture=aggregateFixture(parent),env={ImageOS:'ubuntu24',ImageVersion:'20261022.1.0'};
+  const gates=[...groups,'rules','compatibility'];
+  const {file,proof}=inputCoverage(fixture);
+  for(const gate of gates.slice(1))proof.inputPasses[gate]=inputCoverage(fixture,gate).proof.inputPasses[gate];
+  writeJson(file,proof);
+  for(const group of groups){const covered=invoke(fixture,{group,args:['--covered','--proof',file],env});assert.equal(covered.status,0,covered.stdout+covered.stderr);fixture.originals.set(group,covered.outputDir);}
+  const consumed=gate=>createHash('sha256').update(JSON.stringify(proof.inputPasses[gate])).digest('hex');
+  const firstRouting=needs=>{const x=JSON.parse(fs.readFileSync(needs));x['cohort-routing'].outputs={decision:'full',reused:JSON.stringify(gates)};x['event-gates'].outputs={rules:'covered',compatibility:'covered','rules-coverage':consumed('rules'),'compatibility-coverage':consumed('compatibility')};writeJson(needs,x);};
+  const finalRouting=(name,inputPasses)=>{const target=path.join(path.dirname(file),name);writeJson(target,{...proof,inputPasses});return target;};
+  await parent.test('the final routing still verifies every reused pass',t=>{
+    const result=aggregateCopy(t,fixture,(_root,needs)=>firstRouting(needs),['--proof',finalRouting('final-all.json',proof.inputPasses)],env);
+    assert.equal(result.status,0,result.stdout+result.stderr);
+    const report=JSON.parse(fs.readFileSync(path.join(result.outputDir,'aggregate.json')));
+    assert.equal(report.mode,'covered');assert.equal(report.caseCount,0);
+  });
+  await parent.test('the final routing verifies none of them',t=>{
+    const result=aggregateCopy(t,fixture,(_root,needs)=>firstRouting(needs),['--proof',finalRouting('final-none.json',{})],env);
+    assert.notEqual(result.status,0,'an unverified reused pass cannot complete the required cohort');
+    assert.doesNotMatch(result.stderr,/Covered mode requires/,'a full routing is not in covered mode');
+    assert.match(result.stderr,/cohort-routing decided full with reused gates core,scenery,persistence-recovery,native-process,rules,compatibility/);
+    assert.match(result.stderr,/final routing decided full with reused gates none/);
+  });
+});
+
 test('test group covered aggregate requires four honest references and fresh original producer proof', async parent => {
   const fixture=createFixture(parent),{file,proof}=fixtureCoverage(fixture);fixture.originals=new Map();
   for(const group of groups){const result=invoke(fixture,{group,args:['--covered','--proof',file]});assert.equal(result.status,0,result.stdout+result.stderr);fixture.originals.set(group,result.outputDir);}

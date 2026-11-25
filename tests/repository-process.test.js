@@ -1504,6 +1504,22 @@ test('RISK repository process: a group runs with its declared Node heap instead 
  requirePinsPass('scripts/agent-tools/test-groups.test.mjs',['test group runs a group with its declared Node heap and rejects an invalid heap'],'group heap');
 });
 
+// #2489: main's aggregate failed with the covered-mode error after a full
+// routing whose final recheck verified none of the reused passes, and that
+// blocked the Pages deploy until a rerun. The mismatch now names both routing
+// decisions. The executed, mixed, emulator and covered aggregate pins run beside
+// it so the fix leaves those paths exactly as they were.
+test('RISK repository process: the scanner aggregate names both routing decisions when the final recheck drops reused passes',()=>{
+ requirePinsPass('scripts/agent-tools/test-groups.test.mjs',[
+  'test group aggregate names both routing decisions when the final routing no longer verifies the reused passes',
+  'test group aggregate verifies the complete actual cohort and native artifacts',
+  'test group aggregate reconciles reused and executed groups with fresh original proof',
+  'test group aggregate preserves observer protocol across emulator coverage and fresh fallback',
+  'test group input aggregation rejects stale missing and fabricated coverage',
+  'test group covered aggregate requires four honest references and fresh original producer proof',
+ ],'routing-mismatch aggregate');
+});
+
 // The nightly cross-engine move is pinned at the agreed seams (the CI workflow
 // files in the CI-routing tests, and test:group --aggregate in the test-group
 // tests); this process RISK requires those pins to execute and pass.
