@@ -24767,6 +24767,55 @@ test("RISK steady scanner browser: no row of actions beside a card or of choices
  }finally{await base.close();}
 });
 
+// #2474: on phones the candidate's four actions broke 3 + 1, so Delete sat alone
+// on its own line under the candidate (at 375 px, the width in the original
+// report) while it shared a line under the dotted task; with Postpone the
+// dotted task's row ended in a lone Delete too. At the normal text size,
+// across the whole sweep, Delete now shares the last line of both rows.
+// Lines are read from the buttons' tops, so the test doesn't depend on how
+// the rows are laid out.
+const steadyRowLines=selectors=>selectors.map(selector=>{
+ const row=document.querySelector(selector);if(!row)return null;
+ const boxes=[...row.children].filter(el=>el.matches('button')&&el.getClientRects().length).map(el=>({act:el.dataset.act,top:el.getBoundingClientRect().top,left:el.getBoundingClientRect().left})).sort((a,b)=>a.top-b.top||a.left-b.left);
+ const lines=[];for(const b of boxes){const line=lines.at(-1);if(line&&Math.abs(line[0].top-b.top)<=1)line.push(b);else lines.push([b]);}
+ return lines.map(line=>line.map(b=>b.act));
+});
+const steadyWidthRanges=widths=>widths.sort((a,b)=>a-b).reduce((out,w)=>{const last=out.at(-1);if(last&&w===last[1]+1)last[1]=w;else out.push([w,w]);return out;},[]).map(([a,b])=>a===b?`${a}`:`${a}-${b}`).join(', ');
+test("RISK steady scanner browser: at the normal text size Delete never sits alone on the last line under the dotted task or the candidate at any phone width from 320 to 480 px or at tablet and desktop width, with web fonts and blocked and Postpone on and off, in Chromium and WebKit",{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const sweep=await layoutSweep(),failures=[],rows=[['the dotted task','.card.bench + *'],['the candidate','.card.cand + *']];
+ const wrapped={bench:0,cand:0};
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const fonts of ['web','blocked'])for(const postpone of [true,false])for(const kind of ['phone','wide']){
+    const views=kind==='phone'?sweep.PHONE_WIDTHS.map(width=>({width,height:sweep.PHONE_HEIGHT})):sweep.WIDE_VIEWS;
+    const label=`${engineName} fonts:${fonts} postpone:${postpone?'on':'off'} ${kind}`;
+    const {page,context,errors}=await sweep.openBoardPage(browser,{url:process.env.LANDSCAPE_BROWSER_URL,board:sweep.steadyBoard({postpone}),fonts,width:views[0].width,height:views[0].height,
+     touch:kind==='phone',isMobile:kind==='phone'&&engineName==='chromium',selectors:rows.map(([,selector])=>selector)});
+    try{
+     const alone={};
+     for(const view of views){
+      await page.setViewportSize(view);await page.evaluate(sweep.pageOp,{op:'settle'});
+      const seen=await page.evaluate(steadyRowLines,rows.map(([,selector])=>selector));
+      rows.forEach(([name],i)=>{
+       const lines=seen[i];
+       if(!lines){failures.push(`${label} ${view.width}px: ${name}'s row is missing`);return;}
+       if(lines.length>1)wrapped[i?'cand':'bench']++;
+       const last=lines.at(-1);
+       if(lines.length>1&&last.length===1&&last[0]==='delete-task')(alone[name]||=[]).push(view.width);
+      });
+     }
+     for(const [name,widths] of Object.entries(alone))failures.push(`${label}: Delete sits alone on the last line under ${name} at ${steadyWidthRanges(widths)} px`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ // Positive control: both rows wrap somewhere in the sweep, so Delete could be left alone.
+ assert.ok(wrapped.bench>0&&wrapped.cand>0,`positive control: both rows wrap at some width: dotted task ${wrapped.bench}, candidate ${wrapped.cand}`);
+ assert.deepEqual(failures,[]);
+});
+
 const STEADY_SHARED_ACTIONS=[['Done','bench-done','cand-done'],['Edit','edit','edit'],['Worked on it','worked','cand-worked'],['Delete','delete-task','delete-task']];
 test('RISK steady scanner browser: the actions under the dotted task and the candidate match in size type and colour whichever card the key hints sit on, share one alignment and keep Delete last, across phone enlarged short-landscape tablet and desktop views in day and night with web fonts and blocked in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[];
