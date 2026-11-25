@@ -20016,10 +20016,14 @@ test('RISK BACKWARD COMPATIBILITY: the supported floor and the release base open
   let cloud=null;
   for(const end=Date.now()+15000;Date.now()<end;await new Promise(resolve=>setTimeout(resolve,20))){
    await settleRecoveryOperations188(old.ctx);
-   cloud=JSON.parse((await backend.CS.pull()).payload);
+   // A read that a landing push overtakes comes back as manifest-changed (or
+   // cancelled) with no payload; that is not yet, so poll again (#2490 CI).
+   const read=await backend.CS.pull();
+   if(typeof read?.payload!=='string')continue;
+   cloud=JSON.parse(read.payload);
    if(cloud.tasks.some(task=>task.title==='Added on the release')&&!vm.runInContext('pulling||cloudPushInFlight',old.ctx))break;
   }
-  assert.ok(cloud.tasks.some(task=>task.title==='Added on the release'),'and syncs it');
+  assert.ok(cloud?.tasks.some(task=>task.title==='Added on the release'),'and syncs it');
   const releaseRevision=old.ctx.state.syncRev;
   await close();
   const reopened=await answeringDevice2408(sub,{docs:device.docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,changeRecords:false,signedIn:false});
