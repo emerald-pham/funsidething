@@ -16159,7 +16159,12 @@ function answerClock2408(ctx,counters){
  };
  const clock={get now(){return now;},quiet,
   install(){
-   start=vm.runInContext('Date.now()',ctx);base=performance.now();
+   // #2485: the base is a whole millisecond, so every clock read the app
+   // takes is one and every delay it works out from two of them is exact.
+   // A fractional base rounded once base+now passed a power of two (late in
+   // a long test process), and timers fired a rounding error off their time.
+   // Rounded up, it never reads behind what the app read before install.
+   start=vm.runInContext('Date.now()',ctx);base=Math.ceil(performance.now());
    ctx.setTimeout=(fn,ms,...args)=>{const id={answerClock2408:++serial};timers.set(id,{at:now+Math.max(0,Number(ms)||0),serial,fn:()=>fn(...args)});return id;};
    ctx.clearTimeout=id=>{timers.delete(id);};
    ctx.performance={now:()=>base+now};ctx.__answerClockNow2408=()=>start+now;
@@ -16634,6 +16639,28 @@ test('RISK one save per answer: on a phone whose device saves take 0.7 to 3 s, a
   assert.equal(answeredDecisions2408(cloud.board,run.taps).length,run.taps.length,'once the run stops the cloud copy holds every answer');
   assert.equal(cloud.rev,run.device.ctx.state.syncRev,'and this device is acknowledged at its revision');
  });
+});
+
+// #2485: the fake clock took its base from this test process's
+// performance.now(). Late in a long group run (CI's persistence group runs
+// for about 50 minutes) that reading is past 2^20 ms with a fraction, and once
+// the fake time carried the sum past a power of two it rounded, so the app's
+// timers fired a rounding error away from the times they were set for (an
+// upload at 29999.999999999767 ms) and whether a test passed depended on
+// where the process clock happened to be. This process clock reads just under
+// 2^20 ms, so the run crosses it while sign-in settles.
+test('Fake answer clock: on a test process whose clock reads late, a slow phone’s answer run still taps, saves and uploads on the whole milliseconds the fake clock schedules, and each answer reaches the cloud within the 20 s longest wait',{timeout:300000},async t=>{
+ const late=2**20-2000+0.1;
+ t.mock.method(performance,'now',()=>late);
+ const run=await answerRunOnSlowPhone2408(t,{saveMs:1500,gapMs:1000,changeRecords:false});
+ assert.ok(run.taps.length>=20&&run.uploads.length>=1,'positive control: the run answers and uploads: '+run.taps.length+' taps, '+run.uploads.length+' uploads');
+ const times=[...run.taps.map(tap=>['tap',tap.at]),...run.commits.flatMap(commit=>[['save',commit.at],['saved',commit.endedAt]]),...run.uploads.map(upload=>['upload',upload.at])];
+ assert.deepEqual(times.filter(([,at])=>!Number.isInteger(at)),[],'every tap, save and upload is on a whole millisecond');
+ const lastTap=run.taps.at(-1).at;
+ for(const tap of run.taps.filter(tap=>tap.at+LONGEST_WAIT2408<=lastTap)){
+  const first=run.uploads.find(upload=>upload.seq>tap.seq&&upload.decided.has(tap.candidate));
+  assert.ok(first&&first.at<=tap.at+LONGEST_WAIT2408,'the '+tap.act+' at '+tap.at+' ms reaches the cloud within 20 s: first upload with it '+(first?'at '+first.at+' ms':'after the run'));
+ }
 });
 
 test('RISK one save per answer: on a phone whose device saves take 0.7 to 3 s, a run of answers saves at most once per answer plus once per acknowledged push, one save at a time',{timeout:900000},async t=>{
