@@ -681,6 +681,11 @@
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
     {
+      "root": "RISK steady scanner browser: no row of actions beside a card or of choices takes more lines than on the base build at any phone width from 320 to 480 px or at tablet and desktop width, at 100% 150% and 200% text and Chrome's minimum font size, with web fonts and blocked and Postpone on and off, in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app, a base build it serves from LAYOUT_BASE_REF (main by default), the Google Fonts hosts and local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
       "root": "RISK steady scanner browser: a key hint never widens an action beside a card and its label sits centred clear of the hint, so the candidate's row keeps one line on 412 to 430 px phones and the dotted task's Delete is never alone at 375 px with Postpone, with web fonts and blocked in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."

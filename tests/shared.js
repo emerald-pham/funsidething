@@ -4392,3 +4392,60 @@ export { answersCaughtUp };
 export { woopFields2421, woopBoard2421, woopSnapshot2421 };
 export { scanPanelDom221, markupButtons, chainPills, chainPillIds, chainPill, benchmarkEdit, keepEditorValues, returnButton,
   returnDotFromScan, returnFromPill, returnBenchmarkFromEdit };
+
+// #2480: the layout rules under the scanner that select on a data-* attribute.
+// The saved view shown before the app loads keeps classes but drops data-*
+// attributes, so such a rule styles the live scanner and not its saved copy,
+// and the page jumps as the board loads (117 px in #2460 review).
+// Data attributes the saved view has too: the root's theme and ready flags sit
+// outside it, and the saved view's own markers stand in for the live ids.
+const SAVED_VIEW_DATA_ATTRIBUTES = new Set(["data-theme", "data-app-ready", "data-saved-preview", "data-preview-id"]);
+// Properties that paint without moving or resizing anything. Every other one,
+// generated content included, counts as layout.
+const PAINT_ONLY_PROPERTY = /^(?:color|background(?:-[\w-]+)?|opacity|box-shadow|text-shadow|outline(?:-[\w-]+)?|cursor|pointer-events|visibility|transition(?:-[\w-]+)?|animation(?:-[\w-]+)?|filter|backdrop-filter|fill|stroke(?:-[\w-]+)?|text-decoration(?:-[\w-]+)?|caret-color|accent-color|color-scheme|will-change|-webkit-tap-highlight-color|(?:-webkit-)?user-select|touch-action|border(?:-(?:top|right|bottom|left|block|inline)(?:-(?:start|end))?)?-color|scrollbar-color|mix-blend-mode|z-index)$/;
+function styleRules(css) {
+  const rules = [], open = [];
+  let text = "";
+  for (const ch of css.replace(/\/\*[\s\S]*?\*\//g, "")) {
+    if (ch === "{") { open.push(text.trim()); text = ""; }
+    else if (ch === "}") {
+      const prelude = open.pop();
+      if (prelude && !prelude.startsWith("@") && text.trim()) rules.push({ prelude, body: text });
+      text = "";
+    } else if (ch === ";" && !open.length) text = "";
+    else text += ch;
+  }
+  return rules;
+}
+// Splits a selector list at its top-level commas, leaving :has(a, b) whole.
+function selectorList(prelude) {
+  const out = [];
+  let depth = 0, part = "";
+  for (const ch of prelude) {
+    if (ch === "(" || ch === "[") depth++;
+    if (ch === ")" || ch === "]") depth--;
+    if (ch === "," && !depth) { out.push(part.trim()); part = ""; } else part += ch;
+  }
+  if (part.trim()) out.push(part.trim());
+  return out;
+}
+function scannerDataAttributeLayoutRules(css, scannerClasses) {
+  const found = [];
+  for (const { prelude, body } of styleRules(css)) {
+    const layout = [...new Set(body.split(";").map(d => d.slice(0, d.indexOf(":")).trim().toLowerCase()).filter(p => p && !PAINT_ONLY_PROPERTY.test(p)))];
+    if (!layout.length) continue;
+    for (const selector of selectorList(prelude)) {
+      const attributes = [...selector.matchAll(/\[\s*(data-[\w-]+)/g)].map(m => m[1]);
+      if (!attributes.some(name => !SAVED_VIEW_DATA_ATTRIBUTES.has(name))) continue;
+      // A selector reaches the scanner unless it names an id other than #scan,
+      // or a class the scanner and its shell never carry. :not() rules nothing out.
+      const scope = selector.replace(/\[[^\]]*\]/g, "").replace(/:not\([^()]*\)/g, "");
+      const ids = [...scope.matchAll(/#([\w-]+)/g)].map(m => m[1]);
+      const classes = [...scope.matchAll(/\.([A-Za-z_-][\w-]*)/g)].map(m => m[1]);
+      if (ids.some(id => id !== "scan") || classes.some(name => !scannerClasses.has(name))) continue;
+      found.push(selector + " { " + layout.join(", ") + " }");
+    }
+  }
+  return found;
+}
+export { scannerDataAttributeLayoutRules };

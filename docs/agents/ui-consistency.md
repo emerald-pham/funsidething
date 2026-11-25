@@ -25,5 +25,9 @@ had.
 - Give a genuinely new kind of control a named class with a comment on why it
   differs from its neighbors.
 - Size in em, so enlarged text scales a control with its neighbors.
+- Style the scanner by class, never by a `data-*` attribute: the saved view
+  shown before the app loads keeps classes but drops data attributes, so a
+  data-attribute layout rule lays the scanner out differently before and after
+  loading (117 px in #2460). A core test fails on such a rule (#2480).
 - Judge widths with the web fonts loaded as well as blocked. The fonts change
   label widths, so a row that fits on fallback fonts can wrap for a person.
