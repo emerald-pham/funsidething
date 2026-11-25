@@ -25025,7 +25025,7 @@
     ],
     "redEvidence": {
       "command": "LANDSCAPE_BROWSER_URL=<served worktree> node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <git-common-dir>/agent-test-runs/issue-2486 --purpose preimplementation-red -- node --test --test-name-pattern=\"a double tap or a repeated key answers only\" tests/core.test.js",
-      "failure": "Record 2026-11-25T10-28-21-234Z-0b9f7a01 (the Chromium 6x CPU rounds added, taps still Playwright's): \"chromium at 6x CPU two touch taps 120 ms apart: only the task on screen was answered: steady-2,steady-3\". GREEN record 2026-11-25T10-28-53-964Z-d4f3b848 after the touches carried their own timestamps; the test then passed 3 of 3 runs with 22 busy processes on the 11-core host."
+      "failure": "Record 2026-11-25T10-28-21-234Z-0b9f7a01 (the Chromium 6x CPU rounds added, taps still Playwright's): \"chromium at 6x CPU two touch taps 120 ms apart: only the task on screen was answered: steady-2,steady-3\". GREEN record 2026-11-25T10-28-53-964Z-d4f3b848 after the touches carried their own timestamps; the test then passed 3 of 3 runs with 22 busy processes on the 11-core host. Help: preimplementation-red record 2026-11-25T10-34-08-154Z-51bd5d60 failed the #2481 changelog test on the new Help sentence (\"Help says a Yes or No on your own next task waits only for it to show\") and the new #2486 changelog test on its missing Done bullet, before index.html changed; GREEN record 2026-11-25T10-34-28-449Z-efce13c3 (224 text and guard tests, 223 pass, 1 env-gated skip)."
     }
   }
 ]
