@@ -16159,12 +16159,13 @@ function answerClock2408(ctx,counters){
  };
  const clock={get now(){return now;},quiet,
   install(){
+   start=vm.runInContext('Date.now()',ctx);base=performance.now();
    // #2485: the base is a whole millisecond, so every clock read the app
    // takes is one and every delay it works out from two of them is exact.
    // A fractional base rounded once base+now passed a power of two (late in
    // a long test process), and timers fired a rounding error off their time.
    // Rounded up, it never reads behind what the app read before install.
-   start=vm.runInContext('Date.now()',ctx);base=Math.ceil(performance.now());
+   base=Math.ceil(base);
    ctx.setTimeout=(fn,ms,...args)=>{const id={answerClock2408:++serial};timers.set(id,{at:now+Math.max(0,Number(ms)||0),serial,fn:()=>fn(...args)});return id;};
    ctx.clearTimeout=id=>{timers.delete(id);};
    ctx.performance={now:()=>base+now};ctx.__answerClockNow2408=()=>start+now;
