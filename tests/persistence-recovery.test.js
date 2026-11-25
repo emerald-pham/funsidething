@@ -21643,3 +21643,71 @@ test('RISK scanner press guard (#2486): a press 149 ms after the last one that a
   await clock.advance(10);guard.paint();await clock.advance(1000);
  }
 });
+
+// #2481 kept the 100 ms grace for a card something other than the person's
+// own press drew; its tests drew that card with the app's own onAction. These
+// draw it by a real Undo, clicked and by z, after an own Yes.
+test('RISK scanner press guard (#2486): after a Yes that acted, the card a real Undo brings back, by click or by z, holds a press 50 ms after it paints, 350 ms after that Yes, and one 110 ms after answers it',{timeout:300000},async t=>{
+ const fixture=await largeBoardFixture();
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ await startAnswering2408(device);
+ const {ctx,clock,shim}=device,guard=pressGuard2461(device);
+ guard.paint();await clock.advance(1000);
+ const undoButton={dataset:{act:'undo'},classList:{contains:()=>false}};undoButton.closest=()=>undoButton;
+ for(const [label,undo] of [['Undo clicked',()=>shim.document.dispatchEvent({type:'click',detail:1,isTrusted:true,timeStamp:guard.now(),target:undoButton})],['z key',()=>guard.key('z')]]){
+  const first=ctx.state.candidateId;
+  guard.press('yes');
+  assert.ok(ctx.state.chain.includes(first),label+': positive control: the Yes answers its candidate');
+  await clock.advance(70);guard.paint();await clock.advance(230);
+  undo();
+  assert.equal(ctx.state.candidateId,first,label+': positive control: Undo brings the answered candidate back');
+  assert.ok(!ctx.state.chain.includes(first),label+': and takes its dot off the chain');
+  guard.paint();await clock.advance(50);
+  const shown=answeredState2461(ctx);
+  assert.ok(guard.press('yes').classList.contains('held'),label+': a Yes 50 ms after the card Undo brought back painted is held');
+  guard.key('n');
+  assert.deepEqual(answeredState2461(ctx),shown,label+': the n key at that moment is held too, and neither changes anything');
+  await clock.advance(60);
+  const before=answeredState2461(ctx);
+  guard.press('yes');
+  assert.deepEqual([...ctx.state.chain],[...before.chain,first],label+': a Yes 110 ms after it painted answers it');
+  await clock.advance(70);guard.paint();await clock.advance(1000);
+ }
+});
+
+// Another device's answer reaches this one through sync (#2417's change
+// records) and draws the next card here; the person did not draw it.
+test('RISK scanner press guard (#2486): signed in on the large board, after a Yes that acted, the card another device’s synced answer draws holds a press 50 ms after it paints, and one 110 ms after answers it',{timeout:600000},async t=>{
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const {phone,laptop}=await twoOpenDevices2417(t,JSON.parse(fixture.payload));
+ phone.clock.install();await phone.clock.advance(1000);
+ const {ctx,clock}=phone,guard=pressGuard2461(phone);
+ guard.paint();await clock.advance(1000);
+ const first=ctx.state.candidateId;
+ guard.press('yes');
+ assert.ok(ctx.state.chain.includes(first),'positive control: the phone’s Yes answers its candidate');
+ const second=ctx.state.candidateId;assert.ok(second&&second!==first,'positive control: the phone draws a new candidate');
+ const pressed=guard.now();
+ // Past the double tap: the press below is the grace's alone to hold.
+ await clock.advance(70);guard.paint();await clock.advance(230);
+ // The laptop receives the Yes and shows the same next candidate.
+ for(let i=0;i<200&&!(laptop.ctx.state.chain.includes(first)&&laptop.ctx.state.candidateId===second);i++){await clock.advance(50);await new Promise(resolve=>setTimeout(resolve,10));}
+ assert.ok(laptop.ctx.state.chain.includes(first),'positive control: the laptop has the phone’s Yes');
+ assert.equal(laptop.ctx.state.candidateId,second,'positive control: and shows the same next candidate');
+ await new Promise(resolve=>setTimeout(resolve,300));
+ const answered=laptop.tap('no');
+ assert.equal(answered,second,'positive control: the laptop says No to that candidate');
+ // The phone applies the laptop's No and draws the candidate after it.
+ for(let i=0;i<200&&ctx.state.considered?.[second]!=='no';i++){await clock.advance(10);await new Promise(resolve=>setTimeout(resolve,10));}
+ assert.equal(ctx.state.considered?.[second],'no','positive control: the phone applies the laptop’s No');
+ const third=ctx.state.candidateId;assert.ok(third&&third!==second,'positive control: and draws another candidate');
+ guard.paint();await clock.advance(50);
+ assert.ok(guard.now()-pressed>=350,'fixture: the press comes at least 350 ms after the phone’s Yes: '+(guard.now()-pressed));
+ const shown=answeredState2461(ctx);
+ assert.ok(guard.press('yes').classList.contains('held'),'a Yes 50 ms after the card the synced answer drew painted is held');
+ assert.deepEqual(answeredState2461(ctx),shown,'and changes nothing');
+ await clock.advance(60);
+ const before=answeredState2461(ctx);
+ guard.press('yes');
+ assert.deepEqual([...ctx.state.chain],[...before.chain,third],'a Yes 110 ms after it painted answers it');
+});
