@@ -59,7 +59,15 @@ import { rewriteGenerationFixture } from "./shared.js";
 import { coldRelaunch2198 } from "./shared.js";
 import { appFixtureScope } from "./shared.js";
 import { scannerDataAttributeLayoutRules } from "./shared.js"; // #2480
-import { scaleText as steadyScaleText, chromeMinimumFontHost, serveBuild, compareCase, sweepBuilds, describeFinding } from "../scripts/agent-tools/layout-sweep.mjs"; // #2480
+// #2480's layout sweep tool, loaded on first use: preflight's isolated fixture
+// copies of the test files leave scripts/agent-tools out, and a static import
+// would stop this whole file loading there.
+const layoutSweep=()=>import("../scripts/agent-tools/layout-sweep.mjs");
+const steadyScaleText=async(...args)=>(await layoutSweep()).scaleText(...args);
+const chromeMinimumFontHost=(...args)=>({newContext:async options=>(await layoutSweep()).chromeMinimumFontHost(...args).newContext(options)});
+const serveBuild=async(...args)=>(await layoutSweep()).serveBuild(...args);
+const compareCase=async(...args)=>(await layoutSweep()).compareCase(...args);
+const sweepBuilds=async(...args)=>(await layoutSweep()).sweepBuilds(...args);
 import { woopFields2421, woopBoard2421, woopSnapshot2421 } from "./shared.js"; // #2421 saved WOOP data
 import { backupRowsWithText } from "./shared.js";
 import { releaseKnownCloudCopy2377 } from "./shared.js";
@@ -24746,7 +24754,7 @@ test('RISK steady scanner browser: Yes No and Cant share one width and no scanne
 const STEADY_LINE_ROWS=['.card.bench + *','.card.cand + *','.decide'];
 const steadyBaseBuild=()=>serveBuild(__dirname,process.env.LAYOUT_BASE_REF||'origin/main');
 const steadyCandidateBuild=()=>({url:process.env.LANDSCAPE_BROWSER_URL,fingerprint:null});
-const steadyNoMoreLinesThanBase=(label,findings)=>assert.deepEqual(findings.map(f=>describeFinding(f.case||label,f)),[],`${label}: no row takes more lines than on the base build`);
+const steadyNoMoreLinesThanBase=async(label,findings)=>{const {describeFinding}=await layoutSweep();assert.deepEqual(findings.map(f=>describeFinding(f.case||label,f)),[],`${label}: no row takes more lines than on the base build`);};
 test("RISK steady scanner browser: no row of actions beside a card or of choices takes more lines than on the base build at any phone width from 320 to 480 px or at tablet and desktop width, at 100% 150% and 200% text and Chrome's minimum font size, with web fonts and blocked and Postpone on and off, in Chromium and WebKit",{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const base=await steadyBaseBuild();
  try{
@@ -24755,7 +24763,7 @@ test("RISK steady scanner browser: no row of actions beside a card or of choices
    text:['100%','150%','200%','minimum'],minimumFontSize:16,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chromium',selectors:STEADY_LINE_ROWS},{playwright});
   assert.equal(cases.length,(4+3)*2*2*2,'positive control: every engine, font, Postpone, text and view case ran');
   assert.ok(cases.every(c=>c.lines.base[c.widths[0]]['.card.cand + *'].length===1),'positive control: the base build shows the candidate\'s row in every case');
-  steadyNoMoreLinesThanBase(`base ${base.sha}`,findings);
+  await steadyNoMoreLinesThanBase(`base ${base.sha}`,findings);
  }finally{await base.close();}
 });
 
@@ -24906,7 +24914,7 @@ test('RISK steady scanner browser: the actions under the dotted task and the can
      // #2480: at this view no row takes more lines than on the base build.
      const sameLines=await compareCase(browser,{base:lineBase,candidate:steadyCandidateBuild()},{board:steadySeededBoard(spec),fonts:webFonts?'web':'blocked',views:[{width:spec.width,height:spec.height}],
       touch:spec.touch!==false,selectors:STEADY_LINE_ROWS,scale:spec.enlarged?(spec.doubleText?STEADY_DOUBLE_TEXT:STEADY_ENLARGED_TEXT):1,label});
-     steadyNoMoreLinesThanBase(label,sameLines.findings);
+     await steadyNoMoreLinesThanBase(label,sameLines.findings);
      assert.deepEqual(errors,[],`${label}: no page errors`);
     }catch(error){failures.push(error.message.split('\n')[0]);}finally{await context.close();}
    }
