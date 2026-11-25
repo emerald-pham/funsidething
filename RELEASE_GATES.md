@@ -63,7 +63,9 @@ specialist wrote one, and refuses that file when
 fills the fields left empty: every `summary`, the owner `scope.rationale`,
 `faqCoverage` and any `memoryScope` not filled from that file. `release:record` refuses them while empty. An
 `additionalSpecialistDomains` escalation is still added by hand, with the
-matching `specialistReview` domains.
+matching `specialistReview` domains. Then record the filled input by its path:
+`npm run release:record -- <report-directory>/receipt-input.json`. Its
+`faqCoverage.result` is `updated` or `no-user-facing-change`.
 
 The input fields below are what preparation writes. Record the candidate's full
 40-character commit SHA, tree SHA, and intended base SHA. Every schema version 2 input includes an

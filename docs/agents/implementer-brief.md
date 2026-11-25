@@ -23,6 +23,8 @@ your full spec.
 - For a functional change, call the Skill tool with `mattpocock-skills:tdd`
   and read its tests.md and mocking.md before your first test. Agreed seams:
   <seams>. Recorder evidence: `<evidence directory outside the checkout>`.
+- Changelog and Help text promise only what your tests exercise, and keep a
+  measured limit in its feature's bullet.
 
 ## Parallel siblings
 
@@ -31,7 +33,7 @@ your full spec.
 ## Finish
 
 - Run the focused groups your change touches, then
-  `node scripts/test-first-gate.mjs <full origin/main SHA>`. Run the gate
+  `node scripts/test-first-gate.mjs origin/main`. Run the gate
   against `origin/main`, never the integration base: CI compares with main, and
   in #2409 rationale entries that passed against the integration base failed CI.
 - Commit with messages referencing (#<N>).
