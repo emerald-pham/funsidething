@@ -1451,6 +1451,14 @@
       "group": "core",
       "file": "tests/core.test.js",
       "reason": "#2421 removed WOOP: renamed: the WOOP lifecycle answers this root required are gone, so it now requires their absence; its section and dependency-filter assertions are unchanged. See the #2421 rationale."
+    },
+    {
+      "baselineRoot": "RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes",
+      "currentRoot": "RISK repository process: preflight without --base catches outgoing upstream rationale gaps after the default base passes, and an explicit --base compares only with that base",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/repository-process.test.js",
+      "reason": "#2488 made an explicit --base preflight's only comparison: renamed: the outgoing upstream gap is now checked without --base, and an explicit --base run must compare only with that base. See the #2488 rationale."
     }
   ]
 }

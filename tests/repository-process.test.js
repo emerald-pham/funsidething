@@ -247,6 +247,52 @@ test('RISK test-first gate: an app change paired with an edit to any split test 
  assert.match(weakened.stderr,/without an exact-diff rationale/);
 });
 
+// Spec #2488: the gate compares commits. In #2483 it passed on the previous
+// commit while the uncommitted test edit failed once committed, so it now
+// refuses to report on a tree whose tests, app or rationale are uncommitted.
+test('RISK test-first gate: uncommitted test, app or rationale changes are refused with a request to commit first',async t=>{
+ const os=await import('node:os'),root=fs.mkdtempSync(path.join(os.tmpdir(),'chain-dirty-gate-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const git=(...args)=>{const r=spawnSync('git',args,{cwd:root,encoding:'utf8'});assert.equal(r.status,0,r.stderr);return r.stdout.trim();};
+ const write=(file,text)=>{fs.mkdirSync(path.dirname(path.join(root,file)),{recursive:true});fs.writeFileSync(path.join(root,file),text);};
+ write('scripts/test-first-gate.mjs',fs.readFileSync(path.join(__dirname,'scripts/test-first-gate.mjs'),'utf8'));
+ const weighted="test('scan: weight',()=>{\n assert.equal(weight(),2);\n});\n";
+ write('index.html','<p>old</p>\n');write('tests/core.test.js',weighted);write('TEST_CHANGE_RATIONALES.json','[]\n');write('notes.md','base\n');
+ git('init','-q');git('config','user.email','gate@example.invalid');git('config','user.name','Gate fixture');git('add','.');git('commit','-qm','base');
+ const base=git('rev-parse','HEAD');
+ write('index.html','<p>new</p>\n');write('tests/core.test.js',weighted+"test('RISK scan: new boundary',()=>{});\n");git('add','.');git('commit','-qm','app change with a test');
+ const gate=()=>spawnSync(process.execPath,['scripts/test-first-gate.mjs',base],{cwd:root,encoding:'utf8'});
+ const clean=gate();
+ assert.equal(clean.status,0,'positive control: the committed change passes: '+clean.stdout+clean.stderr);
+ write('notes.md','an unrelated note\n');
+ const unrelated=gate();
+ assert.equal(unrelated.status,0,'an uncommitted file the gate does not classify leaves the check alone: '+unrelated.stdout+unrelated.stderr);
+ // The #2483 shape: the assertion is dropped but not yet committed.
+ write('tests/core.test.js',"test('scan: weight',()=>{\n});\ntest('RISK scan: new boundary',()=>{});\n");
+ const dirtyTest=gate();
+ assert.notEqual(dirtyTest.status,0,'an uncommitted weakened test cannot pass on the previous commit: '+dirtyTest.stdout);
+ assert.match(dirtyTest.stderr,/commit/i);assert.match(dirtyTest.stderr,/tests\/core\.test\.js/);
+ assert.doesNotMatch(dirtyTest.stdout,/gate passed/);
+ git('checkout','--','tests/core.test.js');
+ write('TEST_CHANGE_RATIONALES.json','[{"reason":"draft"}]\n');
+ const dirtyRationale=gate();
+ assert.notEqual(dirtyRationale.status,0,'an uncommitted rationale is not the one the commit carries');
+ assert.match(dirtyRationale.stderr,/TEST_CHANGE_RATIONALES\.json/);
+ git('checkout','--','TEST_CHANGE_RATIONALES.json');
+ write('landscape.js','const hue = 30;\n');write('tests/scenery.test.js',"test('sky: hue',()=>{});\n");
+ const untracked=gate();
+ assert.notEqual(untracked.status,0,'new app and test files that are not committed yet are refused too');
+ assert.match(untracked.stderr,/landscape\.js/);assert.match(untracked.stderr,/tests\/scenery\.test\.js/);
+ fs.rmSync(path.join(root,'landscape.js'));fs.rmSync(path.join(root,'tests/scenery.test.js'));
+ write('tests/core.test.js',"test('scan: weight',()=>{\n});\ntest('RISK scan: new boundary',()=>{});\n");git('commit','-qam','drop the assertion');
+ const committed=gate();
+ assert.equal(committed.status,1,'once committed, the weakened test is checked and needs its rationale');
+ assert.match(committed.stderr,/without an exact-diff rationale/);
+ const {uncommittedGateFiles}=await import('../scripts/test-first-gate.mjs');
+ assert.deepEqual(uncommittedGateFiles(['R  tests/scenery.test.js','tests/core.test.js',' M notes.md','?? docs/plan.md','']),['tests/core.test.js','tests/scenery.test.js'],
+  'a staged rename names both its paths, and unclassified files are left out');
+});
+
 test('RISK test-first gate: a root tests.js is no longer a test file and adding or editing one is rejected',async t=>{
  const {validateTestFirst}=await import('../scripts/test-first-gate.mjs');
  const risk=['+test("RISK eligibility: boundary",()=>{})'];
@@ -747,6 +793,70 @@ test('RISK repository process: release prepare takes specialist domains from the
   fs.writeFileSync(inputPath,JSON.stringify(input,null,2)+'\n');
   const recorded=releaseCommand(fixture,'record',inputPath);
   assert.equal(recorded.status,0,recorded.stdout+recorded.stderr);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+// Spec #2488: the specialist writes the receipt's memory scope to
+// memory-scope.json in the release directory, so nobody retypes ~5 KB of JSON
+// from the reviewer's reply.
+test('RISK repository process: release prepare fills the memory scope from memory-scope.json and refuses an invalid one',()=>{
+ const fixture=datedReleaseFixture({candidate:{'scripts/cloud-sync.mjs':'export const cloudValue = 2;\n'}});
+ try{
+  const header=(completed,body='The review of the exact diff.\n')=>releaseReportHeader(fixture.candidateSha,'approved',completed)+body;
+  const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z','The owner read the exact diff.\n'),
+   'independent-review.md':header('2026-11-01T11:53:58.000Z'),'specialist-review.md':header('2026-11-01T12:05:26.000Z')});
+  const inputPath=path.join(reports,'receipt-input.json'),scopePath=path.join(reports,'memory-scope.json');
+  const prepare=()=>releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  const missing=prepare();
+  assert.equal(missing.status,0,missing.stdout+missing.stderr);
+  const unassessed={affected:null,rationale:'',tests:[]};
+  assert.deepEqual(JSON.parse(fs.readFileSync(inputPath,'utf8')).specialistReview.memoryScope,{memory:unassessed,cloud:unassessed,sync:unassessed},
+   'with no memory-scope.json the scope stays empty for a person to fill');
+  fs.rmSync(inputPath);
+  const scope={
+   memory:{affected:false,rationale:'The candidate changes no in-memory board state.',tests:[]},
+   cloud:{affected:true,rationale:'The cloud value constant changes what the tool reports.',tests:['RISK cloud sync tool: reports the cloud value']},
+   sync:{affected:false,rationale:'No sync ordering or revision code changes.',tests:[]},
+  };
+  for(const [invalid,named] of [['{"memory":',/memory-scope\.json/],[JSON.stringify({...scope,sync:{affected:false,rationale:'short',tests:[]}}),/memory-scope\.json[\s\S]*sync/]]){
+   fs.writeFileSync(scopePath,invalid);
+   const refused=prepare();
+   assert.notEqual(refused.status,0,'an invalid memory-scope.json cannot enter the receipt input');
+   assert.match(refused.stderr,named);
+   assert.equal(fs.existsSync(inputPath),false,'nothing is written from an invalid scope');
+  }
+  fs.writeFileSync(scopePath,JSON.stringify(scope,null,2)+'\n');
+  const filled=prepare();
+  assert.equal(filled.status,0,filled.stdout+filled.stderr);
+  const input=JSON.parse(fs.readFileSync(inputPath,'utf8'));
+  assert.deepEqual(input.specialistReview.memoryScope,scope,'the receipt input carries the specialist\'s scope as written');
+  input.ownerReview.summary='The owner read every line of the exact candidate diff.';
+  input.ownerReview.scope.rationale='A cloud tooling change fits the derived code and specialist reviews.';
+  input.independentReview.summary='The reviewer read the full diff and its tests and found no defect.';
+  input.specialistReview.summary='The specialist read the full diff and found no cloud or sync defect.';
+  fs.writeFileSync(inputPath,JSON.stringify(input,null,2)+'\n');
+  const recorded=releaseCommand(fixture,'record',inputPath);
+  assert.equal(recorded.status,0,recorded.stdout+recorded.stderr);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: the specialist checks memory-scope.json with the validator record uses',()=>{
+ const fixture=makeScaledReviewFixture({candidate:{'scripts/cloud-sync.mjs':'export const cloudValue = 2;\n'}});
+ try{
+  const scopePath=path.join(fixture.root,'memory-scope.json');
+  const entry=(tests=[])=>({affected:false,rationale:'This candidate leaves this area of saved data unchanged.',tests});
+  fs.writeFileSync(scopePath,JSON.stringify({memory:entry(['RISK cloud sync tool: keeps the saved board']),cloud:entry(),sync:entry()}));
+  const valid=releaseCommand(fixture,'memory-scope',scopePath);
+  assert.equal(valid.status,0,valid.stdout+valid.stderr);
+  assert.match(valid.stdout,/memory-scope\.json/);
+  fs.writeFileSync(scopePath,JSON.stringify({memory:entry(),cloud:entry(),sync:entry()}));
+  const untested=releaseCommand(fixture,'memory-scope',scopePath);
+  assert.notEqual(untested.status,0,'an all-unaffected scope still needs one focused preservation test, as record requires');
+  assert.match(untested.stderr,/memory-scope\.json.*focused/);
+  fs.writeFileSync(scopePath,JSON.stringify({memory:entry(),cloud:{affected:true,rationale:'The cloud constant changes.',tests:[]},sync:entry(['RISK cloud sync tool: keeps order'])}));
+  const unproven=releaseCommand(fixture,'memory-scope',scopePath);
+  assert.notEqual(unproven.status,0,'an affected area needs its own focused tests');
+  assert.match(unproven.stderr,/memory-scope\.json\.cloud/);
  }finally{cleanupReleaseGateFixture(fixture);}
 });
 
@@ -1394,6 +1504,22 @@ test('RISK repository process: a group runs with its declared Node heap instead 
  requirePinsPass('scripts/agent-tools/test-groups.test.mjs',['test group runs a group with its declared Node heap and rejects an invalid heap'],'group heap');
 });
 
+// #2489: main's aggregate failed with the covered-mode error after a full
+// routing whose final recheck verified none of the reused passes, and that
+// blocked the Pages deploy until a rerun. The mismatch now names both routing
+// decisions. The executed, mixed, emulator and covered aggregate pins run beside
+// it so the fix leaves those paths exactly as they were.
+test('RISK repository process: the scanner aggregate names both routing decisions when the final recheck drops reused passes',()=>{
+ requirePinsPass('scripts/agent-tools/test-groups.test.mjs',[
+  'test group aggregate names both routing decisions when the final routing no longer verifies the reused passes',
+  'test group aggregate verifies the complete actual cohort and native artifacts',
+  'test group aggregate reconciles reused and executed groups with fresh original proof',
+  'test group aggregate preserves observer protocol across emulator coverage and fresh fallback',
+  'test group input aggregation rejects stale missing and fabricated coverage',
+  'test group covered aggregate requires four honest references and fresh original producer proof',
+ ],'routing-mismatch aggregate');
+});
+
 // The nightly cross-engine move is pinned at the agreed seams (the CI workflow
 // files in the CI-routing tests, and test:group --aggregate in the test-group
 // tests); this process RISK requires those pins to execute and pass.
@@ -1944,6 +2070,42 @@ test('RISK repository process: changed-line review plan fails closed on large pa
   'script inside an SVG is code');
 });
 
+// Spec #2488: specialist reviews come from app changes. Like the earlier
+// policies, the committed AGENTS.md sentence must be at both base and head.
+const APP_CHANGE_SPECIALIST_POLICY_TEXT_2488=CHANGED_LINE_POLICY_TEXT_2234+'Specialist reviews come from app changes, not test files or test-group assignments.\n';
+test('RISK repository process: test files and test-group assignments derive no specialist domain, while app storage code still does',async()=>{
+ const {deriveReleaseReviewPlan}=await import('../scripts/release-evidence.mjs');
+ const plan=(base,candidate,policy=APP_CHANGE_SPECIALIST_POLICY_TEXT_2488)=>{
+  const f=makeScaledReviewFixture({base,candidate,agentsBase:policy,agentsHead:policy});
+  try{return deriveReleaseReviewPlan(f.repo,f.candidateSha,f.baseSha);}finally{cleanupReleaseGateFixture(f);}
+ };
+ // The #2487 shape: one CSS value in the app, a new test whose name says
+ // "saved", a helper edit beside a Firebase line, and a test-assignment row.
+ const page=justify=>`<!doctype html>\n<style>\n.actionrow{display:flex;justify-content:${justify}}\n</style>\n<body>\n<script>\nfunction boot(){ start(); }\n</script>\n</body>\n`;
+ const helper=probe=>`export async function savedViewBrowser(page){\n  if(options.holdConfiguredFirebaseImports)await page.evaluate(()=>localStorage.setItem('hold','true'));\n  const rects=root=>${probe};\n  return rects;\n}\n`;
+ const assignments=rows=>JSON.stringify({environmentSkips:rows},null,2)+'\n';
+ const base={'index.html':page('flex-end'),'tests/shared.js':helper('[]'),'tests/core.test.js':"test('scan: rows',()=>{});\n",
+  'tests/persistence-recovery.test.js':"test('recovery: keeps the saved board',()=>{});\n",
+  'scripts/agent-tools/cloud-sync.test.mjs':"test('cloud sync: pull',()=>{});\n",'scripts/test-group-assignments.json':assignments([])};
+ const tests={'tests/shared.js':helper("[...root.querySelectorAll('.actionrow > button')].map(b=>b.getBoundingClientRect().left)"),
+  'tests/core.test.js':"test('scan: rows',()=>{});\ntest('RISK saved view: action rows start at the left edge after a localStorage reload',()=>{ localStorage.getItem('fvp:chain-scanner:v1'); });\n",
+  'tests/persistence-recovery.test.js':"test('recovery: keeps the saved board',()=>{});\ntest('recovery: a cloud sync session restores the backup',()=>{ firestore.saveBoard(); });\n",
+  'scripts/agent-tools/cloud-sync.test.mjs':"test('cloud sync: pull',()=>{});\ntest('cloud sync: signIn token persists',()=>{});\n",
+  'scripts/test-group-assignments.json':assignments([{root:'RISK saved view: action rows start at the left edge after a localStorage reload',environment:'LANDSCAPE_BROWSER_URL'}])};
+ const cssOnly=plan(base,{...tests,'index.html':page('flex-start')});
+ assert.deepEqual(cssOnly.specialistDomains,[],'one CSS line plus test-file and test-assignment edits derives no specialist domain');
+ assert.equal(cssOnly.mode,'independent-review','the test edits still get the independent code review');
+ assert.equal(cssOnly.requiresTypographyReview,true,'the CSS value still gets the typography review');
+ assert.deepEqual(plan(base,tests).specialistDomains,[],'a test-only diff derives no specialist domain');
+ const storagePage=page('flex-start').replace('start();','localStorage.setItem("fvp:chain-scanner:v1", "{}"); start();');
+ assert.deepEqual(plan(base,{...tests,'index.html':storagePage}).specialistDomains,['memory-cloud-sync'],
+  'an app diff that touches storage code still derives the persistence specialist');
+ assert.deepEqual(plan({'cloud-store.js':'export const rev = 1;\n'},{'cloud-store.js':'export const rev = 2;\n','tests/core.test.js':"test('RISK cloud store: rev',()=>{});\n"}).specialistDomains,
+  ['memory-cloud-sync'],'an app sync module still derives the persistence specialist by its path');
+ assert.deepEqual(plan(base,{...tests,'index.html':page('flex-start')},CHANGED_LINE_POLICY_TEXT_2234).specialistDomains,['memory-cloud-sync','security-deployment','shared-session-state'],
+  'a candidate whose base predates the policy keeps its earlier classification, so its receipt still verifies');
+});
+
 test('RISK repository process: changed-line review plan skips typography for text-only edits inside existing elements',async()=>{
  const {deriveReleaseReviewPlan}=await import('../scripts/release-evidence.mjs');
  const typography=(base,candidate)=>{
@@ -2233,7 +2395,10 @@ test('RISK repository process boundary: visual test requirements live in the ren
  assert.match(policy,/changed controls or layout.*rendered-evidence\.md/i,'the always-loaded instructions must still route changed controls or layout to the requirements');
  assert.match(policy,/computed color scheme and paint/i,'theme labels must not substitute for actual applied colors');assert.match(policy,/theme labels alone.*not.*coverage/i);
 });
-test('RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes',async t=>{
+// #2488: an explicit --base became the whole comparison, so the outgoing
+// upstream check is exercised on the default path and --base is checked to
+// leave the branch's last push alone.
+test('RISK repository process: preflight without --base catches outgoing upstream rationale gaps after the default base passes, and an explicit --base compares only with that base',async t=>{
  const os=await import('node:os'),fixture=fs.mkdtempSync(path.join(os.tmpdir(),'chain-preflight-outgoing-'));
  t.after(()=>fs.rmSync(fixture,{recursive:true,force:true}));
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
@@ -2255,11 +2420,16 @@ test('RISK repository process: preflight catches outgoing upstream rationale gap
  assert.equal(selectedGate.status,0,selectedGate.stderr);assert.equal(outgoingGate.status,1,outgoingGate.stderr);
  assert.match(outgoingGate.stderr,/without an exact-diff rationale/,'real existing rationale gate distinguishes the outgoing delta');
  const before={refs:git('show-ref'),head:git('rev-parse','HEAD'),status:git('status','--porcelain','--untracked-files=no'),config:git('config','--local','--list')};
- const result=run(path.join(__dirname,'scripts/agent-tools/preflight.mjs'),'--base',selectedBase),output=result.stdout+result.stderr;
+ const result=run(path.join(__dirname,'scripts/agent-tools/preflight.mjs')),output=result.stdout+result.stderr;
  assert.equal(result.status,1,`selected-base validation passed, but preflight must reject the missing outgoing rationale:\n${output}`);
  assert.match(output,/upstream/i,'failure identifies the outgoing upstream comparison');assert.match(output,/without an exact-diff rationale/);
  assert.equal((output.match(/^✔ Landscape location:/gm)||[]).length,1);assert.equal((output.match(/^✔ RISK Quick start content:/gm)||[]).length,1);
  assert.equal((output.match(/Test-first diff gate passed\./g)||[]).length,1,'selected-base rationale runs once before upstream rejects');
+ assert.match(output,new RegExp(`selected base, base ${selectedBase}`),'with no --base the selected comparison is the main merge base');
+ const explicit=run(path.join(__dirname,'scripts/agent-tools/preflight.mjs'),'--base',selectedBase),explicitOutput=explicit.stdout+explicit.stderr;
+ assert.equal(explicit.status,0,`an explicit --base is the only comparison, so the outgoing delta is not checked:\n${explicitOutput}`);
+ assert.doesNotMatch(explicitOutput,/upstream/i,'the branch last push is not compared when --base is given');
+ assert.equal((explicitOutput.match(/Test-first diff gate passed\./g)||[]).length,1,'the explicit base runs once');
  assert.deepEqual({refs:git('show-ref'),head:git('rev-parse','HEAD'),status:git('status','--porcelain','--untracked-files=no'),config:git('config','--local','--list')},before,'preflight preserves local refs, HEAD, tracked files and configuration');
 });
 

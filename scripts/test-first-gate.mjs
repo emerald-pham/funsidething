@@ -67,6 +67,25 @@ export function validateTestFirst(changedFiles,addedTestLines,deletedFiles=[],bo
   return errors;
 }
 
+// The gate compares commits, but in #2483 it passed on the previous commit
+// while an uncommitted test edit failed once committed, and two reviewers had
+// to catch it (#2488). So the files it classifies (tests, app, enforcement and
+// the rationale ledger) must be committed before it reports. Other files, such
+// as notes, leave the check alone. Paths come from `git status -z`.
+const RATIONALE_FILE='TEST_CHANGE_RATIONALES.json';
+export function uncommittedGateFiles(statusEntries){
+  const files=[];
+  for(let index=0;index<statusEntries.length;index++){
+    const entry=statusEntries[index];if(!entry)continue;
+    const code=entry.slice(0,2),file=entry.slice(3);
+    // A rename or copy carries its source path as the next entry; both count.
+    const paths=/[RC]/.test(code)?[file,statusEntries[++index]]:[file];
+    for(const changed of paths)
+      if(changed&&(isTestFile(changed)||changed===LEGACY_TEST_FILE||changed===RATIONALE_FILE||isAppFile(changed)||isProcessFile(changed))&&!files.includes(changed))files.push(changed);
+  }
+  return files.sort();
+}
+
 // The fingerprint covers every executable test change so a record cannot be
 // reused for a different diff. Blank lines and single-line comments cannot
 // change what runs, so they are left out. With several test files each line
@@ -198,17 +217,23 @@ if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.
     process.stderr.write('A zero base SHA has no commit to compare. Resolve the base against the default branch before running the gate.\n');process.exitCode=2;
   }else{
     try{
-      const diff=(...args)=>execFileSync('git',['diff',...args,`${base}...HEAD`],{encoding:'utf8'});
-      const changed=diff('--name-only','--diff-filter=ACMRTD').trim().split('\n').filter(Boolean);
-      const deleted=diff('--name-only','--diff-filter=D').trim().split('\n').filter(Boolean);
-      // tests.js stays in the protected diff because a base from before the
-      // split still has it: deleting its tests must need a record like any other.
-      const testDiff=execFileSync('git',['diff','--unified=0',`${base}...HEAD`,'--',LEGACY_TEST_FILE,'tests'],{encoding:'utf8',maxBuffer:256*1024*1024}).split('\n');
-      const records=fs.existsSync('TEST_CHANGE_RATIONALES.json')?JSON.parse(fs.readFileSync('TEST_CHANGE_RATIONALES.json','utf8')):[];
-      const bookkeeping=changed.filter(file=>/(?:^|\/)(?:[^/]+\.html?|sw\.js)$/i.test(file)&&!deleted.includes(file)&&onlyReleaseBookkeeping(base,file));
-      const errors=[...validateTestFirst(changed,testDiff,deleted,bookkeeping),...validateRegressionChanges(testDiff,records)];
-      if(errors.length){process.stderr.write(errors.join('\n')+'\n');process.exitCode=1;}
-      else process.stdout.write('Test-first diff gate passed.\n');
+      const uncommitted=uncommittedGateFiles(execFileSync('git',['status','--porcelain=v1','-z','--untracked-files=all'],{encoding:'utf8',maxBuffer:64*1024*1024}).split('\0'));
+      if(uncommitted.length){
+        process.stderr.write(`Commit first: the test-first gate checks commits, not the working tree, and these files the gate checks have uncommitted changes: ${uncommitted.join(', ')}.\n`);
+        process.exitCode=1;
+      }else{
+        const diff=(...args)=>execFileSync('git',['diff',...args,`${base}...HEAD`],{encoding:'utf8'});
+        const changed=diff('--name-only','--diff-filter=ACMRTD').trim().split('\n').filter(Boolean);
+        const deleted=diff('--name-only','--diff-filter=D').trim().split('\n').filter(Boolean);
+        // tests.js stays in the protected diff because a base from before the
+        // split still has it: deleting its tests must need a record like any other.
+        const testDiff=execFileSync('git',['diff','--unified=0',`${base}...HEAD`,'--',LEGACY_TEST_FILE,'tests'],{encoding:'utf8',maxBuffer:256*1024*1024}).split('\n');
+        const records=fs.existsSync(RATIONALE_FILE)?JSON.parse(fs.readFileSync(RATIONALE_FILE,'utf8')):[];
+        const bookkeeping=changed.filter(file=>/(?:^|\/)(?:[^/]+\.html?|sw\.js)$/i.test(file)&&!deleted.includes(file)&&onlyReleaseBookkeeping(base,file));
+        const errors=[...validateTestFirst(changed,testDiff,deleted,bookkeeping),...validateRegressionChanges(testDiff,records)];
+        if(errors.length){process.stderr.write(errors.join('\n')+'\n');process.exitCode=1;}
+        else process.stdout.write('Test-first diff gate passed.\n');
+      }
     }catch(error){process.stderr.write(`Could not compare ${base} to HEAD: ${error.message}\n`);process.exitCode=2;}
   }
 }
