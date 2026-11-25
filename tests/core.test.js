@@ -43991,6 +43991,20 @@ test('Changelog #2486: the November 25 notes say quick Done taps each count and 
  assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the Help topic length');
 });
 
+// #2484: with sync on, the next task shows sooner after a Yes on a large
+// board. The #2484 tests drive Yes, and the browser measurement behind the
+// bullet tapped Yes, so it promises Yes alone, with what was measured and the
+// limit that a slower phone can still hold some taps.
+test('Changelog #2484: the November 25 notes say that with sync on the next task shows sooner after a Yes on a large board, with what was measured and that a slower phone can still hold some quick taps',()=>{
+ const notes=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ const items=(notes.split('<h3>November 25, 2026</h3>')[1]?.split('</ul>')[0]||'').split('<li>').slice(1);
+ const sooner=items.filter(item=>/With sync on, the next task now shows sooner after a Yes on a large board/.test(item));
+ assert.equal(sooner.length,1,'one bullet is about the next task showing sooner with sync on: '+items.join(' | '));
+ assert.match(sooner[0],/ten Yes taps a fifth of a second apart all counted/,'it says what was measured');
+ assert.match(sooner[0],/A slower phone can still hold some quick taps/,'and keeps the limit with its feature');
+ assert.doesNotMatch(sooner[0],/\bNo\b|Done|Can’t|catch|paint|frame|guard|debounce|\d\s*ms\b/i,'it promises Yes alone and says what the person sees, not how it works');
+});
+
 // #2455 review: the November 23 changelog has one feature per bullet: the
 // scenery's lighter frames apart from its later opening plan, the add box that
 // empties at once apart from the save after the frame, and the ranks that
