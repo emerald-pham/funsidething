@@ -44057,6 +44057,28 @@ test('Changelog #2484: the November 25 notes say that with sync on the next task
  assert.doesNotMatch(sooner[0],/\bNo\b|Done|Can’t|catch|paint|frame|guard|debounce|\d\s*ms\b/i,'it promises Yes alone and says what the person sees, not how it works');
 });
 
+// #2474: the action rows' lines are balanced when they wrap. The browser
+// sweeps drive Chromium and WebKit at phone widths from 320 to 480 px (and
+// tablet and desktop) with web fonts and blocked: at the normal text size
+// Delete never sits alone on the last line under either card, and no row takes
+// more lines than on the base build at 100%, 150% and 200% text and Chrome's
+// minimum font size. No test reads how the four candidate actions split, and
+// a browser without balanced lines (before Chrome 114 and Safari 17.5) fills
+// them greedily, as before. #2490 review (independent N4): so the bullet
+// promises what those sweeps check, in the browsers they ran, with that
+// limit beside it.
+test('Changelog #2474: the November 25 notes say Delete no longer sits alone under either task at the normal text size on phones and no row takes more lines, as checked in Chrome and Safari, and that older browsers still can leave it alone',()=>{
+ const notes=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ const items=(notes.split('<h3>November 25, 2026</h3>')[1]?.split('</ul>')[0]||'').split('<li>').slice(1);
+ const rows=items.filter(item=>/Delete no longer sits alone/.test(item));
+ assert.equal(rows.length,1,'one bullet is about Delete sitting alone: '+items.join(' | '));
+ assert.match(rows[0],/At the normal text size on phones, Delete no longer sits alone on the last line of actions under the dotted task or under the task you’re weighing/,'it names the text size and both rows the sweep checks');
+ assert.match(rows[0],/neither row takes more lines than before/,'and that no row takes more lines');
+ assert.match(rows[0],/checked in Chrome and Safari on screens 320 to 480 pixels wide/,'it says where it was checked');
+ assert.match(rows[0],/Browsers older than Chrome 114 and Safari 17\.5 still fill each line in turn, so there Delete can still sit alone/,'and keeps the older-browser limit with its feature');
+ assert.doesNotMatch(rows[0],/two and two|split|Done|Yes|text-wrap|balance:|flex|\d\s*px\b/i,'it promises nothing the sweeps do not read and says what the person sees');
+});
+
 // #2455 review: the November 23 changelog has one feature per bullet: the
 // scenery's lighter frames apart from its later opening plan, the add box that
 // empties at once apart from the save after the frame, and the ranks that
