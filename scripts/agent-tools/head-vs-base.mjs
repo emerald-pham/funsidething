@@ -16,18 +16,21 @@ import { fileURLToPath } from 'node:url';
 import { PORT_VARIABLES, applyPreparedPorts } from './worktree-ports.mjs';
 
 const worktreeReady = fileURLToPath(new URL('./worktree-ready.mjs', import.meta.url));
+const recordRun = fileURLToPath(new URL('./record-run.mjs', import.meta.url));
+const self = fileURLToPath(import.meta.url);
 const MESSAGE_LIMIT = 200;
 const KILL_GRACE_MS = 750;
 const USAGE = `usage: head-vs-base.mjs --file <test file> --pattern <test name pattern>
   [--runs <n per side, default 6>] [--parallel <p, default 6>] [--base <ref, default origin/main>]
-  [--node-option <option>]... [--json]`;
+  [--node-option <option>]... [--json] [--evidence-dir <dir> --purpose <recorder purpose>]`;
 
 class UsageError extends Error {}
 
 function parseArguments(argv) {
-  const options = { runs: 6, parallel: 6, base: 'origin/main', nodeOptions: [], json: false };
+  const options = { runs: 6, parallel: 6, base: 'origin/main', nodeOptions: [], json: false, comparisonArgs: [] };
   for (let index = 0; index < argv.length; index += 1) {
     const name = argv[index];
+    const start = index;
     const value = () => {
       const next = argv[index + 1];
       if (next === undefined) throw new UsageError(`${name} needs a value`);
@@ -41,8 +44,12 @@ function parseArguments(argv) {
     else if (name === '--base') options.base = value();
     else if (name === '--node-option') options.nodeOptions.push(value());
     else if (name === '--json') options.json = true;
+    else if (name === '--evidence-dir') options.evidenceDir = value();
+    else if (name === '--purpose') options.purpose = value();
     else throw new UsageError(`unknown option ${name}`);
+    if (name !== '--evidence-dir' && name !== '--purpose') options.comparisonArgs.push(...argv.slice(start, index + 1));
   }
+  if ((options.evidenceDir === undefined) !== (options.purpose === undefined)) throw new UsageError('--evidence-dir and --purpose go together');
   if (!options.file) throw new UsageError('--file is required');
   if (options.pattern === undefined) throw new UsageError('--pattern is required');
   return options;
@@ -245,9 +252,31 @@ function printReport(report) {
   console.log(lines.join('\n'));
 }
 
+// The recorder runs the plain comparison as its child and keeps its command,
+// output, exit and source identity, as for any other recorded test run.
+let recorder;
+
+function recordComparison(headRoot, options) {
+  return new Promise((resolvePromise) => {
+    recorder = spawn(process.execPath, [
+      recordRun, '--repo', headRoot, '--evidence-dir', options.evidenceDir, '--purpose', options.purpose,
+      '--', process.execPath, self, ...options.comparisonArgs,
+    ], { cwd: headRoot, stdio: 'inherit' });
+    recorder.on('error', (error) => {
+      console.error(`head-vs-base: the recorder did not start: ${error.message}`);
+      resolvePromise(2);
+    });
+    recorder.on('close', (status, signal) => resolvePromise(status ?? 128 + constants.signals[signal]));
+  });
+}
+
 async function main() {
   const options = parseArguments(process.argv.slice(2));
   const headRoot = realpathSync(await git(process.cwd(), 'rev-parse', '--show-toplevel'));
+  if (options.evidenceDir !== undefined) {
+    process.exitCode = await recordComparison(headRoot, options);
+    return;
+  }
   const headSha = await git(headRoot, 'rev-parse', 'HEAD');
   const dirty = (await git(headRoot, 'status', '--porcelain')) !== '';
   const baseSha = await git(headRoot, 'rev-parse', '--verify', '--end-of-options', `${options.base}^{commit}`);
@@ -281,7 +310,10 @@ async function main() {
   }
 }
 
-for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => interrupt(signal));
+// Under the recorder, the recorder stops the comparison and records that.
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+  process.on(signal, () => (recorder ? recorder.kill(signal) : interrupt(signal)));
+}
 
 main().catch((error) => {
   console.error(`head-vs-base: ${error.message}`);

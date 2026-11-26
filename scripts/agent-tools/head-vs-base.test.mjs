@@ -200,3 +200,26 @@ test("head-vs-base gives the base runs the ports worktree-ready claimed for the 
     rmSync(setup.fixture, { recursive: true, force: true });
   }
 });
+
+test('head-vs-base records its comparison through the test-run recorder when given an evidence directory', () => {
+  const setup = createFixture('chain-head-vs-base-record-', {
+    base: `${PROBE_HEADER}test('save loop probe', () => {});\n`,
+    head: `${PROBE_HEADER}test('save loop probe', () => { assert.equal(1, 2, 'head broke the save loop'); });\n`,
+  });
+  const evidence = join(setup.fixture, 'evidence');
+  try {
+    const result = compare(['--file', 'probe.test.js', '--pattern', 'save loop', '--runs', '2', '--parallel', '2', '--base', 'main',
+      '--evidence-dir', evidence, '--purpose', 'later-baseline-sensitivity'], setup);
+    assert.equal(result.status, 1, `the recorded comparison keeps its exit status\n${result.stderr}`);
+    const records = existsSync(evidence) ? readdirSync(evidence).filter((name) => name.endsWith('.json')) : [];
+    assert.equal(records.length, 1, `one recorder record is written\n${result.stderr}`);
+    const record = JSON.parse(readFileSync(join(evidence, records[0]), 'utf8'));
+    assert.equal(record.declaredPurpose, 'later-baseline-sensitivity');
+    assert.equal(record.execution.exitCode, 1, 'the record holds the comparison exit');
+    assert.match(record.execution.output.stdout, /^head .*: 0 passed, 2 failed, 0 not run$/m, "the record holds the head side's counts");
+    assert.match(record.execution.output.stdout, /^base main .*: 2 passed, 0 failed, 0 not run$/m, "the record holds the base side's counts");
+    assert.ok(!record.command.args.includes('--evidence-dir'), 'the recorded comparison is the plain command, not a second recording');
+  } finally {
+    rmSync(setup.fixture, { recursive: true, force: true });
+  }
+});
