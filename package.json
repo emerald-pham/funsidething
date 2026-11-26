@@ -18,6 +18,7 @@
     "agent:browser-audit": "node scripts/agent-tools/browser-audit.mjs",
     "agent:ci-monitor": "node scripts/agent-tools/ci-monitor.mjs",
     "agent:pr-body-update": "node scripts/agent-tools/pr-body-update.mjs",
+    "agent:head-vs-base": "node scripts/agent-tools/head-vs-base.mjs",
     "test:rules": "firebase emulators:exec --only firestore --project demo-chain-scanner-data-safety \"node --test --test-name-pattern='Firestore rules:' tests/core.test.js\"",
     "test:compatibility": "firebase emulators:exec --only firestore --project demo-backward-compatibility \"node scripts/backward-compatibility.mjs\"",
     "release:install-hook": "node scripts/install-release-hook.mjs",

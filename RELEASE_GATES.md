@@ -32,7 +32,11 @@ version 2 and the risk plan derived from the exact diff.
 ## Prepare and record evidence
 
 Create the final candidate commit first. Print the plan before reviews start:
-`npm run release:plan -- <candidate-sha> <base-sha>`.
+`npm run release:plan -- <candidate> <base>`. Both commands take any commit ref
+(`HEAD`, `origin/main`, a branch or an abbreviated SHA), resolve it to the full
+SHA, and refuse one that names no commit; the receipt records full SHAs as
+before. Add `--summary` to print only the plan's mode, review flags and
+specialist domains, without the changed-file list.
 
 Put each required report outside the checkout in one directory, named
 `owner-review.md`, `independent-review.md` and `specialist-review.md`. Each
@@ -47,7 +51,7 @@ Completed: <UTC ISO timestamp with milliseconds>
 ```
 
 With the exact candidate checked out, run
-`npm run release:prepare -- <candidate-sha> <base-sha> <report-directory> <issue-number>`.
+`npm run release:prepare -- <candidate> <base> <report-directory> <issue-number>`.
 It writes `receipt-input.json` beside the reports, with digests, the plan's
 domains and each report's time. It refuses a report that names another commit,
 has no approved verdict, or has a missing or future time or one earlier than the
