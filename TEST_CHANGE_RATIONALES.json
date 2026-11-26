@@ -25407,5 +25407,77 @@
       "command": "node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <git-common-dir>/agent-test-runs/issue-2484 --purpose later-baseline-sensitivity -- node --test --test-name-pattern=\"RISK one save per answer: (a single Yes with nothing else syncing still pushes at once|a push that starts while the answer’s own device save is still running)\" tests/persistence-recovery.test.js, and the same with --test-name-pattern=\"a record’s reply counts toward Synced only through the Sync session\"; and, for the two change-record tests, --test-name-pattern=\"RISK change records: (a record whose device row is still saving when the account switches|a record is saved on the device before it is sent)\" on the head before they moved, then with them moved but each check left at the zero-delay advance, then with only the own-save check left there For this branch: node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <git-common-dir>/agent-test-runs/issue-2484 --purpose preimplementation-red -- node --test --test-name-pattern=\"signed out on the large board, at Yes taps 300 to 500\" tests/persistence-recovery.test.js at 4c1418ca with only the test added; the same at main 49c89b54's index.html (later-baseline-sensitivity) and after the fix (green). For branch ticket/2490-dup-decision: node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <git-common-dir>/agent-test-runs/issue-2484-dup-decision --purpose preimplementation-red -- zsh repeat-test.sh <out> 160 4 \"on the large board with sync off, ten Yes taps at a steady 200 ms\" (the #2481 rhythm test, one node process a run, until a run fails), with a temporary dump of the scanner state when a tap finds no button.",
       "failure": "Run once the catch-up waited for the frame, before these tests moved by it. Record 2026-11-25T13-17-26-554Z-c906c13e: \"the Yes is pushed without waiting for any timer\" (actual 0, expected 1) and \"positive control: the push has started: [push-debounce, device-save, device-save]\". Record 2026-11-25T13-25-24-029Z-1a6a32d1: \"obsolete: positive control: the record is being sent\". Each passes once it reads the clock one frame later. The #2484 behavioral RED for the change itself is record 2026-11-25T13-11-28-224Z-623db94f (the catch-up ran before the frame: History and rank draws written, the record saved and sent). The integration entry above records its own lines' red runs. Change-record tests: record 2026-11-25T14-34-34-936Z-56d41eb9, run on this build before they moved: \"positive control: the first answer’s device row is still saving\" (actual 0, expected 1), while the save-before-send test passed with its other-copy and own-save checks read before the catch-up ran. Record 2026-11-25T14-34-57-146Z-907bab08, moved with each check left at the zero-delay advance: \"another copy writing: positive control: the answer has caught up\" and the account-switch control fail. Record 2026-11-25T14-35-17-310Z-94b19800, with only the own-save check left there: \"positive control: the second record is saved on the device and sent before this device’s own save returns\" (order [device, cloud] of four). Each passes at 16 ms. For this branch: record 2026-11-25T21-14-39-779Z-530b486c at 4c1418ca: \"taps 300 ms apart, frames 16 ms late: every answer is saved within 350 ms of its tap or with an answer given within 350 ms after it; late at [2100]\", with no device save in any of the five runs and 0 of 8 answers kept after the close in each. On main's index.html (record 2026-11-25T21-15-05-290Z-1bd9e633) and after the fix (record 2026-11-25T21-17-53-994Z-bb4d7190) every run saved each answer 350 ms after its tap and kept all 8. The timing test's own failure on efficiency cores (medians 303.5 and 306.5 ms) is in the independent review of 4c1418ca. The longest-wait test on 4c1418ca's index.html (record 2026-11-25T21-35-46-941Z-f06e9fee): \"a device save runs while the answers go on\", with one save, 950 ms after the last tap; after the fix (record 2026-11-25T21-35-29-059Z-4a7f67be) saves ran 1350 and 3030 ms into the run. For branch ticket/2490-dup-decision: record 2026-11-26T01-23-45-421Z-5acb68c1-4103-414d-a5a8-e7dee497282e: run 43 of 44 failed \"the scanner shows a yes button\": the scanner showed the check-in (its continue-scan and start-working buttons, interventionActive with interventionP 0.206 under the 25% threshold) after 33 Yes answers, on a chain of 35 with no task twice and 406 decisions all with unique ids."
     }
+  },
+  {
+    "baseCommit": "a33205a6fc8ca53d554d83be063b3eb8fe2e7f65",
+    "weakenedTestLines": [
+      "tests/core.test.js:-assert.deepEqual(layout.actions,['cand-done','edit','cand-worked','delete-task']);",
+      "tests/core.test.js:-assert.equal(await page.evaluate(()=>state.tasks.find(t=>t.title==='Dotted task').done),true,'deemphasis never disables task actions');",
+      "tests/core.test.js:-assert.equal(await page.locator('.actionrow').evaluate(e=>getComputedStyle(e).opacity),'1','finishing scanning restores full emphasis');",
+      "tests/core.test.js:-assert.equal(await page.locator('.actionrow').evaluate(e=>getComputedStyle(e).opacity),'1','keyboard focus restores readable brightness');",
+      "tests/core.test.js:-assert.equal(await page.locator('.btnwrap').evaluate(e=>getComputedStyle(e).opacity),'1','resume action is readable on keyboard focus');",
+      "tests/core.test.js:-assert.equal(await page.locator('.decide').evaluate(e=>getComputedStyle(e).opacity),'1','Yes/No decisions remain prominent');",
+      "tests/core.test.js:-assert.equal(layout.buttons[0].y,layout.buttons[1].y,'buttons begin in a horizontal row');",
+      "tests/core.test.js:-assert.ok(!layout.overflow,`no horizontal page overflow at ${width}px`);",
+      "tests/core.test.js:-assert.ok(await page.locator('.actionrow').evaluate(e=>+getComputedStyle(e).opacity)<1,'benchmark actions must visibly dim after all stylesheets load');",
+      "tests/core.test.js:-assert.ok(await page.locator('.siderail').evaluate(e=>+getComputedStyle(e).opacity)<1,'candidate management actions dim too');",
+      "tests/core.test.js:-assert.ok(layout.buttons.every(b=>b.x>=0&&b.right<=width),'every button stays inside the viewport');",
+      "tests/core.test.js:-assert.ok(layout.rail.y>=layout.card.bottom,`actions must be below the yellow card at ${width}px`);",
+      "tests/core.test.js:-await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));",
+      "tests/core.test.js:-await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));",
+      "tests/core.test.js:-await page.evaluate(()=>{addTask('Dotted task',true);addTask('Next task',false);state.interventionActive=false;render();});",
+      "tests/core.test.js:-await page.evaluate(()=>{addTask('Dotted task',true);addTask('Next task',false);state.interventionActive=false;render();});",
+      "tests/core.test.js:-await page.evaluate(theme=>document.documentElement.setAttribute('data-theme',theme),theme);",
+      "tests/core.test.js:-await page.goto(process.env.LANDSCAPE_BROWSER_URL);",
+      "tests/core.test.js:-await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'networkidle'});",
+      "tests/core.test.js:-await page.locator('#modalRoot [data-act=\"close-modal\"]').click();",
+      "tests/core.test.js:-await page.locator('#modalRoot [data-act=\"close-modal\"]').click();",
+      "tests/core.test.js:-await page.locator('.actionrow [data-act=\"bench-done\"]').click();",
+      "tests/core.test.js:-await page.locator('.actionrow [data-act=\"edit\"]').focus();",
+      "tests/core.test.js:-await page.locator('.btnwrap [data-act=\"resume-scan\"]').focus();",
+      "tests/core.test.js:-await page.locator('.decide [data-act=\"yes\"]').focus();",
+      "tests/core.test.js:-await page.locator('[data-act=\"start-working\"]').click();await page.mouse.move(0,0);",
+      "tests/core.test.js:-await page.mouse.move(0,0);",
+      "tests/core.test.js:-await page.setViewportSize({width,height:900});",
+      "tests/core.test.js:-const browser=await chromium.launch({headless:true,channel:'chrome'});",
+      "tests/core.test.js:-const browser=await chromium.launch({headless:true,channel:'chrome'});",
+      "tests/core.test.js:-const layout=await page.evaluate(()=>{",
+      "tests/core.test.js:-const page=await browser.newPage();",
+      "tests/core.test.js:-const page=await browser.newPage({viewport:{width:1000,height:900}});",
+      "tests/core.test.js:-const rail=document.querySelector('.siderail');",
+      "tests/core.test.js:-const rect=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom};};",
+      "tests/core.test.js:-const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT);",
+      "tests/core.test.js:-const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT);",
+      "tests/core.test.js:-for(const theme of ['light','dark']){",
+      "tests/core.test.js:-for(const width of [1000,390,320]){",
+      "tests/core.test.js:-if(width===1000) assert.ok(layout.buttons.every(b=>b.y===layout.buttons[0].y),'all buttons fit on one desktop row');",
+      "tests/core.test.js:-return {card:rect(document.querySelector('.cand')),rail:rect(rail),buttons:[...rail.querySelectorAll('button')].map(rect),actions:[...rail.querySelectorAll('button')].map(e=>e.dataset.act),overflow:document.documentElement.scrollWidth>innerWidth};",
+      "tests/core.test.js:-test('Scanner browser: secondary actions dim during scanning and brighten for focus or work', {skip:!process.env.LANDSCAPE_BROWSER_URL}, async()=>{",
+      "tests/core.test.js:-test('Scanner browser: yellow task actions run horizontally below the card and wrap on mobile', {skip:!process.env.LANDSCAPE_BROWSER_URL}, async()=>{",
+      "tests/core.test.js:-try{",
+      "tests/core.test.js:-try{",
+      "tests/core.test.js:-}",
+      "tests/core.test.js:-}",
+      "tests/core.test.js:-});",
+      "tests/core.test.js:-}finally{await browser.close();}",
+      "tests/core.test.js:-}finally{await browser.close();}"
+    ],
+    "reason": "#2479 (issue: \"Two Scanner browser tests can't start: their fixture writes the retired motion choice\"). The two September 2026 env-gated Scanner browser tests wrote the landscape motion choice as the plain string 'reduced'. The app now reads only {choice,savedAt}, so it treated the choice as unset, opened the motion dialog over the page, and the dialog caught each test's first click on the welcome modal's Close, so neither test ever reached an assertion. CI baseline-skips both, which hid it. Each test's init script now writes the current format (shared as scannerActionsMotionChoice), each runs in Chromium and WebKit through steadyScannerEngines instead of Chrome alone, its assertion messages name the engine (and theme) so a failure says where, and the dim test waits for #2461's press guard to release after Start working redraws the panel before it clicks the dotted task's Done. Each test's declaration gains a 120 s timeout, since it now drives two engines and a hung one should fail the run rather than stall it; that is why the two test( lines appear in the diff.",
+    "previousBehavior": "Both tests launched Chrome only and wrote localStorage 'fvp:chain-scanner:landscape-motion' as the string 'reduced'. On main a33205a6 both time out at setup: locator.click on '#modalRoot [data-act=\"close-modal\"]' waits 30 s while '<dialog open id=\"motionDialog\">' intercepts pointer events. The dim test clicked Done right after Start working with nothing waiting for the press guard, so a fast enough run would have its click held and Done not completed.",
+    "intendedBehavior": "Both tests start and every original assertion runs, in Chromium (Chrome channel by default, or LANDSCAPE_BROWSER_CHANNEL) and in WebKit: the yellow card's actions sit below it in a horizontal row that fits one desktop row, wraps inside the viewport at 390 and 320 px, keeps the order Done, Edit, Worked, Delete, and causes no page overflow; and the dim test's benchmark and candidate rows dim while scanning in light and dark, the Yes/No row stays at full opacity, keyboard focus brightens a row, Start working restores full emphasis, Resume is readable on focus, and Done still completes the dotted task once the guard lets a press through. Titles are unchanged.",
+    "replacementTests": [
+      "Scanner browser: yellow task actions run horizontally below the card and wrap on mobile",
+      "Scanner browser: secondary actions dim during scanning and brighten for focus or work"
+    ],
+    "preservedCoverage": [
+      "Every assertion of the yellow-actions test is kept at 1000, 390 and 320 px (below the card, a horizontal first row, one row on desktop, the four actions in order, no overflow, every button inside the viewport); messages gain the engine and width only.",
+      "Every assertion of the dim test is kept in both themes (benchmark and candidate rows dim, Yes/No stays at 1, keyboard focus restores 1, Start working restores 1, Resume readable on focus, Done completes the dotted task); messages gain the engine and theme only.",
+      "Chromium still runs on the Chrome channel by default as before; WebKit is added. A mutation check on this branch (siderail/actionrow dim set to opacity 1 and the rail stacked as a column in index.html, reverted) fails both tests: 'chromium: buttons begin in a horizontal row at 1000px' and 'chromium light: benchmark actions must visibly dim after all stylesheets load'.",
+      "#2461's press guard keeps its own tests (the persistence-recovery #2461/#2481/#2486 seam tests and the held-press browser tests); this test only waits for it, as a person would. A probe on this branch confirmed the guard holds a Done clicked straight after Start working in both engines (answerBeforeCandidateCouldBeRead() true, the dotted task not done)."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <git-common-dir>/agent-test-runs/issue-2479 --purpose preimplementation-red -- node --test --test-name-pattern='^Scanner browser: yellow task actions run horizontally below the card and wrap on mobile$' --test-name-pattern='^Scanner browser: secondary actions dim during scanning and brighten for focus or work$' tests/core.test.js, with LANDSCAPE_PLAYWRIGHT=playwright and LANDSCAPE_BROWSER_URL set to scripts/serve-shell.mjs on the worktree port, at integration tip a33205a6 before the test edit; the same command after it (green).",
+      "failure": "Record 2026-11-26T10-13-45-096Z-2e4d5287-f163-423a-a0b2-79a0ab0bc223 (preimplementation-red): both tests fail with 'locator.click: Timeout 30000ms exceeded' on '#modalRoot [data-act=\"close-modal\"]', the call log showing '<dialog open=\"\" id=\"motionDialog\" class=\"motion-dialog\" ...> intercepts pointer events' (core.test.js 24244 and 24270). Record 2026-11-26T10-15-23-070Z-a9c31d77-0069-4012-8908-49a49585caae (green): 2 pass, 0 fail, 0 skipped, each in Chromium and WebKit; 36 of 36 passed in three rounds of six concurrent runs."
+    }
   }
 ]
