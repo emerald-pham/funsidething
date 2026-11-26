@@ -16142,6 +16142,17 @@ function answeringBoard2408({tasks=300,padBytes=3_000_000}={}){
   seenQuickStart:true,futureBoard:{pad:'x'.repeat(padBytes)},
   settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8,theme:'system'}});
 }
+// #2490 review: a large fixture's board for a device that answers many times,
+// with the check-in off, as on the synthetic board above. The fixtures keep the
+// default 25% check-in threshold, and a long run of Yes answers makes the
+// benchmark strong enough that the check-in can replace the next card (more
+// likely on the task the fixture's own scan already chose Yes for, which
+// differs from one test process to the next), so the next tap found no Yes.
+function answeringLargeBoard2490(fixture){
+ const board=JSON.parse(fixture.payload);
+ board.settings={...board.settings,thresholdPct:0};
+ return board;
+}
 // Once installed, the app's timers, Date.now and performance.now run on this
 // clock. Before it fires a timer it waits until no device-store call and no
 // hash is running, so real storage and crypto work finishes at the current
@@ -18360,7 +18371,7 @@ test('RISK full copies off the answer path: once a change since the last full co
 test('RISK full copies off the answer path: during a run of answers 3 seconds apart on the large board, whole-board device saves and full-copy uploads per answer fall well below their counts when every pause brings a full copy',{timeout:900000},async t=>{
  const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email),answers=6;
  const run=async changeRecords=>{
-  const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,changeRecords});
+  const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,dropDatabase:true,changeRecords});
   await startAnswering2408(device);
   const {counters,clock}=device,from={commits:counters.commits.length,uploads:counters.uploads.length,taps:counters.taps.length},eventsBefore=device.ctx.state.decisionEvents.length;
   for(let i=0;i<answers;i++){device.tap(i%2?'yes':'no');await clock.advance(3000);}
@@ -21482,7 +21493,7 @@ async function pressInRhythm2481(device,guard,gaps,acts,{paintAfter=PAINT_AFTER_
 
 test('RISK scanner press guard (#2481): on the large board with sync off, ten Yes taps at a steady 200 ms, a steady 150 ms or jittered between them each answer the candidate shown, and so do alternating Yes and No by touch click and by y and n keys',{timeout:300000},async t=>{
  const fixture=await largeBoardFixture();
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,dropDatabase:true,signedIn:false});
  await startAnswering2408(device);
  const {ctx,clock}=device,guard=pressGuard2461(device);
  guard.paint();await clock.advance(1000);
