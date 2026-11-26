@@ -504,9 +504,24 @@ test('test group runner names why a test failed in the job log', t => {
 
 // Roots appended here throw exactly what their source says; the expected log
 // text below is written out by hand, not derived from the runner's own parsing.
+// They register through a wrapper module, as every tests/*.test.js file does
+// through tests/shared.js, so Node reports the wrapper as each test's location
+// and only the stack names the test file (#2498 review B2).
 function failingRootsFixture(t, roots) {
   const fixture = createFixture(t);
-  fs.appendFileSync(path.join(fixture.root, suiteFile), roots.map(([title, body]) => `\ntest(${JSON.stringify(title)}, () => { ${body} });\n`).join(''));
+  fs.writeFileSync(path.join(fixture.root, 'tests/shared.js'), `import nodeTest from 'node:test';
+export function test(...args) {
+  const run = args.at(-1);
+  if (typeof run !== 'function') return nodeTest(...args);
+  return nodeTest(...args.slice(0, -1), async context => {
+    try { return await run(context); } finally { /* fixtures released here */ }
+  });
+}
+`);
+  const suite = path.join(fixture.root, suiteFile), source = fs.readFileSync(suite, 'utf8');
+  assert.ok(source.includes("import { test } from 'node:test';"), 'the fixture suite imports test from node:test');
+  fs.writeFileSync(suite, source.replace("import { test } from 'node:test';", "import { test } from './shared.js';"));
+  fs.appendFileSync(suite, roots.map(([title, body]) => `\ntest(${JSON.stringify(title)}, t => { ${body} });\n`).join(''));
   const file = path.join(fixture.root, 'scripts/test-group-assignments.json'), catalog = JSON.parse(fs.readFileSync(file, 'utf8'));
   catalog.rootAssignments.push(...roots.map(([root]) => ({ root, group: 'core', file: suiteFile })));
   writeJson(file, catalog);
@@ -530,16 +545,97 @@ test('test group runner keeps a failed test reason to one capped line of the fir
   const result = invoke(fixture);
   assert.notEqual(result.status, 0);
   assert.equal(failureLine(result.stderr, 'fixture multi-line assertion root'), 'first assertion line');
-  assert.doesNotMatch(result.stderr, /board data stays out of the log/, 'only the first assertion line reaches the public log');
+  // #2495: later assertion lines now follow as indented details; the failure
+  // line itself still carries only the first.
+  assert.doesNotMatch(failureLine(result.stderr, 'fixture multi-line assertion root'), /board data stays out of the log/, 'only the first assertion line is on the failure line');
   for (const [title, character] of [['fixture long assertion root', 'x'], ['fixture long multi-line assertion root', 'y']]) {
     const reason = failureLine(result.stderr, title);
     assert.ok(reason.length <= 200, `${title} stays within the 200 character cap: ${reason.length}`);
     assert.ok(reason.startsWith(character.repeat(150)), `${title} keeps the start of its assertion`);
   }
-  assert.doesNotMatch(result.stderr, /second line/);
+  assert.doesNotMatch(failureLine(result.stderr, 'fixture long multi-line assertion root'), /second line/);
   const escaped = failureLine(result.stderr, 'fixture terminal escape assertion root');
   assert.doesNotMatch(escaped, /\u001b/, 'terminal control characters do not reach the log');
   assert.match(escaped, /colored first line/);
+  assert.doesNotMatch(result.stderr, /\u001b/, 'terminal control characters do not reach the log through the details either');
+});
+
+// #2495: the indented lines that follow a failure line in the job log, so CI's
+// diagnostics, compared values and test-file frame can be read without the artifact.
+const failureDetails = (stderr, title) => {
+  const lines = stderr.split('\n'), start = lines.findIndex(line => line.startsWith(`Test case failed: ${title}`));
+  assert.notEqual(start, -1, `the log names ${title}`);
+  const details = [];
+  for (const line of lines.slice(start + 1)) { if (!line.startsWith('  ')) break; details.push(line); }
+  return details;
+};
+
+test('test group runner prints the diagnostics and error details of a failed test under its failure line', t => {
+  const fixture = failingRootsFixture(t, [
+    ['fixture diagnosed failure root', 't.diagnostic("sync status title: Sync paused"); t.diagnostic("interventionP: 0.42"); assert.equal(1, 2, "values differ");'],
+    ['fixture undiagnosed failure root', 'throw new Error("plain failure\\nsecond error line");'],
+    ['fixture passing diagnosed root', 't.diagnostic("passing diagnostic stays out of the log");'],
+    ['fixture skipped diagnosed root', 't.diagnostic("skipped diagnostic stays out of the log"); t.skip("not here");'],
+  ]);
+  const result = invoke(fixture);
+  assert.notEqual(result.status, 0);
+  assert.equal(failureLine(result.stderr, 'fixture diagnosed failure root'), 'values differ');
+  const diagnosed = failureDetails(result.stderr, 'fixture diagnosed failure root');
+  assert.ok(diagnosed.includes('  diagnostic: sync status title: Sync paused'), diagnosed.join('\n'));
+  assert.ok(diagnosed.includes('  diagnostic: interventionP: 0.42'), diagnosed.join('\n'));
+  assert.ok(diagnosed.includes('  expected: 2'), diagnosed.join('\n'));
+  assert.ok(diagnosed.includes('  actual: 1'), diagnosed.join('\n'));
+  assert.ok(diagnosed.some(line => /^ {2}at: tests\/core\.test\.js:\d+:\d+$/.test(line)), `the first stack frame in the test file is named: ${diagnosed.join('\n')}`);
+
+  const undiagnosed = failureDetails(result.stderr, 'fixture undiagnosed failure root');
+  assert.ok(undiagnosed.includes('  error: plain failure'), undiagnosed.join('\n'));
+  assert.ok(undiagnosed.includes('    second error line'), undiagnosed.join('\n'));
+  assert.ok(undiagnosed.some(line => /^ {2}at: tests\/core\.test\.js:\d+:\d+$/.test(line)), undiagnosed.join('\n'));
+  assert.equal(undiagnosed.filter(line => line.startsWith('  diagnostic:')).length, 0, 'a failure without diagnostics prints none');
+
+  assert.doesNotMatch(result.stderr, /passing diagnostic stays out of the log/, 'a passing test adds nothing to the log');
+  assert.doesNotMatch(result.stderr, /skipped diagnostic stays out of the log/, 'a skipped test adds nothing to the log');
+  assert.deepEqual(failureDetails(result.stderr.replace('Test case was unexpectedly skipped: ', 'Test case failed: '), 'fixture skipped diagnosed root'), [], 'a skipped test gets no detail lines');
+});
+
+test('test group runner caps failure details per test and per job and says where it cut', t => {
+  const flood = 'for (let index = 0; index < 100; index++) t.diagnostic("flood diagnostic " + index); assert.equal(1, 2, "flooded");';
+  const single = failingRootsFixture(t, [['fixture flooded failure root', flood]]);
+  const one = invoke(single);
+  assert.notEqual(one.status, 0);
+  const details = failureDetails(one.stderr, 'fixture flooded failure root');
+  assert.ok(details.length <= 25, `one test prints at most 24 detail lines and a cut notice: ${details.length}`);
+  assert.ok(details.includes('  expected: 2') && details.includes('  actual: 1'), 'the compared values survive a flood of diagnostics');
+  assert.ok(details.includes('  diagnostic: flood diagnostic 0'), 'the first diagnostics are kept');
+  assert.ok(!details.some(line => line.includes('flood diagnostic 99')), 'later diagnostics are cut');
+  assert.match(details.at(-1), /^ {2}… \d+ more detail lines cut; the full output is in test\.tap\.$/, 'the log says the test\'s details were cut');
+
+  const titles = Array.from({ length: 15 }, (_, index) => `fixture flooded failure root ${String(index).padStart(2, '0')}`);
+  const many = failingRootsFixture(t, titles.map(title => [title, flood]));
+  const mass = invoke(many);
+  assert.notEqual(mass.status, 0);
+  const lines = mass.stderr.split('\n');
+  for (const title of titles) assert.equal(lines.filter(line => line.startsWith(`Test case failed: ${title}: `)).length, 1, `${title} is still named`);
+  const detailCount = lines.filter(line => line.startsWith('  ')).length;
+  assert.ok(detailCount <= 240, `the job prints at most 240 detail lines: ${detailCount}`);
+  assert.match(mass.stderr, /^Failure details for \d+ more failed tests were cut at the job's 240-line cap; the full output is in test\.tap\.$/m, 'the log says the job\'s details were cut');
+});
+
+// #2498 review N7: GitHub's runner trims leading whitespace and then runs any
+// log line that starts with `::` as a workflow command, so an indented detail
+// line from a test's error or values must never start with it.
+test('test group runner keeps the details of a failed test from reading as GitHub workflow commands', t => {
+  const fixture = failingRootsFixture(t, [
+    ['fixture workflow command failure root', 'throw new Error("first line\\n::warning file=x::injected from the error\\n  ::error::indented too");'],
+    ['fixture workflow command values root', 'assert.equal("first value line\\n::add-mask::x", "first value line\\n::group::y", "values differ");'],
+  ]);
+  const result = invoke(fixture);
+  assert.notEqual(result.status, 0);
+  const details = [...failureDetails(result.stderr, 'fixture workflow command failure root'), ...failureDetails(result.stderr, 'fixture workflow command values root')];
+  assert.ok(details.some(line => line.includes('warning file=x::injected from the error')), `the error's later lines are still shown: ${details.join('\n')}`);
+  assert.ok(details.some(line => line.includes('add-mask::x')) && details.some(line => line.includes('group::y')), `the compared values are still shown: ${details.join('\n')}`);
+  const commands = result.stderr.split('\n').filter(line => line.trimStart().startsWith('::'));
+  assert.deepEqual(commands, [], 'no job log line starts with a workflow command');
 });
 
 test('test group runner fails closed when a required native child registration is missing or duplicated', t => {
