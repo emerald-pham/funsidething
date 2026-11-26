@@ -25504,6 +25504,28 @@
   {
     "baseCommit": "a33205a6fc8ca53d554d83be063b3eb8fe2e7f65",
     "weakenedTestLines": [
+      "tests/persistence-recovery.test.js:-const LONG_SCAN_GROWTH_GUARD_MIB={chromium:193,webkit:453};",
+      "tests/persistence-recovery.test.js:-if(longScanWork.floatArrays>LONG_SCAN_ANSWERS*LONG_SCAN_RANK_BUFFERS_PER_ANSWER)failures.push(`${engineName}: 60 answers allocated ${longScanWork.floatArrays} rank buffers, above ${LONG_SCAN_ANSWERS*LONG_SCAN_RANK_BUFFERS_PER_ANSWER}`);"
+    ],
+    "reason": "#2492: the long-scan memory browser test failed on main in both engines, and CI does not run it. Rank buffers: a bisect with a probe that counts Float32Array constructions during the same 60-answer scan gives 0 at aade50b3 and 894 at 7fb34faf (#2459), the same 894 on a33205a6. #2459 samples an answer's ranks in parts into a second set of per-task arrays (rankSpare), so a draw of the list between parts never reads half-sampled ranks. The first answer of a scan allocates that set once (a hist and a cdf per task, 2 x 447), and the two sets swap from then on, so no later answer allocates. That is the price of #2459's guarantee, not a per-answer leak; the old limit of 8 per answer (480) could not fit a one-time set on a board over 240 tasks. Memory growth: Chromium's growth guard of 193 MiB is stale, not a regression. The peak during the answers is the same on the build that set the guard (140f9aa0, median 474 MiB of 5 runs), before #2459 (aade50b3, 471 MiB of 9) and on a33205a6 (479 MiB of 9). The settled board the growth is measured from now sits lower and sometimes dips (216-249 MiB), so growth reached 227, 213 and 214 MiB on those three builds. Growth medians were 150, 186 and 178 MiB, with no difference before and after #2459.",
+    "previousBehavior": "The test failed when 60 answers allocated more than 480 rank buffers (8 per answer) or when Chromium's growth over its settled scanning board passed 193 MiB.",
+    "intendedBehavior": "The test fails when 60 answers allocate more than 1374 rank buffers: the one spare set #2459 needs (2 per task, 894 on this board) plus the same 8 per answer, so one more fresh set (1788) still fails. Chromium's growth guard is 246 MiB, about 15% above the highest growth measured on a33205a6 (214 MiB); WebKit's stays 453 MiB.",
+    "preservedCoverage": [
+      "The per-answer rank-buffer budget is unchanged: a rank refresh that allocates again fails. With the spare dropped once more (a mutated copy of a33205a6), both engines allocate 1788 and the test fails 'above 1374'.",
+      "A new Node test at the #2459 seam (answeringDevice2408 on largeSignedInBoardFixture) pins the reuse in CI, which never runs the browser test: five answers allocate [894, 0, 0, 0, 0] rank-length arrays, and it fails with [894, 894, 894, 894, 894] when the spare is dropped after every refresh (record 2026-11-26T10-53-26-621Z-83bcb726; GREEN 2026-11-26T10-53-36-275Z-9c8a935a).",
+      "WebKit's 453 MiB growth guard, the 117 MiB Undo-delta allowance, rows drawn from scratch, rows placed per second, the 30-step Undo limit, Undo reversing the newest answer, the kept list matching a freshly drawn list, every answer accepted and no page errors all keep their assertions."
+    ],
+    "replacementTests": [
+      "RISK rank work per answer: on the large board, ranks sampled in parts allocate one spare set of rank arrays at most once, and later answers reuse both sets without allocating"
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <git-common-dir>/agent-test-runs/issue-2492 --purpose preimplementation-red -- node --test --test-name-pattern='RISK long scan memory browser' tests/persistence-recovery.test.js, with LANDSCAPE_BROWSER_URL serving a33205a6 (node scripts/serve-shell.mjs) and LANDSCAPE_PLAYWRIGHT set to the repository's Playwright",
+      "failure": "Record 2026-11-26T10-17-36-450Z-d7645c52: 'chromium: 60 answers allocated 894 rank buffers, above 480' and 'webkit: 60 answers allocated 894 rank buffers, above 480'; Chromium grew 187 MiB that run. The issue records Chromium growth of 176, 200, 199 and 169 MiB on 49c89b54 and #2490. After the change: GREEN record 2026-11-26T10-50-08-002Z-2660ccb9 (894 buffers, Chromium 185 MiB, WebKit 337 MiB); sensitivity record 2026-11-26T10-36-12-052Z-5f059887 on a copy with one extra fresh set fails 'above 1374' in both engines."
+    }
+  },
+  {
+    "baseCommit": "a33205a6fc8ca53d554d83be063b3eb8fe2e7f65",
+    "weakenedTestLines": [
       "tests/core.test.js:-assert.deepEqual(layout.actions,['cand-done','edit','cand-worked','delete-task']);",
       "tests/core.test.js:-assert.equal(await page.evaluate(()=>state.tasks.find(t=>t.title==='Dotted task').done),true,'deemphasis never disables task actions');",
       "tests/core.test.js:-assert.equal(await page.locator('.actionrow').evaluate(e=>getComputedStyle(e).opacity),'1','finishing scanning restores full emphasis');",
@@ -25554,15 +25576,18 @@
       "tests/core.test.js:-});",
       "tests/core.test.js:-}finally{await browser.close();}",
       "tests/core.test.js:-}finally{await browser.close();}",
+      "tests/persistence-recovery.test.js:-const LONG_SCAN_GROWTH_GUARD_MIB={chromium:193,webkit:453};",
+      "tests/persistence-recovery.test.js:-if(longScanWork.floatArrays>LONG_SCAN_ANSWERS*LONG_SCAN_RANK_BUFFERS_PER_ANSWER)failures.push(`${engineName}: 60 answers allocated ${longScanWork.floatArrays} rank buffers, above ${LONG_SCAN_ANSWERS*LONG_SCAN_RANK_BUFFERS_PER_ANSWER}`);",
       "tests/shared.js:-const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(message)),Math.max(0,deadline-performance.now()));});"
     ],
-    "reason": "Combined entry for the whole 2026-11-26 slice diff (integration/slice-2026-11-26 against main a33205a6), which the test-first gate checks as one diff. It covers the weakened lines of #2479 (the two Scanner browser tests re-indented inside an engine loop) and #2414 (the fixtureDeadline timer line); each lane's own entry above gives its reason.",
-    "previousBehavior": "See the #2479 and #2414 entries above with base a33205a6.",
-    "intendedBehavior": "Unchanged from those entries: #2479 keeps every original Scanner browser assertion, now in Chromium and WebKit; #2414 moves the timer tolerance into fixtureDeadline and keeps the fixture test's exact 20000 ms check.",
+    "reason": "Combined entry for the whole 2026-11-26 slice diff (integration/slice-2026-11-26 against main a33205a6), which the test-first gate checks as one diff. It covers the weakened lines of #2479 (the two Scanner browser tests re-indented inside an engine loop), #2414 (the fixtureDeadline timer line) and #2492 (the long-scan rank-buffer limit and Chromium memory guard, re-baselined); each lane's own entry above gives its reason.",
+    "previousBehavior": "See the #2479, #2414 and #2492 entries above with base a33205a6.",
+    "intendedBehavior": "Unchanged from those entries: #2479 keeps every original Scanner browser assertion, now in Chromium and WebKit; #2414 moves the timer tolerance into fixtureDeadline and keeps the fixture test's exact 20000 ms check; #2492 allows exactly one spare set of rank arrays (2*tasks + 480) and a 246 MiB Chromium growth guard, with a new Node test at #2459's seam.",
     "replacementTests": [
       "Scanner browser: yellow task actions run horizontally below the card and wrap on mobile",
       "Scanner browser: secondary actions dim during scanning and brighten for focus or work",
-      "RISK corrupt work budget fixture: a shared action deadline never rejects before its own deadline when the host timer fires early"
+      "RISK corrupt work budget fixture: a shared action deadline never rejects before its own deadline when the host timer fires early",
+      "RISK rank work per answer: on the large board, ranks sampled in parts allocate one spare set of rank arrays at most once, and later answers reuse both sets without allocating"
     ],
     "preservedCoverage": [
       "Every assertion of the yellow-actions test is kept at 1000, 390 and 320 px (below the card, a horizontal first row, one row on desktop, the four actions in order, no overflow, every button inside the viewport); messages gain the engine and width only.",
@@ -25571,11 +25596,14 @@
       "#2461's press guard keeps its own tests (the persistence-recovery #2461/#2481/#2486 seam tests and the held-press browser tests); this test only waits for it, as a person would. A probe on this branch confirmed the guard holds a Done clicked straight after Start working in both engines (answerBeforeCandidateCouldBeRead() true, the dotted task not done).",
       "RISK corrupt work budget fixture: one shared action deadline rejects an actually held device commit keeps its exact elapsed>=20000 check, unchanged; a budget shortened to 19s still fails it (19003ms).",
       "Every fixtureDeadline caller keeps its message, its ms and its success-path check that a result arriving at or after the deadline still fails. A rejection can now come at most one timer tick later than before, never earlier than the deadline.",
-      "The wait() polling and its cleanup on rejection are unchanged."
+      "The wait() polling and its cleanup on rejection are unchanged.",
+      "The per-answer rank-buffer budget is unchanged: a rank refresh that allocates again fails. With the spare dropped once more (a mutated copy of a33205a6), both engines allocate 1788 and the test fails 'above 1374'.",
+      "A new Node test at the #2459 seam (answeringDevice2408 on largeSignedInBoardFixture) pins the reuse in CI, which never runs the browser test: five answers allocate [894, 0, 0, 0, 0] rank-length arrays, and it fails with [894, 894, 894, 894, 894] when the spare is dropped after every refresh (record 2026-11-26T10-53-26-621Z-83bcb726; GREEN 2026-11-26T10-53-36-275Z-9c8a935a).",
+      "WebKit's 453 MiB growth guard, the 117 MiB Undo-delta allowance, rows drawn from scratch, rows placed per second, the 30-step Undo limit, Undo reversing the newest answer, the kept list matching a freshly drawn list, every answer accepted and no page errors all keep their assertions."
     ],
     "redEvidence": {
-      "command": "See the #2479 and #2414 entries above.",
-      "failure": "Record 2026-11-26T10-13-45-096Z-2e4d5287-f163-423a-a0b2-79a0ab0bc223 (preimplementation-red): both tests fail with 'locator.click: Timeout 30000ms exceeded' on '#modalRoot [data-act=\"close-modal\"]', the call log showing '<dialog open=\"\" id=\"motionDialog\" class=\"motion-dialog\" ...> intercepts pointer events' (core.test.js 24244 and 24270). Record 2026-11-26T10-15-23-070Z-a9c31d77-0069-4012-8908-49a49585caae (green): 2 pass, 0 fail, 0 skipped, each in Chromium and WebKit; 36 of 36 passed in three rounds of six concurrent runs. | Record 2026-11-26T10-17-54-912Z-718537f4: 'the deadline rejects no earlier than its 50ms by performance.now(): 48.78354200000001'. Load baseline on main, record 2026-11-26T10-15-12-319Z-29283bd6: 6 failed of 30, each 'the earned action stall reaches the original single 20s limit' at 19999ms. After the fix: record 2026-11-26T10-18-04-681Z-0c1040ba (both fixture tests pass) and record 2026-11-26T10-18-37-348Z-6cf3c75a (0 failed of 30 six at a time, minimum 20000ms). Mutation, action budget 20000 to 19000 in the consumer: record 2026-11-26T10-21-22-279Z-e68b19f1, the fixture test fails at 19003ms."
+      "command": "See the #2479, #2414 and #2492 entries above.",
+      "failure": "Record 2026-11-26T10-13-45-096Z-2e4d5287-f163-423a-a0b2-79a0ab0bc223 (preimplementation-red): both tests fail with 'locator.click: Timeout 30000ms exceeded' on '#modalRoot [data-act=\"close-modal\"]', the call log showing '<dialog open=\"\" id=\"motionDialog\" class=\"motion-dialog\" ...> intercepts pointer events' (core.test.js 24244 and 24270). Record 2026-11-26T10-15-23-070Z-a9c31d77-0069-4012-8908-49a49585caae (green): 2 pass, 0 fail, 0 skipped, each in Chromium and WebKit; 36 of 36 passed in three rounds of six concurrent runs. | Record 2026-11-26T10-17-54-912Z-718537f4: 'the deadline rejects no earlier than its 50ms by performance.now(): 48.78354200000001'. Load baseline on main, record 2026-11-26T10-15-12-319Z-29283bd6: 6 failed of 30, each 'the earned action stall reaches the original single 20s limit' at 19999ms. After the fix: record 2026-11-26T10-18-04-681Z-0c1040ba (both fixture tests pass) and record 2026-11-26T10-18-37-348Z-6cf3c75a (0 failed of 30 six at a time, minimum 20000ms). Mutation, action budget 20000 to 19000 in the consumer: record 2026-11-26T10-21-22-279Z-e68b19f1, the fixture test fails at 19003ms. | Record 2026-11-26T10-17-36-450Z-d7645c52: 'chromium: 60 answers allocated 894 rank buffers, above 480' and 'webkit: 60 answers allocated 894 rank buffers, above 480'; Chromium grew 187 MiB that run. The issue records Chromium growth of 176, 200, 199 and 169 MiB on 49c89b54 and #2490. After the change: GREEN record 2026-11-26T10-50-08-002Z-2660ccb9 (894 buffers, Chromium 185 MiB, WebKit 337 MiB); sensitivity record 2026-11-26T10-36-12-052Z-5f059887 on a copy with one extra fresh set fails 'above 1374' in both engines."
     }
   },
   {

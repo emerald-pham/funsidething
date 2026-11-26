@@ -1993,7 +1993,14 @@ const LONG_SCAN_ROWS_PER_ANSWER=4,LONG_SCAN_RANK_BUFFERS_PER_ANSWER=8;
 // ceiling is about 15% above the highest of three runs per engine on desktop
 // (Chromium 168 MiB, WebKit 394 MiB). Passing here does not show a phone is
 // safe: the installed iPhone run is the real acceptance.
-const LONG_SCAN_GROWTH_GUARD_MIB={chromium:193,webkit:453};
+// #2492: Chromium's guard went stale without the scan getting worse. Its peak
+// during the answers is the same on the build that set 193 (140f9aa0, median
+// 474 MiB of 5 runs), before #2459 (aade50b3, 471 MiB of 9) and on a33205a6
+// (479 MiB of 9), but the settled board it is measured from now sits lower and
+// sometimes dips (216-249 MiB), so growth reached 213-227 MiB on all three
+// builds. 246 is about 15% above the highest, 214 MiB on a33205a6. WebKit's
+// highest on a33205a6 was 357 MiB, under its guard.
+const LONG_SCAN_GROWTH_GUARD_MIB={chromium:246,webkit:453};
 test('RISK long scan memory browser: 60 answers on a large saved board stay under a per-engine memory growth guard, Undo adds little and keeps 30 steps, each answer redraws only the rows it changed, and Undo still reverses the newest answer, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
  const fixture=await largeBoardFixture(),{stats}=fixture,allowance=LONG_SCAN_FIXED_MARGIN+LONG_SCAN_BYTES_FACTOR*stats.serializedBytes;
@@ -2090,7 +2097,14 @@ test('RISK long scan memory browser: 60 answers on a large saved board stay unde
   // second of scanning, however fast the answers come. A rate of work, not a speed.
   const placedAllowed=Math.ceil(LARGE_BOARD_SHAPE.tasks*(longScanSeconds+2));
   if(longScanWork.placed>placedAllowed)failures.push(`${engineName}: 60 answers placed ${longScanWork.placed} list rows, above ${placedAllowed} for a ${Math.round(longScanSeconds)} second scan`);
-  if(longScanWork.floatArrays>LONG_SCAN_ANSWERS*LONG_SCAN_RANK_BUFFERS_PER_ANSWER)failures.push(`${engineName}: 60 answers allocated ${longScanWork.floatArrays} rank buffers, above ${LONG_SCAN_ANSWERS*LONG_SCAN_RANK_BUFFERS_PER_ANSWER}`);
+  // #2492: #2459 samples an answer's ranks in parts into a second set of
+  // per-task arrays (rankSpare), so a draw of the list between parts never
+  // reads half-sampled ranks. That set is allocated once, by the first answer
+  // of the scan (two arrays per task, 894 on this board), and the two sets
+  // swap from then on. The allowance is that one set plus the per-answer
+  // budget, so a refresh that allocates again still fails here.
+  const rankBuffersAllowed=2*LARGE_BOARD_SHAPE.tasks+LONG_SCAN_ANSWERS*LONG_SCAN_RANK_BUFFERS_PER_ANSWER;
+  if(longScanWork.floatArrays>rankBuffersAllowed)failures.push(`${engineName}: 60 answers allocated ${longScanWork.floatArrays} rank buffers, above ${rankBuffersAllowed}`);
  }
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
@@ -21165,6 +21179,31 @@ test('RISK rank work per answer: ranks sampled in parts after a Yes on the large
  assert.deepEqual(differing.slice(0,5),[],'the parts give exactly the whole sampling’s ranks: '+differing.length+' tasks differ');
  const after=ctx.state.tasks.find(task=>task.id===answered).ratingHistory.at(-1).after;
  assert.equal(after.topK,expected.find(([id])=>id===answered)[1],'History records the Top x of those ranks');
+});
+// #2492: sampling in parts writes into a second set of rank arrays (rankSpare)
+// so a draw of the list never reads half-sampled ranks. The first answer's
+// catch-up allocates that set once; the two sets then swap, so later answers
+// allocate no rank arrays at all. Counted at the platform boundary, as the
+// long-scan browser test counts them, which CI does not run: every
+// Float32Array as long as the open list, the length of each rank array.
+test('RISK rank work per answer: on the large board, ranks sampled in parts allocate one spare set of rank arrays at most once, and later answers reuse both sets without allocating',{timeout:300000},async t=>{
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,signedIn:false,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,open=ctx.state.tasks.filter(task=>!task.done).length,ranks=()=>vm.runInContext('rankCache',ctx);
+ vm.runInContext(`globalThis.__rankArrays2492=0;Float32Array=new Proxy(Float32Array,{construct(target,args,newTarget){
+  if(args[0]===${open})__rankArrays2492++;return Reflect.construct(target,args,newTarget);}})`,ctx);
+ const allocated=()=>vm.runInContext('__rankArrays2492',ctx),perAnswer=[];
+ for(const act of ['yes','no','no','yes','no']){
+  const before=ranks(),from=allocated();
+  device.tap(act);await clock.advance(1500);
+  assert.notEqual(ranks(),before,`positive control: the ${act} at answer ${perAnswer.length+1} replaced the ranks`);
+  assert.equal(ranks().size,open,'positive control: a rank for every open task');
+  perAnswer.push(allocated()-from);
+ }
+ t.diagnostic(JSON.stringify({open,perAnswer}));
+ assert.ok(perAnswer[0]<=2*open,`the first answer allocates at most one set of rank arrays (${2*open}): ${perAnswer[0]}`);
+ assert.deepEqual(perAnswer.slice(1),[0,0,0,0],'later answers reuse the two sets of rank arrays');
 });
 
 // #2457 (spec #2455): adding a task on the large board shows it in the tap and
