@@ -24238,10 +24238,11 @@ test('Landscape wings fold toward the body with mirrored motion',()=>{
 // retired for {choice,savedAt}; the motion dialog then opened over the page
 // and caught their first click, so they never started. CI baseline-skips
 // them, which hid it. They now write the current format and run in Chromium
-// and WebKit.
+// and WebKit; their timeout bounds a hung engine instead of the run waiting
+// on it for good.
 const scannerActionsMotionChoice=()=>localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
 const scannerActionsLaunch=(engineName,engine)=>engine.launch({headless:true,...(engineName==='chromium'?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chrome'}:{})});
-test('Scanner browser: yellow task actions run horizontally below the card and wrap on mobile', {skip:!process.env.LANDSCAPE_BROWSER_URL}, async()=>{
+test('Scanner browser: yellow task actions run horizontally below the card and wrap on mobile',{skip:!process.env.LANDSCAPE_BROWSER_URL,timeout:120000},async()=>{
  for(const [engineName,engine] of await steadyScannerEngines()){
   const browser=await scannerActionsLaunch(engineName,engine);
   try{
@@ -24268,7 +24269,7 @@ test('Scanner browser: yellow task actions run horizontally below the card and w
  }
 });
 
-test('Scanner browser: secondary actions dim during scanning and brighten for focus or work', {skip:!process.env.LANDSCAPE_BROWSER_URL}, async()=>{
+test('Scanner browser: secondary actions dim during scanning and brighten for focus or work',{skip:!process.env.LANDSCAPE_BROWSER_URL,timeout:120000},async()=>{
  for(const [engineName,engine] of await steadyScannerEngines()){
   const browser=await scannerActionsLaunch(engineName,engine);
   try{
