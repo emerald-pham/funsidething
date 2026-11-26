@@ -21188,7 +21188,7 @@ test('RISK rank work per answer: ranks sampled in parts after a Yes on the large
 // Float32Array as long as the open list, the length of each rank array.
 test('RISK rank work per answer: on the large board, ranks sampled in parts allocate one spare set of rank arrays at most once, and later answers reuse both sets without allocating',{timeout:300000},async t=>{
  const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,signedIn:false,dropDatabase:true});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,signedIn:false,dropDatabase:true});
  await startAnswering2408(device);
  const {ctx,clock}=device,open=ctx.state.tasks.filter(task=>!task.done).length,ranks=()=>vm.runInContext('rankCache',ctx);
  vm.runInContext(`globalThis.__rankArrays2492=0;Float32Array=new Proxy(Float32Array,{construct(target,args,newTarget){
