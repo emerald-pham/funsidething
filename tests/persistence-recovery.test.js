@@ -22117,6 +22117,16 @@ test('RISK answer shows first (#2484): signed in on the large board, after ten Y
  await startAnswering2408(device);
  const {ctx,clock,counters}=device,guard=pressGuard2461(device);
  guard.paint();await clock.advance(1000);
+ // The decisions these answers add, told apart from those the board held
+ // before the first Yes, and every decision is held once (#2490 review). The
+ // large fixture's own scan answered Yes twice, about tasks drawn afresh in
+ // each test process, and the second of them is offered again once a new
+ // day's pass begins. Picked by task, a Yes on it here also matched the
+ // fixture's older Yes, which comes first: the cloud copy seemed to hold 11
+ // decisions for 10 answers, on main as well.
+ const earlier=new Set(ctx.state.decisionEvents.map(event=>event.id));
+ const yesGiven=board=>(board.decisionEvents||[]).filter(event=>event.kind==='comparison'&&!earlier.has(event.id));
+ const heldOnce=board=>new Set((board.decisionEvents||[]).map(event=>event.id)).size===(board.decisionEvents||[]).length;
  const commitsBefore=counters.commits.length,answered=[],shown=[];
  for(let i=0;i<10;i++){
   shown.push({candidate:ctx.state.candidateId,chain:[...ctx.state.chain]});answered.push(ctx.state.candidateId);
@@ -22137,7 +22147,8 @@ test('RISK answer shows first (#2484): signed in on the large board, after ten Y
  await clock.settle();
  let cloud=await device.cloud();
  assert.deepEqual(cloud.board.chain.slice(-10),answered,'the cloud copy holds every answer, in tap order');
- assert.deepEqual((cloud.board.decisionEvents||[]).filter(event=>event.kind==='comparison'&&answered.includes(event.taskId)).map(event=>event.taskId),answered,'and its decisions are in tap order');
+ assert.ok(heldOnce(cloud.board),'the cloud copy holds each decision once');
+ assert.deepEqual(yesGiven(cloud.board).map(event=>event.taskId),answered,'and its decisions are in tap order');
  assert.equal(cloud.rev,ctx.state.syncRev,'this device is acknowledged at the cloud’s revision');
  // Undo, from the last answer back to the first.
  for(let i=9;i>=0;i--){
@@ -22151,7 +22162,8 @@ test('RISK answer shows first (#2484): signed in on the large board, after ten Y
  const head=JSON.parse((await ctx.window.ScannerDeviceStore.readHead()).payload);
  for(const [where,board] of [['on the device',head],['in the cloud',cloud.board]]){
   assert.deepEqual(board.chain,shown[0].chain,'every Yes is undone '+where);
-  const yes=(board.decisionEvents||[]).filter(event=>event.kind==='comparison'&&answered.includes(event.taskId));
+  assert.ok(heldOnce(board),'each decision is held once '+where);
+  const yes=yesGiven(board);
   assert.equal(yes.length,10,'each Yes stays recorded '+where);
   assert.ok(yes.every(event=>(board.decisionEvents||[]).some(undo=>undo.kind==='undo'&&undo.targetEventIds.includes(event.id))),'with its Undo '+where);
  }
