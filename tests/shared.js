@@ -1771,7 +1771,14 @@ async function fixtureDeadline(promise,message,ms=5000){
  });
  try{
   // Arm from the same absolute start before any synchronous callback prefix.
-  const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(message)),Math.max(0,deadline-performance.now()));});
+  // Node's timer runs on a millisecond loop clock and truncates fractional
+  // delays, so it can fire about 1ms before the deadline by performance.now():
+  // a 20000ms action deadline once rejected at 19,999ms (#2414). Re-arm for
+  // what remains, so a rejection always means the whole deadline passed.
+  const timeout=new Promise((_,reject)=>{
+   const expire=()=>{const left=deadline-performance.now();if(left>0)timer=setTimeout(expire,Math.ceil(left));else reject(Error(message));};
+   timer=setTimeout(expire,Math.max(0,deadline-performance.now()));
+  });
   const result=await Promise.race([typeof promise==='function'?promise(wait):promise,timeout]);
   // A blocked host can deliver a successful microtask before its expired timer.
   if(performance.now()>=deadline)throw Error(message);
