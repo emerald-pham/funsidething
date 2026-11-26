@@ -624,7 +624,7 @@ test('test group runner caps failure details per test and per job and says where
 // #2498 review N7: GitHub's runner trims leading whitespace and then runs any
 // log line that starts with `::` as a workflow command, so an indented detail
 // line from a test's error or values must never start with it.
-test('test group runner keeps a failed test\'s details from reading as GitHub workflow commands', t => {
+test('test group runner keeps the details of a failed test from reading as GitHub workflow commands', t => {
   const fixture = failingRootsFixture(t, [
     ['fixture workflow command failure root', 'throw new Error("first line\\n::warning file=x::injected from the error\\n  ::error::indented too");'],
     ['fixture workflow command values root', 'assert.equal("first value line\\n::add-mask::x", "first value line\\n::group::y", "values differ");'],

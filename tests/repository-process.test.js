@@ -2711,7 +2711,7 @@ test('RISK repository process: a failed group prints capped diagnostics and erro
 // test file's own. And no detail line may read as a GitHub workflow command.
 test('RISK repository process: a failed group names the frame in the test file for a test registered through a wrapper, and no detail line reads as a workflow command',t=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
- const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group runner (prints the diagnostics and error details of a failed test under its failure line|keeps a failed test\'s details from reading as GitHub workflow commands)$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:180000,maxBuffer:8*1024*1024});
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group runner (prints the diagnostics and error details of a failed test under its failure line|keeps the details of a failed test from reading as GitHub workflow commands)$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:180000,maxBuffer:8*1024*1024});
  const output=[result.stdout,result.stderr].filter(Boolean).join('\n');t.diagnostic(output);
  assert.equal(result.error,undefined,'The failure-detail contracts must start: '+(result.error?.message||output));
  assert.equal(result.status,0,'A failed group must name the test file frame and print no workflow command: '+output);
