@@ -89,11 +89,13 @@ function firstErrorLine(block) {
 
 // Reads one run's TAP into an outcome. When a file has no test matching the
 // pattern, Node still reports the file itself as one passing test, so the
-// file's own test point never counts as a pass.
+// file's own test point never counts as a pass. A run that skipped any
+// selected test did not run all of them, so it is not a pass either.
 function readRun({ status, signal, stdout, stderr }, fileNames) {
   const lines = stdout.split('\n');
   let passes = 0;
   const failures = [];
+  const skipped = [];
   for (let index = 0; index < lines.length; index += 1) {
     const point = TEST_POINT.exec(lines[index]);
     if (!point) continue;
@@ -106,6 +108,11 @@ function readRun({ status, signal, stdout, stderr }, fileNames) {
       block.push(lines[next]);
     }
     if (directive === 'TODO') continue;
+    // A skipped test never ran, so it is never a pass (#2494).
+    if (directive === 'SKIP') {
+      skipped.push(name);
+      continue;
+    }
     if (result === 'ok') {
       if (!fileNames.has(name)) passes += 1;
       continue;
@@ -121,6 +128,7 @@ function readRun({ status, signal, stdout, stderr }, fileNames) {
     }
     return { outcome: 'failed', failures };
   }
+  if (skipped.length) return { outcome: 'not-run', reason: `skipped: ${skipped.join(', ')}` };
   return passes > 0 ? { outcome: 'passed' } : { outcome: 'not-run', reason: 'no test matched the pattern' };
 }
 

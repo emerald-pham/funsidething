@@ -113,3 +113,23 @@ test('head-vs-base counts a failure that happens on the head only, names its mes
     rmSync(setup.fixture, { recursive: true, force: true });
   }
 });
+
+test('head-vs-base reports a skipped test, or a pattern that matches nothing, as not run and never as a pass', () => {
+  const probe = `${PROBE_HEADER}test('browser probe', { skip: 'needs LANDSCAPE_BROWSER_URL' }, () => {});\ntest('steady probe', () => {});\n`;
+  const setup = createFixture('chain-head-vs-base-not-run-', { base: probe, head: `${probe}// head edit\n` });
+  try {
+    const compareJson = (pattern) => {
+      const result = compare(['--file', 'probe.test.js', '--pattern', pattern, '--runs', '2', '--parallel', '2', '--base', 'main', '--json'], setup);
+      assert.equal(result.status, 1, `a run that did not run is not a clean comparison\n${result.stderr}`);
+      const report = JSON.parse(result.stdout);
+      return [report.head, report.base].map(({ passed, failed, notRun, notRunReasons }) => ({ passed, failed, notRun, notRunReasons }));
+    };
+    const skipped = { passed: 0, failed: 0, notRun: 2, notRunReasons: [{ reason: 'skipped: browser probe', count: 2 }] };
+    assert.deepEqual(compareJson('browser probe'), [skipped, skipped], 'a skipped test never ran on either side');
+    assert.deepEqual(compareJson('probe'), [skipped, skipped], 'a run that skipped one selected test is not a pass, though another passed');
+    const unmatched = { passed: 0, failed: 0, notRun: 2, notRunReasons: [{ reason: 'no test matched the pattern', count: 2 }] };
+    assert.deepEqual(compareJson('no such probe'), [unmatched, unmatched], "Node's passing file-level point for a file with no match is not a pass");
+  } finally {
+    rmSync(setup.fixture, { recursive: true, force: true });
+  }
+});
