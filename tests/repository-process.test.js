@@ -2913,3 +2913,36 @@ test('RISK support diagnostics: every literal code passed to a sync error report
   assert.doesNotMatch(text,/unlisted-cloudsync-code-2365/,'an unrecognised CloudSync code never enters the report');
  }
 });
+
+// #2493: buildLargeBoardFixture runs a real scan with seed 2225, but the scan's
+// draw also took the app's crypto, so the two tasks it said Yes to differed in
+// every test process (12 processes, 12 pairs). A test that picked out its own
+// decisions by task could then match the fixture's older Yes (#2490's B2).
+// Each process here builds both large fixtures from the same seed, as two test
+// files would, and the boards must agree on every decision and chosen task.
+test('RISK repository process: the large test board holds the same decisions and chosen tasks when two separate test processes build it from the same seed',{timeout:120000},()=>{
+ const shared=new URL('./shared.js',import.meta.url).href;
+ const source=`import {createHash} from 'node:crypto';import {largeBoardFixture,largeSignedInBoardFixture} from ${JSON.stringify(shared)};
+const describe=fixture=>{const board=JSON.parse(fixture.payload);return {payloadSha256:createHash('sha256').update(fixture.payload).digest('hex'),
+ chain:board.chain,candidateId:board.candidateId,considered:board.considered,
+ decisions:board.decisionEvents.map(({id,kind,action,taskId,candidateId,benchmarkId,passId,at})=>({id,kind,action,taskId,candidateId,benchmarkId,passId,at}))};};
+process.stdout.write(JSON.stringify({signedOut:describe(await largeBoardFixture()),signedIn:describe(await largeSignedInBoardFixture('owner@example.test'))}));`;
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const build=()=>{
+  const result=spawnSync(process.execPath,['--input-type=module','-e',source],{cwd:__dirname,encoding:'utf8',env,maxBuffer:64*1024*1024});
+  assert.equal(result.status,0,result.stdout+result.stderr);
+  return JSON.parse(result.stdout);
+ };
+ const first=build(),second=build();
+ for(const variant of ['signedOut','signedIn']){
+  const a=first[variant],b=second[variant];
+  const chosen=board=>board.decisions.filter(event=>event.kind==='comparison').map(event=>event.taskId);
+  assert.equal(chosen(a).length,2,variant+': positive control: the fixture’s scan said Yes twice: '+JSON.stringify(chosen(a)));
+  assert.ok(a.decisions.length>=368,variant+': positive control: the fixture holds the measured board’s decisions');
+  assert.deepEqual(chosen(b),chosen(a),variant+': both processes chose the same tasks');
+  assert.deepEqual(b.chain,a.chain,variant+': and dotted the same chain');
+  assert.deepEqual(b.decisions,a.decisions,variant+': and hold the same decisions');
+  assert.deepEqual({candidateId:b.candidateId,considered:b.considered},{candidateId:a.candidateId,considered:a.considered},variant+': and leave the same candidate and considered tasks');
+  assert.equal(b.payloadSha256,a.payloadSha256,variant+': so the whole board is the same');
+ }
+});

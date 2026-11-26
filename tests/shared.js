@@ -3238,15 +3238,30 @@ function largeSignedInBoardFixture(account){
  if(!largeSignedInBoardFixtures.has(account))largeSignedInBoardFixtures.set(account,buildLargeBoardFixture({account}));
  return largeSignedInBoardFixtures.get(account);
 }
+// #2493: the app's crypto drawn from a seed. A scan's draw (resetChance) is
+// seeded by uid(), which is crypto.randomUUID, so seeding Math.random alone
+// left the fixture's scan choosing different tasks in every test process.
+// Hashing stays on the real subtle crypto.
+function seededCrypto(seed){
+ const rand=mulberry32(seed),fill=view=>{for(let i=0;i<view.length;i++)view[i]=Math.floor(rand()*256);return view;};
+ return {subtle:webcrypto.subtle,
+  getRandomValues(array){fill(new Uint8Array(array.buffer,array.byteOffset,array.byteLength));return array;},
+  randomUUID(){
+   const bytes=fill(new Uint8Array(16));bytes[6]=bytes[6]&0x0f|0x40;bytes[8]=bytes[8]&0x3f|0x80;
+   const hex=Array.from(bytes,byte=>byte.toString(16).padStart(2,'0')).join('');
+   return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+  }};
+}
 async function buildLargeBoardFixture({account:signedInAccount=null}={}){
- const shape=LARGE_BOARD_SHAPE,start=Date.parse('2026-06-01T12:00:00Z'),rand=mulberry32(2225);
+ const LARGE_BOARD_SEED=2225,shape=LARGE_BOARD_SHAPE,start=Date.parse('2026-06-01T12:00:00Z'),rand=mulberry32(LARGE_BOARD_SEED);
  const ids=Array.from({length:shape.tasks},(_,i)=>'large-board-task-'+String(i).padStart(3,'0'));
  const seeded=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
   tasks:ids.map((id,i)=>({...syncTask(id,'Large board task '+i),ctx:['home'],createdAt:start-(shape.tasks-i)*3600000}))});
  // #2227: largeSignedInBoardFixture passes {account}; the scan below then
  // records every decision for that account, exactly as a signed-in app does.
  if(signedInAccount!==null)seeded.syncAccount=signedInAccount;
- const app=await loadApp({seed:2225,cryptoProvider:webcrypto,seedStorage:{[STORE_KEY]:JSON.stringify(seeded)}});
+ // Its own stream, apart from the one that sizes the histories below.
+ const app=await loadApp({seed:LARGE_BOARD_SEED,cryptoProvider:seededCrypto(LARGE_BOARD_SEED^0x2493),seedStorage:{[STORE_KEY]:JSON.stringify(seeded)}});
  try{
   const {ctx}=app;let now=start;const at=()=>{now+=60000;setFakeTime(ctx,now);return now;};setFakeTime(ctx,now);
   const control=()=>({dataset:{candidate:ctx.state.candidateId,benchmark:ctx.state.chain.at(-1)}});

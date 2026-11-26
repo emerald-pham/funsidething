@@ -16143,11 +16143,15 @@ function answeringBoard2408({tasks=300,padBytes=3_000_000}={}){
   settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8,theme:'system'}});
 }
 // #2490 review: a large fixture's board for a device that answers many times,
-// with the check-in off, as on the synthetic board above. The fixtures keep the
-// default 25% check-in threshold, and a long run of Yes answers makes the
-// benchmark strong enough that the check-in can replace the next card (more
-// likely on the task the fixture's own scan already chose Yes for, which
-// differs from one test process to the next), so the next tap found no Yes.
+// with the lowest check-in threshold (0 loads as 1%), as on the synthetic board
+// above. The fixtures keep the default 25% check-in threshold, and a long run
+// of Yes answers makes the benchmark strong enough that the check-in can
+// replace the next card, so the next tap found no Yes.
+// #2493: every large-fixture test that answers in the scanner on a harness
+// device takes its board from here, whether it answers once or forty times;
+// none of them is about the check-in, which has tests of its own. The long scan
+// memory browser test keeps 25% because it clicks Continue whenever the
+// check-in shows and counts only answers.
 function answeringLargeBoard2490(fixture){
  const board=JSON.parse(fixture.payload);
  board.settings={...board.settings,thresholdPct:0};
@@ -17243,7 +17247,7 @@ test('RISK change records: a scanner answer reaches another open device before t
  };
  const small=await measure('small board',answeringBoard2408({tasks:20,padBytes:0}));
  const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
- const large=await measure('large board',JSON.parse(fixture.payload));
+ const large=await measure('large board',answeringLargeBoard2490(fixture));
  t.diagnostic(JSON.stringify({small,large,largeBoardBytes:fixture.stats.serializedBytes}));
  assert.ok(small.writes>0&&small.bytes>0,'positive control: the answer went up as its own write: '+JSON.stringify(small));
  assert.equal(large.writes,small.writes,'the phone makes as many cloud writes for the answer on the large board as on a small one');
@@ -19077,7 +19081,7 @@ test('RISK answer work: one No with sync on costs the same whole-board work on a
  const small=await oneCountedNo2428(t,'20 tasks',twenty,{before:['yes']});
  await small.device.close();
  const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
- const large=await oneCountedNo2428(t,'large board',JSON.parse(fixture.payload));
+ const large=await oneCountedNo2428(t,'large board',answeringLargeBoard2490(fixture));
  t.diagnostic(JSON.stringify({small:small.counted,large:large.counted}));
  t.diagnostic(JSON.stringify({smallSites:small.sites,largeSites:large.sites}));
  assert.ok(small.counted.rowsBuilt>0&&small.counted.boardText>0,'positive control: the counters see the list and the device save: '+JSON.stringify(small.counted));
@@ -20347,7 +20351,7 @@ test('RISK decision evidence work: a No and a Yes with sync on replay the same d
  const small=await countedAnswers2435(t,'20 tasks',twenty,{before:['yes']});
  await small.device.close();
  const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
- const large=await countedAnswers2435(t,'large board',JSON.parse(fixture.payload));
+ const large=await countedAnswers2435(t,'large board',answeringLargeBoard2490(fixture));
  t.diagnostic(JSON.stringify({small:small.counted,large:large.counted}));
  for(const [label,{counted}] of [['20 tasks',small],['large board',large]])for(const act of ['no','yes']){
   // The answer's own replay reads at least the decision it records.
@@ -20827,7 +20831,7 @@ const answeredState2461=ctx=>({chain:[...ctx.state.chain],candidate:ctx.state.ca
 // change the card.
 test('RISK scanner press guard: on the large board, a press within the guard of a new candidate first painting that no press of the person drew, by touch click or by key, is held with a visible acknowledgement on its button and changes nothing, though the frame waited behind a long task',{timeout:300000},async t=>{
  const fixture=await largeBoardFixture();
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,dropDatabase:true,signedIn:false});
  await startAnswering2408(device);
  const {ctx,clock}=device,guard=pressGuard2461(device);
  guard.paint();await clock.advance(1000);
@@ -20855,7 +20859,7 @@ test('RISK scanner press guard: on the large board, a press within the guard of 
 
 test('RISK scanner press guard: on the large board, a press made more than the guard after the new candidate painted counts exactly once though a long task held its handler, by touch click and by key, and one made before the frame paints is held however long the frame waits',{timeout:300000},async t=>{
  const fixture=await largeBoardFixture();
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,dropDatabase:true,signedIn:false});
  await startAnswering2408(device);
  const {ctx,clock}=device,guard=pressGuard2461(device);
  guard.paint();await clock.advance(1000);
@@ -20893,7 +20897,7 @@ test('RISK scanner press guard: on the large board, a press made more than the g
 // rather than a double tap.
 test('RISK scanner press guard: on the large board, a deliberate Yes or n key 150 ms after a new candidate no press of the person drew painted answers it, while one 50 ms after is held',{timeout:300000},async t=>{
  const fixture=await largeBoardFixture();
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,dropDatabase:true,signedIn:false});
  await startAnswering2408(device);
  const {ctx,clock}=device,guard=pressGuard2461(device);
  guard.paint();await clock.advance(1000);
@@ -20924,7 +20928,7 @@ test('RISK scanner press guard: on the large board, a deliberate Yes or n key 15
 // time run out before any frame painted it.
 test('RISK scanner press guard: a held press stays dimmed until a frame has shown it for a moment, however long the work after it blocks the frames',{timeout:300000},async t=>{
  const fixture=await largeBoardFixture();
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,dropDatabase:true,signedIn:false});
  await startAnswering2408(device);
  const {ctx,clock}=device,guard=pressGuard2461(device);
  guard.paint();await clock.advance(1000);
@@ -20946,7 +20950,7 @@ test('RISK scanner press guard: a held press stays dimmed until a frame has show
 // A page that is never given a frame must not hold every press for good.
 test('RISK scanner press guard: when no frame ever comes to paint the new candidate, a press a moment later still counts, and one within the guard of the panel being drawn is still held',{timeout:300000},async t=>{
  const fixture=await largeBoardFixture();
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,dropDatabase:true,signedIn:false});
  await startAnswering2408(device);
  const {ctx,clock}=device,guard=pressGuard2461(device);
  guard.paint();await clock.advance(1000);
@@ -20965,7 +20969,7 @@ test('RISK scanner press guard: when no frame ever comes to paint the new candid
 
 test('RISK scanner press guard: signed in on the large board, a held Yes reaches neither the device save nor the cloud, and the next Yes after the guard does',{timeout:600000},async t=>{
  const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,dropDatabase:true});
  await startAnswering2408(device);
  const {ctx,clock,counters}=device,guard=pressGuard2461(device);
  guard.paint();await clock.advance(1000);
@@ -21001,7 +21005,7 @@ test('RISK scanner press guard: signed in on the large board, a held Yes reaches
 // which the recorded draw never held. Counted, never timed.
 async function yesAfterAdd2459(t,label){
  const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,dropDatabase:true});
  await startAnswering2408(device);
  const {ctx,clock,counters,shim}=device;
  shim.document.getElementById('addInput').value=label;
@@ -21096,7 +21100,7 @@ function drawsPerTask2459(device){
 }
 test('RISK rank work per answer: a Yes on the large board samples its ranks in tasks of a bounded number of draws, and still samples every open task 250 times',{timeout:300000},async t=>{
  const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,dropDatabase:true});
  await startAnswering2408(device);
  const {ctx,clock}=device,open=ctx.state.tasks.filter(task=>!task.done).length,samples=ctx.state.settings.samples;
  const counted=drawsPerTask2459(device),ranks=()=>vm.runInContext('rankCache',ctx),before=ranks();
@@ -21121,7 +21125,7 @@ test('RISK rank work per answer: a Yes on the large board samples its ranks in t
 // tap itself draws nothing (the test above).
 test('RISK rank work per answer: ranks sampled in parts after a Yes on the large board equal one whole sampling of the same tasks from the same draws, and History records their Top x',{timeout:300000},async t=>{
  const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,signedIn:false,dropDatabase:true});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,signedIn:false,dropDatabase:true});
  await startAnswering2408(device);
  const {ctx,clock}=device,run=source=>vm.runInContext(source,ctx);
  const ranksOf=source=>JSON.parse(run(`JSON.stringify([...(${source})].map(([id,rank])=>[id,rank.topK,rank.n,Array.from(rank.hist),Array.from(rank.cdf)]))`));
@@ -21401,7 +21405,7 @@ test('RISK rank work per action: ranks caught up after an Add or an editor Dot o
 // draws from the stream, so this is also what main sampled in the action's tap.
 test('RISK History before values: a Yes pressed after a person’s Add, Delete or editor Done on the large board, before that action’s ranks catch up, records each answered task’s before Top x from the ranks the action left',{timeout:300000},async t=>{
  const fixture=await largeBoardFixture();
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,signedIn:false,dropDatabase:true});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,signedIn:false,dropDatabase:true});
  await startAnswering2408(device);
  const {ctx,clock}=device,run=source=>vm.runInContext(source,ctx);
  run(`globalThis.__stream2467={a:2467};Math.random=function(){let t=(__stream2467.a=(__stream2467.a+0x6D2B79F5)>>>0);
@@ -21443,7 +21447,7 @@ test('RISK History before values: a Yes pressed after a person’s Add, Delete o
 // guard let through is held too; #2481: a deliberate press 150 ms after it acts.
 test('RISK scanner press guard: a press 120 ms after the last Yes that acted is held though the new candidate painted 110 ms before it, and one 150 ms after acts',{timeout:300000},async t=>{
  const fixture=await largeBoardFixture();
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,dropDatabase:true,signedIn:false});
  await startAnswering2408(device);
  const {ctx,clock}=device,guard=pressGuard2461(device);
  guard.paint();await clock.advance(1000);
@@ -21514,7 +21518,7 @@ test('RISK scanner press guard (#2481): on the large board with sync off, ten Ye
 // (another device's answer, Undo) keeps it.
 test('RISK scanner press guard (#2481): after a Yes that acted, a card the app then draws still holds a press 100 ms after it paints, 400 ms after that Yes',{timeout:300000},async t=>{
  const fixture=await largeBoardFixture();
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,dropDatabase:true,signedIn:false});
  await startAnswering2408(device);
  const {ctx,clock}=device,guard=pressGuard2461(device);
  guard.paint();await clock.advance(1000);
@@ -21537,7 +21541,7 @@ test('RISK scanner press guard (#2481): after a Yes that acted, a card the app t
 
 test('RISK scanner press guard (#2481): signed in on the large board, ten Yes taps 200 ms apart each record an answer that reaches the cloud, and a double tap 40 ms apart after them answers once',{timeout:600000},async t=>{
  const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,dropDatabase:true});
  await startAnswering2408(device);
  const {ctx,clock}=device,guard=pressGuard2461(device);
  guard.paint();await clock.advance(1000);
@@ -21574,7 +21578,7 @@ const doneTasks2486=ctx=>ctx.state.tasks.filter(task=>task.done).map(task=>task.
 
 test('RISK scanner press guard (#2486): on the large board, two Done taps on the candidate 200 ms apart, the second with click detail 2, each complete the candidate shown, while a 40 ms pair completes one and dims the second',{timeout:300000},async t=>{
  const fixture=await largeBoardFixture();
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,dropDatabase:true,signedIn:false});
  await startAnswering2408(device);
  const {ctx,clock}=device,guard=pressGuard2461(device);
  guard.paint();await clock.advance(1000);
@@ -21613,7 +21617,7 @@ test('RISK scanner press guard (#2486): on the large board, two Done taps on the
 
 test('RISK scanner press guard (#2486): on the large board, two Done taps on the dotted task 200 ms apart, the second with click detail 2, each complete the dotted task shown, while a 40 ms pair completes one and dims the second',{timeout:300000},async t=>{
  const fixture=await largeBoardFixture();
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,dropDatabase:true,signedIn:false});
  await startAnswering2408(device);
  const {ctx,clock}=device,guard=pressGuard2461(device);
  guard.paint();await clock.advance(1000);
@@ -21661,7 +21665,7 @@ function tasksAfterFrames2486(ctx){
 
 test('RISK scanner press guard (#2486): on the large board, after a Yes that acted, a press after its card’s frame callbacks but before that frame has finished is held, by touch click and by key, and one after the frame finished answers it',{timeout:300000},async t=>{
  const fixture=await largeBoardFixture();
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,dropDatabase:true,signedIn:false});
  await startAnswering2408(device);
  const {ctx,clock}=device,guard=pressGuard2461(device),frames=tasksAfterFrames2486(ctx);
  guard.paint();frames.run();await clock.advance(1000);
@@ -21694,7 +21698,7 @@ test('RISK scanner press guard (#2486): on the large board, after a Yes that act
 // by click and by key, on a card that painted long before.
 test('RISK scanner press guard (#2486): a press 149 ms after the last one that acted is held as a double tap and one 150 ms after counts, by touch click and by key',{timeout:300000},async t=>{
  const fixture=await largeBoardFixture();
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,dropDatabase:true,signedIn:false});
  await startAnswering2408(device);
  const {ctx,clock}=device,guard=pressGuard2461(device);
  guard.paint();await clock.advance(1000);
@@ -21722,7 +21726,7 @@ test('RISK scanner press guard (#2486): a press 149 ms after the last one that a
 // draw it by a real Undo, clicked and by z, after an own Yes.
 test('RISK scanner press guard (#2486): after a Yes that acted, the card a real Undo brings back, by click or by z, holds a press 50 ms after it paints, 350 ms after that Yes, and one 110 ms after answers it',{timeout:300000},async t=>{
  const fixture=await largeBoardFixture();
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,dropDatabase:true,signedIn:false});
  await startAnswering2408(device);
  const {ctx,clock,shim}=device,guard=pressGuard2461(device);
  guard.paint();await clock.advance(1000);
@@ -21752,7 +21756,7 @@ test('RISK scanner press guard (#2486): after a Yes that acted, the card a real 
 // records) and draws the next card here; the person did not draw it.
 test('RISK scanner press guard (#2486): signed in on the large board, after a Yes that acted, the card another device’s synced answer draws holds a press 50 ms after it paints, and one 110 ms after answers it',{timeout:600000},async t=>{
  const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
- const {phone,laptop}=await twoOpenDevices2417(t,JSON.parse(fixture.payload));
+ const {phone,laptop}=await twoOpenDevices2417(t,answeringLargeBoard2490(fixture));
  phone.clock.install();await phone.clock.advance(1000);
  const {ctx,clock}=phone,guard=pressGuard2461(phone);
  guard.paint();await clock.advance(1000);
@@ -21832,7 +21836,7 @@ const median2484=values=>{const sorted=[...values].sort((a,b)=>a-b),mid=sorted.l
 // order test below pin #2484's change.
 test('RISK answer shows first (#2484): signed in on the large board, ten Yes taps 200 ms apart each show the next card, and the modeled tap-to-card time is reported',{timeout:600000},async t=>{
  const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,dropDatabase:true});
  await startAnswering2408(device);
  const {ctx,clock}=device,watch=paintWatch2484(device);
  for(let i=0;i<10;i++){watch.tap('yes');await clock.advance(200);}
@@ -21864,7 +21868,7 @@ function catchUpTrail2484(device){
 // frames run when the test says, as in pressGuard2461.
 test('RISK answer shows first (#2484): signed in on the large board, each of ten Yes taps whose next card’s frame comes late shows that card before any of the answer’s History, rank sampling, change record or save, which then catch up',{timeout:600000},async t=>{
  const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,dropDatabase:true});
  await startAnswering2408(device);
  const {ctx,clock}=device,guard=pressGuard2461(device),trail=catchUpTrail2484(device);
  guard.paint();await clock.advance(1000);
@@ -21894,7 +21898,7 @@ test('RISK answer shows first (#2484): signed in on the large board, each of ten
 // guard's start, it waits for a frame at most FRAME_WAIT_FALLBACK_MS, 1 s.
 test('RISK answer shows first (#2484): signed in on the large board, a Yes whose next card is never given a frame catches up 1 s after the tap, its record is saved and sent, and its device save follows',{timeout:600000},async t=>{
  const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,dropDatabase:true});
  await startAnswering2408(device);
  const {ctx,clock,counters}=device,guard=pressGuard2461(device),trail=catchUpTrail2484(device);
  guard.paint();await clock.advance(1000);
@@ -21925,7 +21929,7 @@ test('RISK answer shows first (#2484): signed in on the large board, a Yes whose
 // answer given) and then saved, one task of 263–269 ms that held the next tap.
 test('RISK answer shows first (#2484): signed in on the large board, when an earlier answer’s device save comes due while the next answer’s frame is late, that save waits for the answer to show and catch up, and one save then holds both answers',{timeout:600000},async t=>{
  const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,dropDatabase:true});
  await startAnswering2408(device);
  const {ctx,clock,counters}=device,guard=pressGuard2461(device),trail=catchUpTrail2484(device);
  guard.paint();await clock.advance(1000);
@@ -21967,7 +21971,7 @@ test('RISK answer shows first (#2484): signed in on the large board, when an ear
 test('RISK answer shows first (#2484): signed out on the large board, at Yes taps 300 to 500 ms apart whose next card’s frame comes 16 to 250 ms late, each answer is saved on the device within 350 ms of its tap unless another answer comes first, as before #2484, and a page closed 360 ms after the last tap reopens with every answer',{timeout:900000},async t=>{
  const fixture=await largeBoardFixture(),rows=[];
  for(const [gap,frame] of [[300,16],[380,60],[420,120],[440,120],[500,250]]){
-  const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,signedIn:false});
+  const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,signedIn:false});
   await startAnswering2408(device);
   const {ctx,clock,counters,shim}=device,guard=pressGuard2461(device);
   guard.paint();await clock.advance(1000);
@@ -22010,7 +22014,7 @@ test('RISK answer shows first (#2484): signed out on the large board, at Yes tap
 // ten-answers test below, since each comes before the card's frame.
 test('RISK answer shows first (#2484): signed out on the large board, at Yes answers 420 ms apart whose next card’s frame comes 600 ms late, a device save that came due waits at most 1 s for an answer still catching up, so each answer is saved within 1.35 s of its tap while the answers go on',{timeout:600000},async t=>{
  const fixture=await largeBoardFixture();
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,dropDatabase:true,signedIn:false});
  await startAnswering2408(device);
  const {ctx,clock,counters}=device,guard=pressGuard2461(device);
  guard.paint();await clock.advance(1000);
@@ -22093,7 +22097,7 @@ function tapWork2484(ctx){
 // base's whole cloud copy twice per answer.
 test('RISK answer shows first (#2484): signed in on the large board, a Yes’s own tap serializes each task at most once for its Undo, and neither parses nor serializes the decision base’s whole cloud copy, also when the previous answer has not caught up',{timeout:600000},async t=>{
  const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,dropDatabase:true});
  await startAnswering2408(device);
  const {ctx,clock}=device,guard=pressGuard2461(device),measure=tapWork2484(ctx);
  assert.ok(ctx.state.decisionBase?.payload?.length>=1_000_000,'positive control: the acknowledged decision base holds a whole cloud copy of the large board');
@@ -22124,7 +22128,7 @@ test('RISK answer shows first (#2484): signed in on the large board, a Yes’s o
 // Every catch-up then runs in tap order, and the device's saves wait for it.
 test('RISK answer shows first (#2484): signed in on the large board, after ten Yes answers each given before the one before it caught up, the device saves them together, the cloud takes every answer in tap order, and Undo then restores each answer in turn on the device and in the cloud',{timeout:600000},async t=>{
  const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
- const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true});
+ const device=await answeringDevice2408(t,{board:answeringLargeBoard2490(fixture),saveMs:0,dropDatabase:true});
  await startAnswering2408(device);
  const {ctx,clock,counters}=device,guard=pressGuard2461(device);
  guard.paint();await clock.advance(1000);
