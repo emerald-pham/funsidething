@@ -137,6 +137,7 @@ variable never ran, so it is not a pass: read the run's `skipped` count.
 | Variable | Unlocks | Set by |
 | --- | --- | --- |
 | `LANDSCAPE_BROWSER_URL` | Browser tests, such as `steady scanner browser:` and saved-view cases; `environmentSkips` in `scripts/test-group-assignments.json` lists them | You: the URL of the served checkout, as below |
+| `LANDSCAPE_PLAYWRIGHT` | The Playwright module most core and persistence-recovery browser tests import to launch Chromium and WebKit. Most skip only on `LANDSCAPE_BROWSER_URL`, so with the URL set and this unset they fail with `Cannot find package 'undefined'` instead of skipping; a few skip without it | You: `playwright` (the pinned dev dependency) or an absolute path to its `index.mjs` |
 | `FIRESTORE_EMULATOR_HOST` | `Firestore rules:` tests | `npm run test:rules` |
 | `CHAIN_NATIVE_PORT` | Local serving fixtures, which fail without it | `npm run agent:worktree-ready -- env` |
 | `CHAIN_NATIVE_CANDIDATE_SHA`, `CHAIN_NATIVE_CANDIDATE_TREE`, `CHAIN_NATIVE_OUTPUT` | Installed-client native cases | `test:group`; by hand, see [installed-client regression](tdd-and-regression.md#installed-client-regression) |
@@ -148,8 +149,15 @@ The first line exports both worktree ports, `CHAIN_NATIVE_PORT` and `CHAIN_NATIV
 ```sh
 eval "$(npm run -s agent:worktree-ready -- env)"
 node scripts/serve-shell.mjs --port "$CHAIN_NATIVE_SMOKE_PORT" & server=$!
-LANDSCAPE_BROWSER_URL="http://127.0.0.1:$CHAIN_NATIVE_SMOKE_PORT/" node --test --test-name-pattern='steady scanner browser' tests/core.test.js; kill $server
+LANDSCAPE_BROWSER_URL="http://127.0.0.1:$CHAIN_NATIVE_SMOKE_PORT/" LANDSCAPE_PLAYWRIGHT=playwright node --test --test-name-pattern='steady scanner browser' tests/core.test.js; kill $server
 ```
+
+Some browser tests fail on a macOS host whatever the change: with both
+variables set, a full core run on the #2490 slice failed 22 browser tests, mostly
+Playwright click and tap timeouts plus some layout assertions. CI skips these
+tests, and [#2253](https://github.com/emerald-pham/funsidething/issues/2253)
+tracks them. Before you blame your change for a browser failure, run the same
+test on the base commit; a failure there too is one of these.
 
 Run the full suite on a clean tree, with no edits or checkouts during the run:
 a run with files changing under it failed a PWA cache test falsely (#2469).
