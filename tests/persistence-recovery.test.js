@@ -21158,6 +21158,31 @@ test('RISK rank work per answer: ranks sampled in parts after a Yes on the large
  const after=ctx.state.tasks.find(task=>task.id===answered).ratingHistory.at(-1).after;
  assert.equal(after.topK,expected.find(([id])=>id===answered)[1],'History records the Top x of those ranks');
 });
+// #2492: sampling in parts writes into a second set of rank arrays (rankSpare)
+// so a draw of the list never reads half-sampled ranks. The first answer's
+// catch-up allocates that set once; the two sets then swap, so later answers
+// allocate no rank arrays at all. Counted at the platform boundary, as the
+// long-scan browser test counts them, which CI does not run: every
+// Float32Array as long as the open list, the length of each rank array.
+test('RISK rank work per answer: on the large board, ranks sampled in parts allocate one spare set of rank arrays at most once, and later answers reuse both sets without allocating',{timeout:300000},async t=>{
+ const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
+ const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,signedIn:false,dropDatabase:true});
+ await startAnswering2408(device);
+ const {ctx,clock}=device,open=ctx.state.tasks.filter(task=>!task.done).length,ranks=()=>vm.runInContext('rankCache',ctx);
+ vm.runInContext(`globalThis.__rankArrays2492=0;Float32Array=new Proxy(Float32Array,{construct(target,args,newTarget){
+  if(args[0]===${open})__rankArrays2492++;return Reflect.construct(target,args,newTarget);}})`,ctx);
+ const allocated=()=>vm.runInContext('__rankArrays2492',ctx),perAnswer=[];
+ for(const act of ['yes','no','no','yes','no']){
+  const before=ranks(),from=allocated();
+  device.tap(act);await clock.advance(1500);
+  assert.notEqual(ranks(),before,`positive control: the ${act} at answer ${perAnswer.length+1} replaced the ranks`);
+  assert.equal(ranks().size,open,'positive control: a rank for every open task');
+  perAnswer.push(allocated()-from);
+ }
+ t.diagnostic(JSON.stringify({open,perAnswer}));
+ assert.ok(perAnswer[0]<=2*open,`the first answer allocates at most one set of rank arrays (${2*open}): ${perAnswer[0]}`);
+ assert.deepEqual(perAnswer.slice(1),[0,0,0,0],'later answers reuse the two sets of rank arrays');
+});
 
 // #2457 (spec #2455): adding a task on the large board shows it in the tap and
 // saves the board once, after the tap. Counted, never timed (responsiveness

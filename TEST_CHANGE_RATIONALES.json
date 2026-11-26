@@ -25419,10 +25419,11 @@
     "intendedBehavior": "The test fails when 60 answers allocate more than 1374 rank buffers: the one spare set #2459 needs (2 per task, 894 on this board) plus the same 8 per answer, so one more fresh set (1788) still fails. Chromium's growth guard is 246 MiB, about 15% above the highest growth measured on a33205a6 (214 MiB); WebKit's stays 453 MiB.",
     "preservedCoverage": [
       "The per-answer rank-buffer budget is unchanged: a rank refresh that allocates again fails. With the spare dropped once more (a mutated copy of a33205a6), both engines allocate 1788 and the test fails 'above 1374'.",
+      "A new Node test at the #2459 seam (answeringDevice2408 on largeSignedInBoardFixture) pins the reuse in CI, which never runs the browser test: five answers allocate [894, 0, 0, 0, 0] rank-length arrays, and it fails with [894, 894, 894, 894, 894] when the spare is dropped after every refresh (record 2026-11-26T10-53-26-621Z-83bcb726; GREEN 2026-11-26T10-53-36-275Z-9c8a935a).",
       "WebKit's 453 MiB growth guard, the 117 MiB Undo-delta allowance, rows drawn from scratch, rows placed per second, the 30-step Undo limit, Undo reversing the newest answer, the kept list matching a freshly drawn list, every answer accepted and no page errors all keep their assertions."
     ],
     "replacementTests": [
-      "RISK long scan memory browser: 60 answers on a large saved board stay under a per-engine memory growth guard, Undo adds little and keeps 30 steps, each answer redraws only the rows it changed, and Undo still reverses the newest answer, in Chromium and WebKit"
+      "RISK rank work per answer: on the large board, ranks sampled in parts allocate one spare set of rank arrays at most once, and later answers reuse both sets without allocating"
     ],
     "redEvidence": {
       "command": "node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <git-common-dir>/agent-test-runs/issue-2492 --purpose preimplementation-red -- node --test --test-name-pattern='RISK long scan memory browser' tests/persistence-recovery.test.js, with LANDSCAPE_BROWSER_URL serving a33205a6 (node scripts/serve-shell.mjs) and LANDSCAPE_PLAYWRIGHT set to the repository's Playwright",
