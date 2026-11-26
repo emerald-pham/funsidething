@@ -25710,6 +25710,7 @@
       "tests/core.test.js:-});",
       "tests/core.test.js:-}finally{await browser.close();}",
       "tests/core.test.js:-}finally{await browser.close();}",
+      "tests/persistence-recovery.test.js:-const LONG_SCAN_GROWTH_GUARD_MIB={chromium:193,webkit:453};",
       "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});",
       "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});",
       "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{board:JSON.parse(fixture.payload),saveMs:0,dropDatabase:true,signedIn:false});",
@@ -25740,17 +25741,19 @@
       "tests/persistence-recovery.test.js:-const large=await measure('large board',JSON.parse(fixture.payload));",
       "tests/persistence-recovery.test.js:-const large=await oneCountedNo2428(t,'large board',JSON.parse(fixture.payload));",
       "tests/persistence-recovery.test.js:-const {phone,laptop}=await twoOpenDevices2417(t,JSON.parse(fixture.payload));",
+      "tests/persistence-recovery.test.js:-if(longScanWork.floatArrays>LONG_SCAN_ANSWERS*LONG_SCAN_RANK_BUFFERS_PER_ANSWER)failures.push(`${engineName}: 60 answers allocated ${longScanWork.floatArrays} rank buffers, above ${LONG_SCAN_ANSWERS*LONG_SCAN_RANK_BUFFERS_PER_ANSWER}`);",
       "tests/shared.js:-const app=await loadApp({seed:2225,cryptoProvider:webcrypto,seedStorage:{[STORE_KEY]:JSON.stringify(seeded)}});",
       "tests/shared.js:-const shape=LARGE_BOARD_SHAPE,start=Date.parse('2026-06-01T12:00:00Z'),rand=mulberry32(2225);",
       "tests/shared.js:-const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(message)),Math.max(0,deadline-performance.now()));});"
     ],
-    "reason": "Combined entry for the whole 2026-11-26 slice diff (integration/slice-2026-11-26 against main a33205a6) once #2493 is merged into it, which the test-first gate checks as one diff. It covers the weakened lines of #2479 and #2414 (as the combined entry two above) and of #2493 (the large fixture's seed and crypto lines in tests/shared.js and the 30 large-fixture answering boards that now take the lowest check-in threshold); each lane's own entry above gives its reason.",
-    "previousBehavior": "As in the #2479, #2414 and #2493 entries above for their lines.",
-    "intendedBehavior": "As in the #2479, #2414 and #2493 entries above for their lines; nothing else changes.",
+    "reason": "Combined entry for the whole 2026-11-26 slice diff (integration/slice-2026-11-26 against main a33205a6) once #2493 is merged into it, which the test-first gate checks as one diff. It covers the weakened lines of #2479, #2414, #2492 (as the slice's own combined entry above) and of #2493 (the large fixture's seed and crypto lines in tests/shared.js and the 30 large-fixture answering boards that now take the lowest check-in threshold); each lane's own entry above gives its reason.",
+    "previousBehavior": "As in the #2479, #2414, #2492 and #2493 entries above for their lines.",
+    "intendedBehavior": "As in the #2479, #2414, #2492 and #2493 entries above for their lines; nothing else changes.",
     "replacementTests": [
       "Scanner browser: yellow task actions run horizontally below the card and wrap on mobile",
       "Scanner browser: secondary actions dim during scanning and brighten for focus or work",
       "RISK corrupt work budget fixture: a shared action deadline never rejects before its own deadline when the host timer fires early",
+      "RISK rank work per answer: on the large board, ranks sampled in parts allocate one spare set of rank arrays at most once, and later answers reuse both sets without allocating",
       "RISK repository process: the large test board holds the same decisions and chosen tasks when two separate test processes build it from the same seed"
     ],
     "preservedCoverage": [
@@ -25761,12 +25764,15 @@
       "RISK corrupt work budget fixture: one shared action deadline rejects an actually held device commit keeps its exact elapsed>=20000 check, unchanged; a budget shortened to 19s still fails it (19003ms).",
       "Every fixtureDeadline caller keeps its message, its ms and its success-path check that a result arriving at or after the deadline still fails. A rejection can now come at most one timer tick later than before, never earlier than the deadline.",
       "The wait() polling and its cleanup on rejection are unchanged.",
+      "The per-answer rank-buffer budget is unchanged: a rank refresh that allocates again fails. With the spare dropped once more (a mutated copy of a33205a6), both engines allocate 1788 and the test fails 'above 1374'.",
+      "A new Node test at the #2459 seam (answeringDevice2408 on largeSignedInBoardFixture) pins the reuse in CI, which never runs the browser test: five answers allocate [894, 0, 0, 0, 0] rank-length arrays, and it fails with [894, 894, 894, 894, 894] when the spare is dropped after every refresh (record 2026-11-26T10-53-26-621Z-83bcb726; GREEN 2026-11-26T10-53-36-275Z-9c8a935a).",
+      "WebKit's 453 MiB growth guard, the 117 MiB Undo-delta allowance, rows drawn from scratch, rows placed per second, the 30-step Undo limit, Undo reversing the newest answer, the kept list matching a freshly drawn list, every answer accepted and no page errors all keep their assertions.",
       "Every large-fixture answering test keeps its assertions, taps and timing; only the board's check-in threshold changes, and the small boards they compare against (answeringBoard2408) already used 0. The fixture keeps LARGE_BOARD_SHAPE, its size checks and the app's acceptance of its decision evidence (decisionEvidenceIssue is null).",
       "The check-in keeps its own tests, and the long scan memory browser test still answers 60 times on the large fixture at the default 25% threshold, continuing past any check-in."
     ],
     "redEvidence": {
-      "command": "See the #2479, #2414 and #2493 entries above.",
-      "failure": "Record 2026-11-26T10-13-45-096Z-2e4d5287-f163-423a-a0b2-79a0ab0bc223 (preimplementation-red): both tests fail with 'locator.click: Timeout 30000ms exceeded' on '#modalRoot [data-act=\"close-modal\"]', the call log showing '<dialog open=\"\" id=\"motionDialog\" class=\"motion-dialog\" ...> intercepts pointer events' (core.test.js 24244 and 24270). Record 2026-11-26T10-15-23-070Z-a9c31d77-0069-4012-8908-49a49585caae (green): 2 pass, 0 fail, 0 skipped, each in Chromium and WebKit; 36 of 36 passed in three rounds of six concurrent runs. | Record 2026-11-26T10-17-54-912Z-718537f4: 'the deadline rejects no earlier than its 50ms by performance.now(): 48.78354200000001'. Load baseline on main, record 2026-11-26T10-15-12-319Z-29283bd6: 6 failed of 30, each 'the earned action stall reaches the original single 20s limit' at 19999ms. After the fix: record 2026-11-26T10-18-04-681Z-0c1040ba (both fixture tests pass) and record 2026-11-26T10-18-37-348Z-6cf3c75a (0 failed of 30 six at a time, minimum 20000ms). Mutation, action budget 20000 to 19000 in the consumer: record 2026-11-26T10-21-22-279Z-e68b19f1, the fixture test fails at 19003ms. #2493: Record 2026-11-26T10-15-59-050Z-d60b75af-a58d-4790-b9d4-aaf4dbf86ccc, before the fixture was seeded: \"signedOut: both processes chose the same tasks\", actual [large-board-task-003, large-board-task-439], expected [large-board-task-041, large-board-task-108]."
+      "command": "See the #2479, #2414, #2492 and #2493 entries above.",
+      "failure": "Record 2026-11-26T10-13-45-096Z-2e4d5287-f163-423a-a0b2-79a0ab0bc223 (preimplementation-red): both tests fail with 'locator.click: Timeout 30000ms exceeded' on '#modalRoot [data-act=\"close-modal\"]', the call log showing '<dialog open=\"\" id=\"motionDialog\" class=\"motion-dialog\" ...> intercepts pointer events' (core.test.js 24244 and 24270). Record 2026-11-26T10-15-23-070Z-a9c31d77-0069-4012-8908-49a49585caae (green): 2 pass, 0 fail, 0 skipped, each in Chromium and WebKit; 36 of 36 passed in three rounds of six concurrent runs. | Record 2026-11-26T10-17-54-912Z-718537f4: 'the deadline rejects no earlier than its 50ms by performance.now(): 48.78354200000001'. Load baseline on main, record 2026-11-26T10-15-12-319Z-29283bd6: 6 failed of 30, each 'the earned action stall reaches the original single 20s limit' at 19999ms. After the fix: record 2026-11-26T10-18-04-681Z-0c1040ba (both fixture tests pass) and record 2026-11-26T10-18-37-348Z-6cf3c75a (0 failed of 30 six at a time, minimum 20000ms). Mutation, action budget 20000 to 19000 in the consumer: record 2026-11-26T10-21-22-279Z-e68b19f1, the fixture test fails at 19003ms. | Record 2026-11-26T10-17-36-450Z-d7645c52: 'chromium: 60 answers allocated 894 rank buffers, above 480' and 'webkit: 60 answers allocated 894 rank buffers, above 480'; Chromium grew 187 MiB that run. The issue records Chromium growth of 176, 200, 199 and 169 MiB on 49c89b54 and #2490. After the change: GREEN record 2026-11-26T10-50-08-002Z-2660ccb9 (894 buffers, Chromium 185 MiB, WebKit 337 MiB); sensitivity record 2026-11-26T10-36-12-052Z-5f059887 on a copy with one extra fresh set fails 'above 1374' in both engines. #2493: Record 2026-11-26T10-15-59-050Z-d60b75af-a58d-4790-b9d4-aaf4dbf86ccc, before the fixture was seeded: \"signedOut: both processes chose the same tasks\", actual [large-board-task-003, large-board-task-439], expected [large-board-task-041, large-board-task-108]."
     }
   }
 ]
