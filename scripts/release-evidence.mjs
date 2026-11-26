@@ -155,6 +155,20 @@ function candidateTree(repoRoot, commitSha) {
   return git(repoRoot, ['rev-parse', commitSha + '^{tree}']);
 }
 
+// The plan and prepare commands take any commit ref, as the test-first gate
+// does (#2496): HEAD, origin/main, a branch or an abbreviated SHA. Only the
+// command line resolves; the library functions and every recorded receipt
+// field still demand the exact 40-character SHA, so a ref can never stand in
+// for the commit a review named.
+export function resolveReleaseRef(repoRoot, ref, label) {
+  const result = typeof ref === 'string' && ref
+    ? spawnSync('git', ['-C', repoRoot, 'rev-parse', '--verify', '--quiet', '--end-of-options', ref + '^{commit}'], { encoding: 'utf8' })
+    : null;
+  const sha = result?.status === 0 ? result.stdout.trim() : '';
+  if (!SHA1.test(sha)) throw new Error(label + ' ' + JSON.stringify(ref) + ' does not name a commit in this repository.');
+  return sha;
+}
+
 function assertAncestor(repoRoot, baseSha, commitSha) {
   if (!SHA1.test(baseSha)) throw new Error('Candidate base SHA must contain 40 lowercase hexadecimal characters.');
   const result = spawnSync('git', ['-C', repoRoot, 'merge-base', '--is-ancestor', baseSha, commitSha], { encoding: 'utf8' });
@@ -632,6 +646,15 @@ export function deriveReleaseReviewPlan(repoRoot, commitSha, baseSha, options = 
     requiresSpecialistReview,
     specialistDomains: domains,
   };
+}
+
+// The full plan lists every changed file, which ran to about 160 KB for a
+// slice, while the decision is its last fields (#2496). The summary keeps the
+// mode, every review flag the plan carries and the specialist domains, and is
+// for reading only: prepare and record always derive the full plan.
+export function releasePlanSummary(plan) {
+  return Object.fromEntries(Object.entries(plan)
+    .filter(([key]) => key === 'mode' || key.startsWith('requires') || key === 'specialistDomains'));
 }
 
 function evidenceFile(repoRoot, sourcePath, expectedSha, label) {
@@ -1538,9 +1561,15 @@ async function main() {
     return;
   }
   if (command === 'plan') {
-    const [commitSha, baseSha] = process.argv.slice(3);
-    if (!commitSha || !baseSha) throw new Error('Usage: node scripts/release-evidence.mjs plan <candidate-sha> <base-sha>');
-    process.stdout.write(JSON.stringify(deriveReleaseReviewPlan(gitCommonDir(repoRoot).root, commitSha, baseSha), null, 2) + '\n');
+    const args = process.argv.slice(3);
+    const summary = args.includes('--summary');
+    const [candidateRef, baseRef] = args.filter(arg => arg !== '--summary');
+    if (!candidateRef || !baseRef) throw new Error('Usage: node scripts/release-evidence.mjs plan [--summary] <candidate-ref> <base-ref>');
+    const root = gitCommonDir(repoRoot).root;
+    const commitSha = resolveReleaseRef(root, candidateRef, 'Candidate');
+    const baseSha = resolveReleaseRef(root, baseRef, 'Base');
+    const plan = deriveReleaseReviewPlan(root, commitSha, baseSha);
+    process.stdout.write(JSON.stringify(summary ? releasePlanSummary(plan) : plan, null, 2) + '\n');
     return;
   }
   if (command === 'memory-scope') {
@@ -1551,10 +1580,13 @@ async function main() {
     return;
   }
   if (command === 'prepare') {
-    const [commitSha, baseSha, reportDirectory, issue] = process.argv.slice(3);
-    if (!commitSha || !baseSha || !reportDirectory || !issue) {
-      throw new Error('Usage: node scripts/release-evidence.mjs prepare <candidate-sha> <base-sha> <report-directory> <issue-number>');
+    const [candidateRef, baseRef, reportDirectory, issue] = process.argv.slice(3);
+    if (!candidateRef || !baseRef || !reportDirectory || !issue) {
+      throw new Error('Usage: node scripts/release-evidence.mjs prepare <candidate-ref> <base-ref> <report-directory> <issue-number>');
     }
+    const root = gitCommonDir(repoRoot).root;
+    const commitSha = resolveReleaseRef(root, candidateRef, 'Candidate');
+    const baseSha = resolveReleaseRef(root, baseRef, 'Base');
     const inputPath = prepareReleaseInput(repoRoot, commitSha, baseSha, reportDirectory, issue);
     process.stdout.write('Wrote ' + inputPath + '. Add the empty authored fields, then run release:record.\n');
     return;
