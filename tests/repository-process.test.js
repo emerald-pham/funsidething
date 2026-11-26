@@ -2554,6 +2554,18 @@ test('RISK repository process: failed groups state a capped reason in the job lo
  assert.match(result.stdout||'',/^# skipped 0$/m,'These contracts cannot pass through a skip');
 });
 
+// #2495: agents diagnosed CI failures by reproducing them locally because the
+// job log dropped the details the TAP artifact held.
+test('RISK repository process: a failed group prints capped diagnostics and error details for each failed test in the job log',t=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group runner (prints the diagnostics and error details of a failed test under its failure line|caps failure details per test and per job and says where it cut)$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:180000,maxBuffer:8*1024*1024});
+ const output=[result.stdout,result.stderr].filter(Boolean).join('\n');t.diagnostic(output);
+ assert.equal(result.error,undefined,'The failure-detail contracts must start: '+(result.error?.message||output));
+ assert.equal(result.status,0,'A failed group must print capped diagnostics and error details under each failure line: '+output);
+ assert.match(result.stdout||'',/^# tests 2$/m,'Both failure-detail contracts must run');
+ assert.match(result.stdout||'',/^# skipped 0$/m,'These contracts cannot pass through a skip');
+});
+
 test('RISK repository process: required parallel scanner aggregation rejects absent group evidence',()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const result=spawnSync(process.execPath,['--test','--test-name-pattern=^test group workflow scanner command rejects missing parallel group evidence$',path.join(__dirname,'scripts/agent-tools/test-groups.test.mjs')],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});

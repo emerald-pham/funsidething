@@ -180,8 +180,12 @@ needs the same groups as a scenery change.
 ## Reading a failed group
 
 A failed group's log gives each failed test's first assertion line, capped at 200
-characters. Compared values on later assertion lines stay in the `test.tap`
-artifact, because job logs are public.
+characters. Indented under it come the test's details (#2495): the first lines of
+its error, its `expected` and `actual` values, its first stack frame in the test
+file, and its `t.diagnostic` lines. Read them there before reproducing a CI
+failure locally. A test prints at most 24 detail lines and the job at most 240;
+each cut says so, and the full output stays in the `test.tap` artifact. Passing
+and skipped tests print nothing.
 
 ## Nightly cross-engine cohort
 
