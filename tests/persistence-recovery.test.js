@@ -1993,7 +1993,14 @@ const LONG_SCAN_ROWS_PER_ANSWER=4,LONG_SCAN_RANK_BUFFERS_PER_ANSWER=8;
 // ceiling is about 15% above the highest of three runs per engine on desktop
 // (Chromium 168 MiB, WebKit 394 MiB). Passing here does not show a phone is
 // safe: the installed iPhone run is the real acceptance.
-const LONG_SCAN_GROWTH_GUARD_MIB={chromium:193,webkit:453};
+// #2492: Chromium's guard went stale without the scan getting worse. Its peak
+// during the answers is the same on the build that set 193 (140f9aa0, median
+// 474 MiB of 5 runs), before #2459 (aade50b3, 471 MiB of 9) and on a33205a6
+// (479 MiB of 9), but the settled board it is measured from now sits lower and
+// sometimes dips (216-249 MiB), so growth reached 213-227 MiB on all three
+// builds. 246 is about 15% above the highest, 214 MiB on a33205a6. WebKit's
+// highest on a33205a6 was 357 MiB, under its guard.
+const LONG_SCAN_GROWTH_GUARD_MIB={chromium:246,webkit:453};
 test('RISK long scan memory browser: 60 answers on a large saved board stay under a per-engine memory growth guard, Undo adds little and keeps 30 steps, each answer redraws only the rows it changed, and Undo still reverses the newest answer, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
  const fixture=await largeBoardFixture(),{stats}=fixture,allowance=LONG_SCAN_FIXED_MARGIN+LONG_SCAN_BYTES_FACTOR*stats.serializedBytes;
@@ -2090,7 +2097,14 @@ test('RISK long scan memory browser: 60 answers on a large saved board stay unde
   // second of scanning, however fast the answers come. A rate of work, not a speed.
   const placedAllowed=Math.ceil(LARGE_BOARD_SHAPE.tasks*(longScanSeconds+2));
   if(longScanWork.placed>placedAllowed)failures.push(`${engineName}: 60 answers placed ${longScanWork.placed} list rows, above ${placedAllowed} for a ${Math.round(longScanSeconds)} second scan`);
-  if(longScanWork.floatArrays>LONG_SCAN_ANSWERS*LONG_SCAN_RANK_BUFFERS_PER_ANSWER)failures.push(`${engineName}: 60 answers allocated ${longScanWork.floatArrays} rank buffers, above ${LONG_SCAN_ANSWERS*LONG_SCAN_RANK_BUFFERS_PER_ANSWER}`);
+  // #2492: #2459 samples an answer's ranks in parts into a second set of
+  // per-task arrays (rankSpare), so a draw of the list between parts never
+  // reads half-sampled ranks. That set is allocated once, by the first answer
+  // of the scan (two arrays per task, 894 on this board), and the two sets
+  // swap from then on. The allowance is that one set plus the per-answer
+  // budget, so a refresh that allocates again still fails here.
+  const rankBuffersAllowed=2*LARGE_BOARD_SHAPE.tasks+LONG_SCAN_ANSWERS*LONG_SCAN_RANK_BUFFERS_PER_ANSWER;
+  if(longScanWork.floatArrays>rankBuffersAllowed)failures.push(`${engineName}: 60 answers allocated ${longScanWork.floatArrays} rank buffers, above ${rankBuffersAllowed}`);
  }
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
