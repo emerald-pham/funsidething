@@ -660,6 +660,38 @@ test('RISK repository process: release plan prints the review plan the validator
  }finally{cleanupReleaseGateFixture(fixture);}
 });
 
+// #2496: the plan and prepare commands take any commit ref, as the test-first
+// gate does, and resolve it to the full SHA before the exact-SHA checks run.
+test('RISK repository process: release plan resolves HEAD, ancestry, branch and abbreviated refs to the full candidate and base',()=>{
+ const fixture=makeScaledReviewFixture({candidate:{'src/cloud-sync.mjs':'export const value = 2;\n'}});
+ try{
+  releaseGateGit(fixture.repo,['branch','release-base',fixture.baseSha]);
+  const expected={schemaVersion:2,changedFiles:['src/cloud-sync.mjs'],mode:'dual-review',
+   requiresCodeReview:true,requiresFaqReview:false,requiresOwnerFaqCoverage:true,requiresSpecialistReview:true,
+   requiresTypographyReview:false,specialistDomains:['memory-cloud-sync']};
+  for(const [candidate,base] of [['HEAD','HEAD~1'],['HEAD','release-base'],[fixture.candidateSha.slice(0,12),fixture.baseSha.slice(0,9)]]){
+   const printed=releaseCommand(fixture,'plan',candidate,base);
+   assert.equal(printed.status,0,candidate+' '+base+': '+printed.stdout+printed.stderr);
+   assert.deepEqual(JSON.parse(printed.stdout),expected,candidate+' '+base);
+  }
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+// The full plan lists every changed file (about 160 KB for a slice), while the
+// decision is the mode, review flags and specialist domains (#2496).
+test('RISK repository process: release plan --summary prints only the mode, review flags and specialist domains',()=>{
+ const fixture=makeScaledReviewFixture({candidate:{'src/cloud-sync.mjs':'export const value = 2;\n','docs/notes.md':'Notes\n'}});
+ try{
+  for(const args of [['plan','--summary','HEAD','HEAD~1'],['plan','HEAD','HEAD~1','--summary']]){
+   const printed=releaseCommand(fixture,...args);
+   assert.equal(printed.status,0,args.join(' ')+': '+printed.stdout+printed.stderr);
+   assert.deepEqual(JSON.parse(printed.stdout),{mode:'dual-review',requiresCodeReview:true,requiresFaqReview:false,
+    requiresOwnerFaqCoverage:true,requiresSpecialistReview:true,requiresTypographyReview:false,specialistDomains:['memory-cloud-sync']},args.join(' '));
+   assert.ok(!printed.stdout.includes('cloud-sync.mjs')&&!printed.stdout.includes('notes.md'),'the summary must leave the changed-file list out');
+  }
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
 const releaseReportHeader=(commit,verdict,completed)=>`Commit: ${commit}\nVerdict: ${verdict}\nCompleted: ${completed}\n\n`;
 function writeReleaseReports(fixture,reports){
  const directory=path.join(fixture.root,'reports');
@@ -708,6 +740,43 @@ test('RISK repository process: release prepare writes receipt input that record 
   assert.equal(recorded.status,0,recorded.stdout+recorded.stderr);
   const verified=releaseCommand(fixture,'verify',fixture.candidateSha);
   assert.equal(verified.status,0,verified.stdout+verified.stderr);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: release prepare given HEAD and HEAD~1 records the full candidate, tree, base and reviewed SHAs',()=>{
+ const fixture=datedReleaseFixture({candidate:{'scripts/tool.mjs':'export const value = 2;\n'}});
+ try{
+  const owner=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T12:00:33.000Z')+'The owner read the exact diff.\n';
+  const independent=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T11:53:58.000Z')+'The reviewer read the exact diff.\n';
+  const reports=writeReleaseReports(fixture,{'owner-review.md':owner,'independent-review.md':independent});
+  const prepared=releaseCommand(fixture,'prepare','HEAD','HEAD~1',reports,'2496');
+  assert.equal(prepared.status,0,prepared.stdout+prepared.stderr);
+  const input=JSON.parse(fs.readFileSync(path.join(reports,'receipt-input.json'),'utf8'));
+  assert.deepEqual(input.candidate,{commitSha:fixture.candidateSha,treeSha:fixture.treeSha,baseSha:fixture.baseSha});
+  assert.match(input.candidate.commitSha,/^[0-9a-f]{40}$/);
+  assert.match(input.candidate.baseSha,/^[0-9a-f]{40}$/);
+  assert.equal(input.ownerReview.reviewedSha,fixture.candidateSha);
+  assert.equal(input.independentReview.reviewedSha,fixture.candidateSha);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: release plan and prepare refuse an unknown ref, a tree and an option-shaped ref by name and write no receipt input',()=>{
+ const fixture=datedReleaseFixture({candidate:{'scripts/tool.mjs':'export const value = 2;\n'}});
+ try{
+  const owner=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T12:00:33.000Z')+'The owner read the exact diff.\n';
+  const independent=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T11:53:58.000Z')+'The reviewer read the exact diff.\n';
+  const reports=writeReleaseReports(fixture,{'owner-review.md':owner,'independent-review.md':independent});
+  for(const [candidate,base,named] of [['no-such-ref','HEAD~1','Candidate "no-such-ref"'],['HEAD','origin/missing','Base "origin/missing"'],
+   ['HEAD^{tree}','HEAD~1','Candidate "HEAD^{tree}"'],['--output=stolen','HEAD~1','Candidate "--output=stolen"']]){
+   for(const args of [['plan',candidate,base],['prepare',candidate,base,reports,'2496']]){
+    const result=releaseCommand(fixture,...args);
+    assert.notEqual(result.status,0,args.join(' ')+' must fail');
+    assert.ok(result.stderr.includes(named+' does not name a commit'),args.join(' ')+': '+result.stderr);
+    assert.equal(result.stdout,'',args.join(' '));
+   }
+  }
+  assert.ok(!fs.existsSync(path.join(reports,'receipt-input.json')),'a refused ref must not leave receipt input behind');
+  assert.ok(!fs.existsSync(path.join(fixture.repo,'stolen')),'an option-shaped ref must not reach git as an option');
  }finally{cleanupReleaseGateFixture(fixture);}
 });
 
@@ -2551,6 +2620,18 @@ test('RISK repository process: failed groups state a capped reason in the job lo
  assert.equal(result.error,undefined,'The failure-line contracts must start: '+(result.error?.message||output));
  assert.equal(result.status,0,'A failed group must state its reason within the cap: '+output);
  assert.match(result.stdout||'',/^# tests 3$/m,'Every failure-line contract must run');
+ assert.match(result.stdout||'',/^# skipped 0$/m,'These contracts cannot pass through a skip');
+});
+
+// #2495: agents diagnosed CI failures by reproducing them locally because the
+// job log dropped the details the TAP artifact held.
+test('RISK repository process: a failed group prints capped diagnostics and error details for each failed test in the job log',t=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group runner (prints the diagnostics and error details of a failed test under its failure line|caps failure details per test and per job and says where it cut)$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:180000,maxBuffer:8*1024*1024});
+ const output=[result.stdout,result.stderr].filter(Boolean).join('\n');t.diagnostic(output);
+ assert.equal(result.error,undefined,'The failure-detail contracts must start: '+(result.error?.message||output));
+ assert.equal(result.status,0,'A failed group must print capped diagnostics and error details under each failure line: '+output);
+ assert.match(result.stdout||'',/^# tests 2$/m,'Both failure-detail contracts must run');
  assert.match(result.stdout||'',/^# skipped 0$/m,'These contracts cannot pass through a skip');
 });
 

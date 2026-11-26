@@ -137,6 +137,7 @@ variable never ran, so it is not a pass: read the run's `skipped` count.
 | Variable | Unlocks | Set by |
 | --- | --- | --- |
 | `LANDSCAPE_BROWSER_URL` | Browser tests, such as `steady scanner browser:` and saved-view cases; `environmentSkips` in `scripts/test-group-assignments.json` lists them | You: the URL of the served checkout, as below |
+| `LANDSCAPE_PLAYWRIGHT` | The Playwright module most core and persistence-recovery browser tests import to launch Chromium and WebKit. Most skip only on `LANDSCAPE_BROWSER_URL`, so with the URL set and this unset they fail with `Cannot find package 'undefined'` instead of skipping; a few skip without it | You: `playwright` (the pinned dev dependency) or an absolute path to its `index.mjs` |
 | `FIRESTORE_EMULATOR_HOST` | `Firestore rules:` tests | `npm run test:rules` |
 | `CHAIN_NATIVE_PORT` | Local serving fixtures, which fail without it | `npm run agent:worktree-ready -- env` |
 | `CHAIN_NATIVE_CANDIDATE_SHA`, `CHAIN_NATIVE_CANDIDATE_TREE`, `CHAIN_NATIVE_OUTPUT` | Installed-client native cases | `test:group`; by hand, see [installed-client regression](tdd-and-regression.md#installed-client-regression) |
@@ -148,8 +149,15 @@ The first line exports both worktree ports, `CHAIN_NATIVE_PORT` and `CHAIN_NATIV
 ```sh
 eval "$(npm run -s agent:worktree-ready -- env)"
 node scripts/serve-shell.mjs --port "$CHAIN_NATIVE_SMOKE_PORT" & server=$!
-LANDSCAPE_BROWSER_URL="http://127.0.0.1:$CHAIN_NATIVE_SMOKE_PORT/" node --test --test-name-pattern='steady scanner browser' tests/core.test.js; kill $server
+LANDSCAPE_BROWSER_URL="http://127.0.0.1:$CHAIN_NATIVE_SMOKE_PORT/" LANDSCAPE_PLAYWRIGHT=playwright node --test --test-name-pattern='steady scanner browser' tests/core.test.js; kill $server
 ```
+
+Some browser tests fail on a macOS host whatever the change: with both
+variables set, a full core run on the #2490 slice failed 22 browser tests, mostly
+Playwright click and tap timeouts plus some layout assertions. CI skips these
+tests, and [#2253](https://github.com/emerald-pham/funsidething/issues/2253)
+tracks them. Before you blame your change for a browser failure, run the same
+test on the base commit; a failure there too is one of these.
 
 Run the full suite on a clean tree, with no edits or checkouts during the run:
 a run with files changing under it failed a PWA cache test falsely (#2469).
@@ -180,8 +188,36 @@ needs the same groups as a scenery change.
 ## Reading a failed group
 
 A failed group's log gives each failed test's first assertion line, capped at 200
-characters. Compared values on later assertion lines stay in the `test.tap`
-artifact, because job logs are public.
+characters. Indented under it come the test's details (#2495): the first lines of
+its error, its `expected` and `actual` values, its first stack frame in the test
+file, and its `t.diagnostic` lines. Read them there before reproducing a CI
+failure locally. A test prints at most 24 detail lines and the job at most 240;
+each cut says so, and the full output stays in the `test.tap` artifact. Passing
+and skipped tests print nothing.
+
+## Is a failure new?
+
+To check whether a failing test, in CI or locally, is new on a branch or already
+fails on main, compare its repeated runs on both (#2494):
+
+```sh
+npm run agent:head-vs-base -- --file tests/persistence-recovery.test.js \
+  --pattern 'RISK cloud save loop guard' --runs 18 --parallel 6 \
+  --node-option --max-old-space-size=8192
+```
+
+It runs the pattern `--runs` times on the current checkout, uncommitted changes
+included, and `--runs` times on `--base` (default `origin/main`; fetch first),
+in a temporary worktree it readies with `agent:worktree-ready` and removes
+afterwards, even when interrupted. The two sides' runs alternate,
+`--parallel` at a time, so both run under the same load. It prints each side's
+passed, failed and not-run counts and each distinct failure message with its
+count, and exits 0 only when every run on both sides passed. A run that skipped
+a selected test, or matched none, counts as not run, never as a pass. Add
+`--json` for the report as JSON, or `--evidence-dir <dir> --purpose <purpose>`
+to record the comparison through the [test-run recorder](test-run-provenance.md).
+The base runs get the base worktree's own ports. A browser test runs against
+whatever `LANDSCAPE_BROWSER_URL` serves, on both sides, so compare Node tests.
 
 ## Nightly cross-engine cohort
 
