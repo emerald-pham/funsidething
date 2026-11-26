@@ -6,6 +6,7 @@ procedure, output and limits; package script names are the command entry points.
 | Task | Command | Guide |
 | --- | --- | --- |
 | Measure rendered typography, zoom, theme and capture evidence | `npm run agent:rendered-evidence --` | [Rendered evidence](rendered-evidence.md) |
+| Find widths where a scanner row takes more lines than on a base build | `npm run agent:layout-sweep --` | [Layout sweep](rendered-evidence.md#layout-sweep) |
 | Record a command's test and source provenance | `npm run agent:record-test-run --` | [Test-run provenance](test-run-provenance.md) |
 | Validate a compact checkpoint with distinct required gates and follow-ups | `npm run agent:checkpoint --` | [Checkpoints](checkpoints.md) |
 | Check native task actions and durable readback in an isolated profile | `npm run agent:native-task-smoke --` | [Native task smoke](native-task-smoke.md) |
@@ -13,8 +14,8 @@ procedure, output and limits; package script names are the command entry points.
 | Ready an agent worktree's dependencies and ports, or free removed worktrees' entries | `npm run agent:worktree-ready --` | [Host coordination](host-coordination.md#agent-worktrees) |
 | Run focused copy and rationale checks | `npm run agent:preflight --` | [Preflight](preflight.md) |
 | Run an isolated browser audit and preserve partial results | `npm run agent:browser-audit --` | [Browser audits](browser-audits.md) |
-| Follow one exact CI run and commit | `npm run agent:ci-monitor --` | [CI monitor](ci-monitor.md) |
-| Run an independently accounted scanner test group | `npm run test:group --` | [Test groups](test-groups.md) |
+| Read a failed CI run's logs, or follow one exact CI run and commit | `npm run agent:ci-monitor --` | [CI monitor](ci-monitor.md) |
+| Run an independently accounted scanner test group, or an environment-gated test | `npm run test:group --` | [Test groups](test-groups.md) |
 | Update an authorized PR body from UTF-8 text | `npm run agent:pr-body-update --` | [PR body update](pr-body-update.md) |
 
 Pass tool arguments after `--`. Read the linked guide before invoking its

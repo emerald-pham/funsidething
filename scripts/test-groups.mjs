@@ -1027,8 +1027,18 @@ function aggregateResults({options, outputDir, descriptor, inventory, assignment
   if(reusedEmulators.some(gate=>!reused.includes(gate)))fail('Emulator coverage was not admitted by the original routing proof.');
   const freshProof=covered||reused.length?readJson(options.proof,'fresh original-producer proof'):null;
   const freshCoverage=covered?coverageReference(freshProof,descriptor.resultIdentity):null;
+  // The final recheck stays authoritative: a pass it no longer verifies is never
+  // accepted on the first routing's word, because a later failure of the same
+  // inputs must still win. But a full routing is not covered mode, so a dropped
+  // pass names both routing decisions instead of falling through to the
+  // covered-mode error (run 45428791832/1, #2489).
+  const gateList=gates=>gates.length?gates.join(','):'none';
+  const inputCoverage=(gate,execution)=>{
+    if(!covered&&!freshProof?.inputPasses?.[gate])fail(`Routing mismatch for reused gate ${gate}: cohort-routing decided ${needs['cohort-routing']?.outputs?.decision||'nothing'} with reused gates ${gateList(reused)}, but the final routing decided ${freshProof?.decision||'nothing'} with reused gates ${gateList(Object.keys(freshProof?.inputPasses||{}))}.${freshProof?.inputReuseReason?` Final routing: ${freshProof.inputReuseReason}`:''} Rerun the whole workflow so unverified gates execute.`);
+    return coverageReference(freshProof,{...descriptor.resultIdentity,selectedGroup:gate},execution);
+  };
   const emulatorCoverage=Object.fromEntries(reusedEmulators.map(gate=>{
-    const reference=coverageReference(freshProof,{...descriptor.resultIdentity,selectedGroup:gate},false);
+    const reference=inputCoverage(gate,false);
     if(emulatorModes[gate+'-coverage']!==sha256(JSON.stringify(reference)))fail('Emulator original coverage changed after the consumer: '+gate);
     return [gate,reference];
   }));
@@ -1062,7 +1072,7 @@ function aggregateResults({options, outputDir, descriptor, inventory, assignment
       }
       if (identity?.selectedGroup !== id || identity.checkoutDirty) fail(`Wrong or dirty group identity: ${id}.`);
       if(covered||inputCovered){
-        const expectedCoverage=inputCovered?coverageReference(freshProof,{...descriptor.resultIdentity,selectedGroup:id},false):freshCoverage;
+        const expectedCoverage=inputCovered?inputCoverage(id,false):freshCoverage;
         if(record.cases?.length!==0||record.artifacts?.length!==0||record.process!==null||JSON.stringify(record.coverage)!==JSON.stringify(expectedCoverage))fail('Covered records are mixed, incomplete or claim current execution.');
         records.push({group:id,mode:'covered',identity,coverage:record.coverage});continue;
       }

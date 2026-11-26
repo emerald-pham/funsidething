@@ -58,6 +58,16 @@ import { openApp } from "./shared.js"; // #2378 app driver
 import { rewriteGenerationFixture } from "./shared.js";
 import { coldRelaunch2198 } from "./shared.js";
 import { appFixtureScope } from "./shared.js";
+import { scannerDataAttributeLayoutRules } from "./shared.js"; // #2480
+// #2480's layout sweep tool, loaded on first use: preflight's isolated fixture
+// copies of the test files leave scripts/agent-tools out, and a static import
+// would stop this whole file loading there.
+const layoutSweep=()=>import("../scripts/agent-tools/layout-sweep.mjs");
+const steadyScaleText=async(...args)=>(await layoutSweep()).scaleText(...args);
+const chromeMinimumFontHost=(...args)=>({newContext:async options=>(await layoutSweep()).chromeMinimumFontHost(...args).newContext(options)});
+const serveBuild=async(...args)=>(await layoutSweep()).serveBuild(...args);
+const compareCase=async(...args)=>(await layoutSweep()).compareCase(...args);
+const sweepBuilds=async(...args)=>(await layoutSweep()).sweepBuilds(...args);
 import { woopFields2421, woopBoard2421, woopSnapshot2421 } from "./shared.js"; // #2421 saved WOOP data
 import { backupRowsWithText } from "./shared.js";
 import { releaseKnownCloudCopy2377 } from "./shared.js";
@@ -14689,6 +14699,99 @@ test("UI: action tooltips name a key only on the card that answers it, and both 
   assert.match(benchDelete(alone), /Delete key/, "with no candidate the dotted task's Delete names the Delete key");
 });
 
+// #2470: the #2460 fix covered Done and Delete by name. This check is general:
+// every scanner button whose tooltip, accessible name or visible key hint names
+// a key must belong to the card that key acts on right now, and a key a tooltip
+// names must be the button's visible hint too. Which card a key acts on comes
+// from pressing it through the real keydown handler on a fresh copy of the same
+// board, not from the render code. A tooltip names a key in parentheses: "(d)",
+// "(Delete key)", "(rule 7, w)".
+test("UI: every key a scanner button names acts on that button's card, with a candidate showing and without", async t => {
+  const SEED = 2470;
+  const scenarios = {
+    "a candidate showing (it is the edit target)": ctx => {
+      ctx.addTask("Waiting task", false);   // the only one left to deal, so every copy deals it
+      ctx.addTask("Dotted task", true);
+    },
+    "no candidate, paused to work the chain (the dotted task is the edit target)": ctx => {
+      ctx.addTask("Waiting task", false);
+      ctx.addTask("Dotted task", true);
+      ctx.onAction("start-working", {});
+    },
+    "no candidate, asked whether to continue": ctx => {
+      ctx.addTask("Waiting task", false);
+      ctx.addTask("Dotted task", true);
+      ctx.state.interventionActive = true; ctx.state.interventionP = 0.1; ctx.state.candidateId = null;
+    },
+    "no candidate, scanning at the end of the list": ctx => {
+      ctx.addTask("Dotted task", true);
+    },
+  };
+  // Every copy gets new task ids, so tasks are told apart by their titles.
+  const fresh = async setup => {
+    const app = await loadApp({ seed: SEED });
+    let now = 0; app.ctx.performance = { now: () => now };
+    setup(app.ctx);
+    app.ctx.render();
+    await new Promise(resolve => setTimeout(resolve, 5));   // the frame that shows the board
+    now += 60000;   // long after it, so the press guard cannot be what stops a key
+    return app;
+  };
+  // The task(s) a key acts on: removed, done, answered, dotted or undotted, or opened to edit.
+  const actsOn = async (setup, key) => {
+    const { ctx, shim } = await fresh(setup);
+    const mark = () => new Map(ctx.state.tasks.map(task => [task.title, JSON.stringify([task.done, task.lastDoneAt ?? null, ctx.state.considered[task.id] ?? null, ctx.state.chain.includes(task.id)])]));
+    const ids = new Map(ctx.state.tasks.map(task => [task.title, task.id])), before = mark();
+    shim.document.dispatchEvent({ type: "keydown", key: key === "⌫" ? "Delete" : key, repeat: false, preventDefault() {}, target: { matches: () => false } });
+    const after = mark(), editor = shim.elements.get("modalRoot").innerHTML;
+    return [...before.keys()].filter(title => after.get(title) !== before.get(title) || editor.includes('data-id="' + ids.get(title) + '"'));
+  };
+  const attr = (attrs, name) => attrs.match(new RegExp('\\s' + name + '="([^"]*)"'))?.[1] ?? "";
+  const keysNamedIn = text => (text.match(/\(([^)]*)\)/g) || [])
+    .flatMap(group => group.slice(1, -1).split(","))
+    .map(part => part.trim().replace(/^press\s+/i, "").replace(/\s+key$/i, ""))
+    .map(part => /^(Delete|Backspace)$/i.test(part) ? "⌫" : part.toLowerCase())
+    .filter(part => /^[a-z⌫]$/.test(part));
+  // Which card a stretch of the scanner belongs to, by the markup that opens it.
+  const regions = [['<div class="crumbs"', null], ['<div class="benchblock"', "bench"], ['<hr class="sep"', null], ['<div class="notice', null], ['<div class="cardrow"', "cand"], ['<div class="qline"', null], ['<div class="decide"', "cand"]];
+
+  for (const [name, setup] of Object.entries(scenarios)) await t.test(name, async () => {
+    const { ctx, shim } = await fresh(setup);
+    const html = shim.elements.get("scan").innerHTML;
+    const cardAt = index => regions.map(([marker, card]) => [html.lastIndexOf(marker, index), card]).filter(([at]) => at >= 0).sort((a, b) => b[0] - a[0])[0]?.[1] ?? null;
+    const buttons = [...html.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)].map(m => ({
+      at: m.index, act: attr(m[1], "data-act"), id: attr(m[1], "data-id"), title: attr(m[1], "title"), aria: attr(m[1], "aria-label"),
+      hints: [...m[2].matchAll(/<span class="keyhint">([^<]*)<\/span>/g)].map(h => h[1]),
+    }));
+    const titleOf = id => ctx.state.tasks.find(task => task.id === id)?.title;
+    const cards = { bench: titleOf(buttons.find(b => b.act === "edit" && cardAt(b.at) === "bench")?.id), cand: titleOf(buttons.find(b => b.act === "edit" && cardAt(b.at) === "cand")?.id) };
+    const editNamesE = card => keysNamedIn(buttons.find(b => b.act === "edit" && cardAt(b.at) === card)?.aria ?? "").includes("e");
+    if (name.startsWith("a candidate")) {
+      assert.ok(cards.bench && cards.cand, "precondition: the dotted task and the candidate both show");
+      assert.ok(html.includes('data-act="yes"'), "precondition: the Yes, No and Can't row shows");
+      assert.ok(editNamesE("cand"), "precondition: the candidate's Edit is the one e opens");
+    } else {
+      assert.ok(cards.bench && !cards.cand, "precondition: only the dotted task shows");
+      assert.ok(editNamesE("bench"), "precondition: the dotted task's Edit is the one e opens");
+    }
+    const routed = new Map();
+    let checked = 0;
+    for (const button of buttons) {
+      const label = `${button.act || "button"} (${button.title || button.aria || "no tooltip"})`;
+      const named = [...new Set([...keysNamedIn(button.title), ...keysNamedIn(button.aria)])];
+      for (const key of named) assert.ok(button.hints.includes(key), `${label} names ${key}, but its visible key hint is ${JSON.stringify(button.hints)}`);
+      for (const key of new Set([...named, ...button.hints])) {
+        const card = cardAt(button.at);
+        assert.ok(card, `${label} names ${key} but sits on no card`);
+        if (!routed.has(key)) routed.set(key, await actsOn(setup, key));
+        assert.deepEqual(routed.get(key), [cards[card]], `${label} on the ${card === "bench" ? "dotted task" : "candidate"} names ${key}, so ${key} should act on that card`);
+        checked++;
+      }
+    }
+    assert.ok(checked > 0, "some button names a key");
+  });
+});
+
 test("UI: benchmark's action row is full opacity in work mode (not greyed)", async () => {
   const { ctx, shim } = await loadApp({ seed: 261 });
   ctx.addTask("Task", true);
@@ -14938,6 +15041,38 @@ test("UI: the header carries the title alone, without the tagline", () => {
   assert.ok(!/ranked FVP — dot, compare, execute/.test(html), "the tagline should be gone from the header");
   assert.ok(!/class="sub"/.test(html), "and its span with it");
   assert.match(html, /<h1>Chain Scanner<\/h1>/, "the title itself stays");
+});
+
+// #2480: the saved view kept from the last session keeps classes but drops
+// data-* attributes, so a layout rule that selects on one renders the scanner
+// differently before and after the app loads. #2460's hidden hint glyph, picked
+// by data-act, left the saved scanner up to 117 px shorter than live. The
+// scanner's classes come from its own rendered markup in each state it shows.
+test('RISK scanner styles: no layout rule under the scanner selects on a data-* attribute, which the saved view drops, so the scanner lays out alike before and after the app loads',async()=>{
+ const {ctx,shim}=await loadApp({seed:2480});
+ ctx.state.settings.showPostpone=true;
+ const markup=[];
+ addTaskAged(ctx,'Oldest',900000);addTaskAged(ctx,'Middle',500000);addTaskAged(ctx,'Newest',1000);
+ markup.push(scanHtmlOf(ctx,shim));
+ ctx.startScan('descending');markup.push(scanHtmlOf(ctx,shim));
+ ctx.decide('yes');markup.push(scanHtmlOf(ctx,shim));
+ ctx.onAction('start-working',{});markup.push(scanHtmlOf(ctx,shim));
+ assert.ok(markup.some(h=>/class="card cand"/.test(h))&&markup.some(h=>/class="siderail/.test(h))&&markup.some(h=>/class="actionrow/.test(h)),'positive control: the scanner showed the candidate and both action rows');
+ // #scan sits in the shell's .wrap, which the saved view copies too.
+ const classes=new Set(['wrap',...markup.flatMap(h=>[...h.matchAll(/class="([^"]*)"/g)].flatMap(m=>m[1].split(/\s+/)))].filter(Boolean));
+ assert.deepEqual(scannerDataAttributeLayoutRules(styleSrc,classes),[],'no scanner layout rule selects on a data-* attribute; style by class instead');
+ // The check sees a layout rule added under the scanner, in a media query too,
+ // and #2460's own data-act glyph rule.
+ const flagged=extra=>scannerDataAttributeLayoutRules(styleSrc+'\n'+extra,classes);
+ assert.deepEqual(flagged('.siderail .btn.sm[data-act="cand-done"]{padding-inline-end:20px}'),['.siderail .btn.sm[data-act="cand-done"] { padding-inline-end }']);
+ assert.deepEqual(flagged('@media (min-width:768px){.decide>[data-act=yes]{margin:0;color:red}}'),['.decide>[data-act=yes] { margin }']);
+ assert.deepEqual(flagged('.btn.sm[data-act$="done"]:has(> .keyhint)::before{content:"d";content:"d"/""}'),['.btn.sm[data-act$="done"]:has(> .keyhint)::before { content }']);
+ assert.deepEqual(flagged('[data-act="edit"]{font-size:20px}'),['[data-act="edit"] { font-size }'],'a bare data-* selector reaches scanner buttons too');
+ // Paint alone can't move anything, and a rule scoped outside the scanner
+ // never meets the saved scanner.
+ assert.deepEqual(flagged('.btn.sm[data-act="edit"]{color:red;opacity:.5;background:var(--line)}'),[]);
+ assert.deepEqual(flagged('#modalRoot .x[data-act="cancel-file-restore"]{padding:4px}'),[]);
+ assert.deepEqual(flagged('.help-faq[data-help-changelog] .kv{margin:0}'),[]);
 });
 
 test("CSS: the retired .sub style is gone too", () => {
@@ -24387,7 +24522,12 @@ test('RISK steady scanner browser: a long chain keeps the dot trail to one row o
  assert.deepEqual(failures,[]);
 });
 
-const STEADY_ENLARGED_TEXT='.btn{font-size:21px!important}.crumbs{font-size:19px!important}.card .title{font-size:23px!important}.qline{font-size:28px!important}';
+// Enlarged text is a platform text scale (#2480): it multiplies every font size
+// inside the scanner, a child's own px size such as a key hint's included, so
+// the child grows with its label. It used to set only the buttons', crumbs',
+// titles' and question's sizes, so a hint that ignored its label's size never
+// grew in these tests. The sweep command enlarges text the same way.
+const STEADY_ENLARGED_TEXT=1.5;
 const steadySeededBoard=({floatingHeader=false,showPostpone=false,tasks=8}={})=>steadyScannerBoard({tasks,showPostpone,
  taskOver:i=>i===2?{due:'2026-01-02'}:{},
  over:{chain:['steady-0','steady-1'],candidateId:'steady-2',settings:{floatingHeader}}});
@@ -24430,7 +24570,7 @@ test('RISK steady scanner browser: every choice stays reachable unclipped and in
     const label=`${engineName} ${spec.name}`;
     const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard(spec),spec);
     try{
-     if(spec.enlarged)await page.addStyleTag({content:STEADY_ENLARGED_TEXT});
+     if(spec.enlarged)await steadyScaleText(page,STEADY_ENLARGED_TEXT);
      // #2421 removed Run WOOP: the overdue candidate gets only the ordinary choices.
      await page.waitForFunction(()=>!!document.querySelector('.card.cand .due-overdue')&&!!document.querySelector('[data-act="no"]'),null,{timeout:15000}).catch(()=>{throw new Error(`${label}: the overdue candidate is offered`);});
      assert.equal(await page.locator('[data-act="run-woop"]').count(),0,`${label}: the overdue candidate offers no Run WOOP`);
@@ -24531,8 +24671,8 @@ test('RISK steady scanner browser: the finish row sits on its own line under the
 // Postpone included, share one width; on a phone Postpone keeps its longer
 // label's width so the row stays on one line.
 const buttonMinEm=viewportWidth=>viewportWidth<=420?5:6;
-// 200% button text, the issue's largest size (STEADY_ENLARGED_TEXT is 150%).
-const STEADY_DOUBLE_TEXT=STEADY_ENLARGED_TEXT.replace('.btn{font-size:21px','.btn{font-size:28px');
+// 200% text, the issue's largest size (STEADY_ENLARGED_TEXT is 150%).
+const STEADY_DOUBLE_TEXT=2;
 test('RISK steady scanner browser: Yes No and Cant share one width and no scanner or side-rail button is narrower than the shared minimum, including a newly added choice, across phone enlarged short-landscape tablet and desktop views in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[];
  const measureWithAddedChoice=page=>page.evaluate(()=>{
@@ -24569,7 +24709,7 @@ test('RISK steady scanner browser: Yes No and Cant share one width and no scanne
       await page.reload({waitUntil:'domcontentloaded'});
       await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]'),null,{timeout:60000});
      }
-     if(spec.enlarged)await page.addStyleTag({content:spec.doubleText?STEADY_DOUBLE_TEXT:STEADY_ENLARGED_TEXT});
+     if(spec.enlarged)await steadyScaleText(page,spec.doubleText?STEADY_DOUBLE_TEXT:STEADY_ENLARGED_TEXT);
      await page.waitForFunction(()=>!!document.querySelector('.decide [data-act="cant"]')&&!!document.querySelector('.siderail [data-act="cand-worked"]'),null,{timeout:15000});
      await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(80);
      const loadedFonts=await page.evaluate(()=>[...document.fonts].filter(face=>face.status==='loaded').length);
@@ -24606,9 +24746,80 @@ test('RISK steady scanner browser: Yes No and Cant share one width and no scanne
 // whichever card the keys act on, with Delete last in each row.
 // #2482: both rows line up on the left, as asked on 2026-11-25, so every line
 // of each row, wrapped ones too, starts at the row's left edge.
+// #2480: no listed row takes more lines than on the base build. In #2460 every
+// extra-line width (the candidate's row wrapping with Delete alone on 407-432 px
+// phones) came from a reviewer's own sweep, never a test. The base is served
+// from LAYOUT_BASE_REF (main by default) the way the sweep command serves a
+// build; the candidate is the app at LANDSCAPE_BROWSER_URL.
+const STEADY_LINE_ROWS=['.card.bench + *','.card.cand + *','.decide'];
+const steadyBaseBuild=()=>serveBuild(__dirname,process.env.LAYOUT_BASE_REF||'origin/main');
+const steadyCandidateBuild=()=>({url:process.env.LANDSCAPE_BROWSER_URL,fingerprint:null});
+const steadyNoMoreLinesThanBase=async(label,findings)=>{const {describeFinding}=await layoutSweep();assert.deepEqual(findings.map(f=>describeFinding(f.case||label,f)),[],`${label}: no row takes more lines than on the base build`);};
+test("RISK steady scanner browser: no row of actions beside a card or of choices takes more lines than on the base build at any phone width from 320 to 480 px or at tablet and desktop width, at 100% 150% and 200% text and Chrome's minimum font size, with web fonts and blocked and Postpone on and off, in Chromium and WebKit",{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const base=await steadyBaseBuild();
+ try{
+  const playwright=await import(process.env.LANDSCAPE_PLAYWRIGHT||process.env.PLAYWRIGHT_MODULE||'playwright');
+  const {cases,findings}=await sweepBuilds({base,candidate:steadyCandidateBuild()},{engines:['chromium','webkit'],fonts:['web','blocked'],postpone:['on','off'],
+   text:['100%','150%','200%','minimum'],minimumFontSize:16,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chromium',selectors:STEADY_LINE_ROWS},{playwright});
+  assert.equal(cases.length,(4+3)*2*2*2,'positive control: every engine, font, Postpone, text and view case ran');
+  assert.ok(cases.every(c=>c.lines.base[c.widths[0]]['.card.cand + *'].length===1),'positive control: the base build shows the candidate\'s row in every case');
+  await steadyNoMoreLinesThanBase(`base ${base.sha}`,findings);
+ }finally{await base.close();}
+});
+
+// #2474: on phones the candidate's four actions broke 3 + 1, so Delete sat alone
+// on its own line under the candidate (at 375 px, the width in the original
+// report) while it shared a line under the dotted task; with Postpone the
+// dotted task's row ended in a lone Delete too. At the normal text size,
+// across the whole sweep, Delete now shares the last line of both rows.
+// Lines are read from the buttons' tops, so the test doesn't depend on how
+// the rows are laid out.
+const steadyRowLines=selectors=>selectors.map(selector=>{
+ const row=document.querySelector(selector);if(!row)return null;
+ const boxes=[...row.children].filter(el=>el.matches('button')&&el.getClientRects().length).map(el=>({act:el.dataset.act,top:el.getBoundingClientRect().top,left:el.getBoundingClientRect().left})).sort((a,b)=>a.top-b.top||a.left-b.left);
+ const lines=[];for(const b of boxes){const line=lines.at(-1);if(line&&Math.abs(line[0].top-b.top)<=1)line.push(b);else lines.push([b]);}
+ return lines.map(line=>line.map(b=>b.act));
+});
+const steadyWidthRanges=widths=>widths.sort((a,b)=>a-b).reduce((out,w)=>{const last=out.at(-1);if(last&&w===last[1]+1)last[1]=w;else out.push([w,w]);return out;},[]).map(([a,b])=>a===b?`${a}`:`${a}-${b}`).join(', ');
+test("RISK steady scanner browser: at the normal text size Delete never sits alone on the last line under the dotted task or the candidate at any phone width from 320 to 480 px or at tablet and desktop width, with web fonts and blocked and Postpone on and off, in Chromium and WebKit",{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const sweep=await layoutSweep(),failures=[],rows=[['the dotted task','.card.bench + *'],['the candidate','.card.cand + *']];
+ const wrapped={bench:0,cand:0};
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const fonts of ['web','blocked'])for(const postpone of [true,false])for(const kind of ['phone','wide']){
+    const views=kind==='phone'?sweep.PHONE_WIDTHS.map(width=>({width,height:sweep.PHONE_HEIGHT})):sweep.WIDE_VIEWS;
+    const label=`${engineName} fonts:${fonts} postpone:${postpone?'on':'off'} ${kind}`;
+    const {page,context,errors}=await sweep.openBoardPage(browser,{url:process.env.LANDSCAPE_BROWSER_URL,board:sweep.steadyBoard({postpone}),fonts,width:views[0].width,height:views[0].height,
+     touch:kind==='phone',isMobile:kind==='phone'&&engineName==='chromium',selectors:rows.map(([,selector])=>selector)});
+    try{
+     const alone={};
+     for(const view of views){
+      await page.setViewportSize(view);await page.evaluate(sweep.pageOp,{op:'settle'});
+      const seen=await page.evaluate(steadyRowLines,rows.map(([,selector])=>selector));
+      rows.forEach(([name],i)=>{
+       const lines=seen[i];
+       if(!lines){failures.push(`${label} ${view.width}px: ${name}'s row is missing`);return;}
+       if(lines.length>1)wrapped[i?'cand':'bench']++;
+       const last=lines.at(-1);
+       if(lines.length>1&&last.length===1&&last[0]==='delete-task')(alone[name]||=[]).push(view.width);
+      });
+     }
+     for(const [name,widths] of Object.entries(alone))failures.push(`${label}: Delete sits alone on the last line under ${name} at ${steadyWidthRanges(widths)} px`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ // Positive control: both rows wrap somewhere in the sweep, so Delete could be left alone.
+ assert.ok(wrapped.bench>0&&wrapped.cand>0,`positive control: both rows wrap at some width: dotted task ${wrapped.bench}, candidate ${wrapped.cand}`);
+ assert.deepEqual(failures,[]);
+});
+
 const STEADY_SHARED_ACTIONS=[['Done','bench-done','cand-done'],['Edit','edit','edit'],['Worked on it','worked','cand-worked'],['Delete','delete-task','delete-task']];
 test('RISK steady scanner browser: the actions under the dotted task and the candidate match in size type and colour whichever card the key hints sit on, share one alignment and keep Delete last, across phone enlarged short-landscape tablet and desktop views in day and night with web fonts and blocked in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[];
+ const lineBase=await steadyBaseBuild();
  const readRows=page=>page.evaluate(()=>{
   const rowAfter=selector=>{
    const card=document.querySelector(selector),row=card?.nextElementSibling;if(!row)return null;
@@ -24642,6 +24853,27 @@ test('RISK steady scanner browser: the actions under the dotted task and the can
   return rows;
  };
  const gaps=rows=>rows.flatMap(line=>line.slice(1).map((b,i)=>b.left-line[i].right));
+ // #2480: every shown key hint stays clear of its label and inside its button.
+ // With enlarged text growing every font, a hint whose room ignores its
+ // label's size runs into the label here, as #2460's pinned hint did.
+ const readHints=page=>page.evaluate(()=>[...document.querySelectorAll('.card.bench + * > button,.card.cand + * > button')].flatMap(el=>{
+  const r=el.getBoundingClientRect(),s=getComputedStyle(el),inner={left:r.left+parseFloat(s.borderLeftWidth),right:r.right-parseFloat(s.borderRightWidth)};
+  const range=document.createRange(),rects=[];
+  const walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT,{acceptNode:n=>n.parentElement.closest('.keyhint')||!n.textContent.trim()?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT});
+  for(let n;(n=walker.nextNode());){range.selectNodeContents(n);rects.push(...[...range.getClientRects()].filter(b=>b.width>0));}
+  const label={left:Math.min(...rects.map(b=>b.left)),right:Math.max(...rects.map(b=>b.right))};
+  return [...el.querySelectorAll('.keyhint')].filter(h=>getComputedStyle(h).visibility==='visible').map(h=>{
+   const glyph=document.createRange();glyph.selectNodeContents(h);const b=glyph.getBoundingClientRect();
+   return {act:el.dataset.act,text:h.textContent,hint:{left:b.left,right:b.right},label,inner,fontSize:parseFloat(getComputedStyle(h).fontSize),labelSize:parseFloat(s.fontSize)};
+  });
+ }));
+ const checkHints=(label,hints)=>{
+  assert.ok(hints.length>0,`${label}: positive control: shown key hints are measured`);
+  for(const h of hints){
+   assert.ok(h.hint.left>=h.label.right-0.5||h.hint.right<=h.label.left+0.5,`${label}: ${h.act}'s ${h.text} hint (${h.hint.left.toFixed(1)}-${h.hint.right.toFixed(1)}) stays clear of its label (${h.label.left.toFixed(1)}-${h.label.right.toFixed(1)})`);
+   assert.ok(h.hint.left>=h.inner.left-0.5&&h.hint.right<=h.inner.right+0.5,`${label}: ${h.act}'s ${h.text} hint stays inside its button: it ends at ${h.hint.right.toFixed(1)}, the button at ${h.inner.right.toFixed(1)}`);
+  }
+ };
  for(const [engineName,engine] of await steadyScannerEngines()){
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
   try{
@@ -24665,8 +24897,15 @@ test('RISK steady scanner browser: the actions under the dotted task and the can
       await page.reload({waitUntil:'domcontentloaded'});
       await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]'),null,{timeout:60000});
      }
-     if(spec.enlarged)await page.addStyleTag({content:spec.doubleText?STEADY_DOUBLE_TEXT:STEADY_ENLARGED_TEXT});
+     await page.waitForFunction(()=>!!document.querySelector('.card.cand + * .keyhint'),null,{timeout:15000});
+     const normalHints=await readHints(page);
+     if(spec.enlarged)await steadyScaleText(page,spec.doubleText?STEADY_DOUBLE_TEXT:STEADY_ENLARGED_TEXT);
      await page.waitForFunction(()=>!!document.querySelector('.card.bench')&&!!document.querySelector('.card.cand')&&!!document.querySelector('[data-act="cand-worked"]'),null,{timeout:15000});
+     // #2480 positive control: enlarged text grows every shown hint with its label.
+     if(spec.enlarged){
+      const scale=spec.doubleText?2:1.5;
+      for(const h of await readHints(page)){const was=normalHints.find(n=>n.act===h.act&&n.text===h.text);assert.ok(was&&Math.abs(h.fontSize-was.fontSize*scale)<=0.05&&Math.abs(h.labelSize-was.labelSize*scale)<=0.05,`${label}: positive control: ${scale*100}% text grows ${h.act}'s ${h.text} hint with its label: hint ${was?.fontSize} to ${h.fontSize} px, label ${was?.labelSize} to ${h.labelSize} px`);}
+     }
      await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(80);
      const loadedFonts=await page.evaluate(()=>[...document.fonts].filter(face=>face.status==='loaded').length);
      if(webFonts)assert.ok(loadedFonts>0,`${label}: positive control: the web fonts loaded, which needs the network`);
@@ -24697,6 +24936,7 @@ test('RISK steady scanner browser: the actions under the dotted task and the can
       assert.ok(seen.bench.opacity<1&&seen.bench.opacity===seen.cand.opacity,`${tl}: both rows dim alike while the candidate is weighed: ${seen.bench.opacity} and ${seen.cand.opacity}`);
      }
      assert.notEqual(candidateListens.light.paint,candidateListens.dark.paint,`${label}: the scanner pane paints differently by day and night: ${candidateListens.light.paint}`);
+     checkHints(`${label}, candidate listening`,await readHints(page));
      // Accessible names stay as they were: an unshown hint is not read out.
      const benchRow=page.locator('.card.bench + *'),candRow=page.locator('.card.cand + *');
      for(const [row,name,exact] of [[benchRow,'✓ Done',true],[benchRow,'Edit this task',true],[benchRow,/^Worked on it\s*w$/,false],[benchRow,'Delete',true],
@@ -24719,11 +24959,17 @@ test('RISK steady scanner browser: the actions under the dotted task and the can
       assert.equal(seen.bench.opacity,1,`${tl}: the dotted task's row is at full strength once scanning stops`);
      }
      assert.notEqual(benchListens.light.paint,benchListens.dark.paint,`${label}: with the dotted task listening, the scanner pane paints differently by day and night: ${benchListens.light.paint}`);
+     checkHints(`${label}, dotted task listening`,await readHints(page));
+     // #2480: at this view no row takes more lines than on the base build.
+     const sameLines=await compareCase(browser,{base:lineBase,candidate:steadyCandidateBuild()},{board:steadySeededBoard(spec),fonts:webFonts?'web':'blocked',views:[{width:spec.width,height:spec.height}],
+      touch:spec.touch!==false,selectors:STEADY_LINE_ROWS,scale:spec.enlarged?(spec.doubleText?STEADY_DOUBLE_TEXT:STEADY_ENLARGED_TEXT):1,label});
+     await steadyNoMoreLinesThanBase(label,sameLines.findings);
      assert.deepEqual(errors,[],`${label}: no page errors`);
     }catch(error){failures.push(error.message.split('\n')[0]);}finally{await context.close();}
    }
   }finally{await browser.close();}
  }
+ await lineBase.close();
  assert.deepEqual(failures,[]);
 });
 
@@ -24840,13 +25086,9 @@ test("RISK steady scanner browser: a key hint never widens an action beside a ca
     const label=`${engineName} ${spec.name} ${webFonts?'with web fonts':'fonts blocked'}`;
     let profile=null,host=browser;
     if(spec.dpr)host={newContext:options=>browser.newContext({...options,deviceScaleFactor:spec.dpr})};
-    if(spec.chromeMinimum){
-     profile=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'hint-minimum-font-2460-'));
-     fs.mkdirSync(path.join(profile,'Default'));
-     fs.writeFileSync(path.join(profile,'Default','Preferences'),JSON.stringify({webkit:{webprefs:{minimum_font_size:spec.chromeMinimum,minimum_logical_font_size:spec.chromeMinimum}}}));
-     // The headless shell ignores the profile's setting; full Chromium reads it.
-     host={newContext:options=>engine.launchPersistentContext(profile,{...options,headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chromium'})};
-    }
+    // Chrome's real minimum font size, in a fresh profile per case and checked
+    // to take effect before the page opens (#2480's shared harness helper).
+    if(spec.chromeMinimum)host=chromeMinimumFontHost(engine,spec.chromeMinimum,{channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chromium'});
     const {page,context,errors}=await steadyScannerPage(host,steadySeededBoard(spec),spec);
     try{
      if(webFonts){
@@ -24902,25 +25144,50 @@ test("RISK steady scanner browser: a key hint never widens an action beside a ca
 // When the next title is as long as the last, a second tap lands on the button
 // of the next candidate before anyone could have read it, so a physical press
 // inside 200 ms of the new task appearing is dropped.
-test('RISK steady scanner browser: a double tap or a repeated key answers only the shown task and the next answer after the window is accepted in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+test('RISK steady scanner browser: a double tap or a repeated key answers only the shown task and the next answer after the window is accepted in Chromium and WebKit, and in Chromium at 6x CPU',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[];
  for(const [engineName,engine] of await steadyScannerEngines()){
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
   try{
-   for(const input of ['two touch taps 60 ms apart','two touch taps 120 ms apart','mouse double click','two key presses']){
-    const label=`${engineName} ${input}`,touch=input.includes('touch');
+   // #2486: a busy machine slows the page between a double tap's two taps; in
+   // Chromium a page at 6x CPU stands in for it.
+   const rounds=[...['two touch taps 60 ms apart','two touch taps 120 ms apart','mouse double click','two key presses'].map(input=>({input,cpu:1})),
+    ...(engineName==='chromium'?['two touch taps 60 ms apart','two touch taps 120 ms apart'].map(input=>({input,cpu:6})):[])];
+   for(const {input,cpu} of rounds){
+    const label=`${engineName}${cpu>1?` at ${cpu}x CPU`:''} ${input}`,touch=input.includes('touch');
     // Titles of one length keep No in place from one candidate to the next, so a
     // second tap lands on the next candidate's No (#2422 review N1).
     const board=steadyScannerBoard({tasks:12,taskOver:i=>({title:'Same length title number '+String(i).padStart(2,'0')}),over:{chain:['steady-0','steady-1'],candidateId:'steady-2'}});
     const {page,context,errors}=await steadyScannerPage(browser,board,{width:390,height:844,touch});
     try{
+     const cdp=engineName==='chromium'?await context.newCDPSession(page):null;
+     if(cpu>1)await cdp.send('Emulation.setCPUThrottlingRate',{rate:cpu});
      await page.waitForSelector('[data-act="no"]',{timeout:15000});await page.waitForTimeout(400);
      const first=await steadyScannerControls(page),at=steadyScannerCenter(first.no);
-     await page.evaluate(()=>{window.steadyPresses=[];document.addEventListener('click',event=>steadyPresses.push({act:event.target.closest?.('[data-act]')?.dataset.act,candidate:state.candidateId}),true);});
+     await page.evaluate(()=>{window.steadyPresses=[];window.steadyStamps=[];
+      document.addEventListener('click',event=>{steadyPresses.push({act:event.target.closest?.('[data-act]')?.dataset.act,candidate:state.candidateId});steadyStamps.push(event.timeStamp);},true);
+      document.addEventListener('keydown',event=>{steadyStamps.push(event.timeStamp);},true);});
      if(input==='mouse double click')await page.mouse.click(at.x,at.y,{clickCount:2,delay:15});
      else if(input==='two key presses'){await page.keyboard.press('n');await page.waitForTimeout(40);await page.keyboard.press('n');}
+     else if(cdp){
+      // #2486: Playwright stamps a tap when the browser takes it, after the
+      // page has handled the last one, so on a busy machine its 120 ms pair
+      // reached the app 134–154 ms apart (184–192 ms at 6x CPU) and the second
+      // tap counted, as a deliberate one should. A finger's touch is stamped
+      // when it lands, so these touches carry their own times.
+      const gap=input.includes('120')?120:60,touchAt=async ms=>{const timestamp=ms/1000;
+       await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:at.x,y:at.y}],timestamp});
+       await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[],timestamp});};
+      const landed=Date.now();await touchAt(landed);
+      await new Promise(resolve=>setTimeout(resolve,Math.max(0,landed+gap-Date.now())));
+      await touchAt(landed+gap);
+     }
      else{await page.touchscreen.tap(at.x,at.y);await page.waitForTimeout(input.includes('120')?120:60);await page.touchscreen.tap(at.x,at.y);}
      await page.waitForFunction(prior=>state.candidateId!==prior,first.candidate,{timeout:5000});
+     // WebKit's taps cannot carry a time; they reached the app 130–133 ms
+     // apart for a 120 ms pair, with or without a busy machine.
+     const stamps=await page.evaluate(()=>steadyStamps);
+     assert.ok(stamps.length>=2&&stamps[1]-stamps[0]<150,`${label}: the two presses reached the app under 150 ms apart, a double tap: ${stamps.map(stamp=>stamp.toFixed(1))}`);
      await page.waitForTimeout(40);
      const seen=await page.evaluate(()=>({answered:Object.keys(state.considered),candidate:state.candidateId}));
      assert.deepEqual(seen.answered,[first.candidate],`${label}: only the task on screen was answered: ${seen.answered}`);
@@ -24978,6 +25245,47 @@ test('RISK steady scanner browser: a double tap on Postpone or Done acts once an
      await page.touchscreen.tap(x,y);await page.waitForTimeout(60);await page.touchscreen.tap(x,y);
      await page.waitForTimeout(450);
      assert.equal(await page.evaluate(()=>undoStack.length),before+1,`${label}: the double tap took one action`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(`${label}: ${error.message.split('\n')[0]}`);}finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+// #2486: Chromium gives the second of two touch taps 243 ms apart click
+// detail 2, and Done once dropped every such click. Chromium's touches here
+// carry their own times, as in the double-tap test above; WebKit's taps
+// cannot, and reach the app at least the 200 ms they are sent apart.
+test('RISK steady scanner browser: two Done taps 200 ms apart on the candidate or on the dotted task each complete the task shown in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const act of ['cand-done','bench-done']){
+    const label=`${engineName} ${act}`;
+    const board=steadyScannerBoard({tasks:12,taskOver:i=>({title:'Same length title number '+String(i).padStart(2,'0')}),over:{chain:['steady-0','steady-1','steady-3'],candidateId:'steady-2'}});
+    const {page,context,errors}=await steadyScannerPage(browser,board,{width:390,height:844,touch:true});
+    try{
+     const selector=`[data-act="${act}"]`;
+     await page.waitForSelector(selector,{timeout:15000});await page.waitForTimeout(500);
+     await page.locator(selector).first().scrollIntoViewIfNeeded();
+     const box=await page.locator(selector).first().boundingBox(),x=box.x+box.width/2,y=box.y+box.height/2;
+     await page.evaluate(()=>{window.doneClicks=[];document.addEventListener('click',event=>doneClicks.push({act:event.target.closest?.('[data-act]')?.dataset.act,detail:event.detail,at:event.timeStamp}),true);});
+     const doneBefore=await page.evaluate(()=>state.tasks.filter(task=>task.done).length);
+     if(engineName==='chromium'){
+      const cdp=await context.newCDPSession(page),touchAt=async ms=>{const timestamp=ms/1000;
+       await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}],timestamp});
+       await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[],timestamp});};
+      const landed=Date.now();await touchAt(landed);
+      await new Promise(resolve=>setTimeout(resolve,Math.max(0,landed+200-Date.now())));
+      await touchAt(landed+200);
+     }else{await page.touchscreen.tap(x,y);await page.waitForTimeout(200);await page.touchscreen.tap(x,y);}
+     await page.waitForTimeout(600);
+     const clicks=await page.evaluate(()=>doneClicks);
+     assert.deepEqual(clicks.map(click=>click.act),[act,act],`${label}: both taps landed on Done: ${JSON.stringify(clicks)}`);
+     assert.ok(clicks[1].at-clicks[0].at>=150,`${label}: they reached the app at least 150 ms apart: ${JSON.stringify(clicks)}`);
+     assert.equal(await page.evaluate(()=>state.tasks.filter(task=>task.done).length),doneBefore+2,`${label}: each tap completed a task (second tap's detail ${clicks[1].detail})`);
      assert.deepEqual(errors,[],`${label}: no page errors`);
     }catch(error){failures.push(`${label}: ${error.message.split('\n')[0]}`);}finally{await context.close();}
    }
@@ -25077,7 +25385,7 @@ test('RISK steady scanner browser: the dot trail shows only the dots that fit wi
     const {page,context,errors}=await steadyScannerPage(browser,steadyTrailBoard(trail),{...view,touch:false});
     try{
      await page.waitForSelector('.crumbs',{timeout:15000});
-     if(view.enlarged)await page.addStyleTag({content:STEADY_ENLARGED_TEXT});
+     if(view.enlarged)await steadyScaleText(page,STEADY_ENLARGED_TEXT);
      await page.waitForTimeout(80);
      steadyAssertTrail(await steadyReadTrail(page),label);
      assert.deepEqual(errors,[],`${label}: no page errors`);
@@ -43700,9 +44008,75 @@ test('Changelog #2481: the November 25 notes say quick Yes and No taps in a row 
  const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();
  const answer=app.shim.document.getElementById('modalRoot').innerHTML.match(/<dt>Why didn’t my second tap count\?<\/dt><dd>(.*?)<\/dd>/)?.[1]??'';
  assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the Help topic length');
- assert.match(answer,/After your own Yes or No brings up the next task, a Yes or No counts once it shows/,'Help says a Yes or No on your own next task waits only for it to show');
+ assert.match(answer,/After your own Yes, No or Done brings up the next task, any of them counts once it shows/,'Help says a Yes or No on your own next task waits only for it to show');
  assert.match(answer,/so quick taps each count/,'and that quick Yes and No taps in a row count');
  assert.match(answer,/With sync on, a large board’s next task can be slow to show, and a tap before it shows is ignored/,'and that with sync on a slow next task still holds a tap');
+});
+
+// #2486: quick Done taps each count once the press guard times them, so the
+// November 25 notes give them their own bullet, with the double tap that
+// still completes one task and the sync-on limit the Yes and No bullet keeps.
+// A tap in the moment between the next task being drawn and it showing is
+// now held: its own bullet, with the limit that the app can learn of the
+// task showing a little early. Help names Done beside Yes and No.
+test('Changelog #2486: the November 25 notes say quick Done taps each count and a double tap on Done still completes one task, and that a tap just before the next task shows is held, and Help names Done',async t=>{
+ const notes=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ const items=(notes.split('<h3>November 25, 2026</h3>')[1]?.split('</ul>')[0]||'').split('<li>').slice(1);
+ const done=items.filter(item=>/Quick Done taps in a row/.test(item));
+ assert.equal(done.length,1,'one bullet is about quick Done taps: '+items.join(' | '));
+ assert.match(done[0],/on the task you’re weighing and on the dotted task/,'it names both Done buttons the tests drive');
+ assert.match(done[0],/instead of every tap after the first being ignored without a sign/,'it says what changed');
+ assert.match(done[0],/A double tap on Done still completes only one task, and Done dims to show the second tap was held/,'with the double tap that still completes one task');
+ assert.match(done[0],/With sync on, the next task on a large board can take long enough to show that some quick taps are still held/,'and the sync-on limit');
+ assert.doesNotMatch(done[0],/Yes and No|timeStamp|paint|guard|frame|detail|\d\s*ms\b/i,'it is about Done alone and says what the person sees');
+ const appears=items.filter(item=>/between the next task being drawn and it appearing on the screen/.test(item));
+ assert.equal(appears.length,1,'one bullet is about a tap just before the next task shows: '+items.join(' | '));
+ assert.match(appears[0],/is now held, as a tap before it was drawn always was, instead of answering a task you could not see yet/,'it says what changed');
+ assert.match(appears[0],/Some browsers tell the app the task has appeared a few thousandths of a second early/,'with the limit measured in Chromium');
+ assert.doesNotMatch(appears[0],/Done|timeStamp|paint|guard|frame|\d\s*ms\b/i,'it is one feature and says what the person sees');
+ const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();
+ const answer=app.shim.document.getElementById('modalRoot').innerHTML.match(/<dt>Why didn’t my second tap count\?<\/dt><dd>(.*?)<\/dd>/)?.[1]??'';
+ assert.match(answer,/After your own Yes, No or Done brings up the next task, any of them counts once it shows, so quick taps each count/,'Help names Done beside Yes and No');
+ assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the Help topic length');
+});
+
+// #2484: with sync on, the next task shows sooner after a Yes on a large
+// board. The #2484 tests drive Yes, and the browser measurement behind the
+// bullet tapped Yes, so it promises Yes alone, with what was measured and the
+// limit that a slower phone can still hold some taps.
+test('Changelog #2484: the November 25 notes say that with sync on the next task shows sooner after a Yes on a large board, with what was measured and that a slower phone can still hold some quick taps',()=>{
+ const notes=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ const items=(notes.split('<h3>November 25, 2026</h3>')[1]?.split('</ul>')[0]||'').split('<li>').slice(1);
+ const sooner=items.filter(item=>/With sync on, the next task now shows sooner after a Yes on a large board/.test(item));
+ assert.equal(sooner.length,1,'one bullet is about the next task showing sooner with sync on: '+items.join(' | '));
+ // Three interleaved batches of three ten-tap runs each, against #2484's
+ // base, against main and against the base with #2474 merged: 30, 29 and 30
+ // of 30 counted, against 21, 21 and 20 before.
+ assert.match(sooner[0],/Yes taps a fifth of a second apart counted 89 times out of 90, against 62 out of 90 before/,'it says what was measured');
+ assert.match(sooner[0],/A slower phone can still hold some quick taps/,'and keeps the limit with its feature');
+ assert.doesNotMatch(sooner[0],/\bNo\b|Done|Can’t|catch|paint|frame|guard|debounce|\d\s*ms\b/i,'it promises Yes alone and says what the person sees, not how it works');
+});
+
+// #2474: the action rows' lines are balanced when they wrap. The browser
+// sweeps drive Chromium and WebKit at phone widths from 320 to 480 px (and
+// tablet and desktop) with web fonts and blocked: at the normal text size
+// Delete never sits alone on the last line under either card, and no row takes
+// more lines than on the base build at 100%, 150% and 200% text and Chrome's
+// minimum font size. No test reads how the four candidate actions split, and
+// a browser without balanced lines (before Chrome 114 and Safari 17.5) fills
+// them greedily, as before. #2490 review (independent N4): so the bullet
+// promises what those sweeps check, in the browsers they ran, with that
+// limit beside it.
+test('Changelog #2474: the November 25 notes say Delete no longer sits alone under either task at the normal text size on phones and no row takes more lines, as checked in Chrome and Safari, and that older browsers still can leave it alone',()=>{
+ const notes=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ const items=(notes.split('<h3>November 25, 2026</h3>')[1]?.split('</ul>')[0]||'').split('<li>').slice(1);
+ const rows=items.filter(item=>/Delete no longer sits alone/.test(item));
+ assert.equal(rows.length,1,'one bullet is about Delete sitting alone: '+items.join(' | '));
+ assert.match(rows[0],/At the normal text size on phones, Delete no longer sits alone on the last line of actions under the dotted task or under the task you’re weighing/,'it names the text size and both rows the sweep checks');
+ assert.match(rows[0],/neither row takes more lines than before/,'and that no row takes more lines');
+ assert.match(rows[0],/checked in Chrome and Safari on screens 320 to 480 pixels wide/,'it says where it was checked');
+ assert.match(rows[0],/Browsers older than Chrome 114 and Safari 17\.5 still fill each line in turn, so there Delete can still sit alone/,'and keeps the older-browser limit with its feature');
+ assert.doesNotMatch(rows[0],/two and two|split|Done|Yes|text-wrap|balance:|flex|\d\s*px\b/i,'it promises nothing the sweeps do not read and says what the person sees');
 });
 
 // #2455 review: the November 23 changelog has one feature per bullet: the

@@ -22,7 +22,8 @@ user preference; keep internal evidence truthful and the extended FAQ accurate.
 This exception does not suppress bugs, safety/accessibility changes or limits.
 
 Release reviews scale to the exact diff. Review plans classify changed code,
-not prose. Before release, read
+not prose. Specialist reviews come from app changes, not test files or
+test-group assignments. Before release, read
 [release and review](docs/agents/release-and-review.md), the single authority
 for the review plan the release validator derives, review identities and the
 exact-candidate regression, compatibility, receipt, CI and live verification
