@@ -11,6 +11,13 @@ export const GROUP_IDS = ['core', 'scenery', 'persistence-recovery', 'native-pro
 export const NIGHTLY_GROUP_ID = 'nightly-cross-engine';
 const TEST_NAME_PATTERN_ARGUMENT_BUDGET = 64 * 1024;
 const FAILURE_REASON_MAX_CHARS = 200;
+// Caps on a failed test's job-log details (#2495): its error and each compared
+// value keep their first lines, diagnostics fill the rest of the test's lines,
+// and the job stops adding details once its total is reached.
+const FAILURE_DETAIL_SECTION_LINES = 8;
+const FAILURE_DETAIL_VALUE_LINES = 4;
+const FAILURE_DETAIL_TEST_LINES = 24;
+const FAILURE_DETAIL_JOB_LINES = 240;
 // A loaded run (#2294) reproduces a slow machine. It is never canonical evidence,
 // so a clean one writes this status rather than 'passed': every consumer of
 // group evidence accepts only 'passed' and so refuses it without a special case.
@@ -820,6 +827,86 @@ function tapFailureReason(lines, resultIndex, indentation) {
 
 const failedCaseLabel = item => `${item.id}${item.failureReason ? `: ${item.failureReason}` : ''}`;
 
+// #2495: agents twice diagnosed a CI failure by reproducing it locally because
+// its diagnostics and compared values sat only in the test.tap artifact, which
+// they need permission to download. So a failed result's details follow its
+// failure line in the job log. The artifact is as public as the log on this
+// repository, so the log adds no exposure; the caps keep a mass failure from
+// flooding it, and every cut says where the rest is.
+function detailLine(text) {
+  const characters = Array.from(text.replace(/[\p{C}\p{Zl}\p{Zp}]/gu, ' ').trimEnd());
+  return characters.length > FAILURE_REASON_MAX_CHARS ? `${characters.slice(0, FAILURE_REASON_MAX_CHARS - 1).join('')}…` : characters.join('');
+}
+
+// The top-level keys of a result's YAML block, each with its inline value or
+// its block lines, read at the block's exact indentation.
+function tapYamlFields(lines, resultIndex, indentation) {
+  const indent = ' '.repeat(indentation + 2), fields = new Map();
+  if (lines[resultIndex + 1] !== `${indent}---`) return { fields, end: resultIndex };
+  let index = resultIndex + 2;
+  for (; index < lines.length && lines[index] !== `${indent}...`; index++) {
+    const key = lines[index].startsWith(indent) && lines[index].slice(indent.length).match(/^([A-Za-z_]\w*):(?: (.*))?$/);
+    if (!key) continue;
+    const inline = (key[2] || '').trim(), block = [];
+    for (let cursor = index + 1; cursor < lines.length && (lines[cursor].startsWith(`${indent}  `) || (!lines[cursor].trim() && cursor + 1 < lines.length && lines[cursor + 1].startsWith(`${indent}  `))); cursor++) block.push(lines[cursor].slice(indent.length + 2));
+    // A nested map (no inline value) keeps its own first line indented under
+    // the key; a scalar or block scalar starts on the key's line.
+    const values = inline && !/^[|>][-+]?$/.test(inline) ? [inline] : block.filter(line => line.trim());
+    fields.set(key[1], inline ? values : ['', ...values]);
+  }
+  return { fields, end: index };
+}
+
+function tapFailureDetails(lines, resultIndex, indentation) {
+  const { fields, end } = tapYamlFields(lines, resultIndex, indentation);
+  const sections = [], unquote = value => value.replace(/^'(.*)'$/, '$1').replace(/''/g, "'");
+  const section = (label, values, limit) => {
+    if (!values.length || (values.length === 1 && !values[0])) return;
+    const rendered = values.map((value, index) => detailLine(index ? `  ${value}` : value ? `${label}: ${value}` : `${label}:`));
+    sections.push({ kept: rendered.slice(0, limit), cut: Math.max(0, rendered.length - limit) });
+  };
+  section('error', (fields.get('error') || []).map((value, index) => index ? value : unquote(value)), FAILURE_DETAIL_SECTION_LINES);
+  section('expected', fields.get('expected') || [], FAILURE_DETAIL_VALUE_LINES);
+  section('actual', fields.get('actual') || [], FAILURE_DETAIL_VALUE_LINES);
+  // The first frame in the failed test's own file, named relative to the
+  // checkout; runner frames say nothing about which assertion failed.
+  const testFile = unquote(fields.get('location')?.[0] || '').replace(/:\d+:\d+$/, '');
+  const frame = testFile && (fields.get('stack') || []).map(line => line.match(/\((?:file:\/\/)?([^()]+):(\d+):(\d+)\)\s*$|^(?:file:\/\/)?([^\s()]+):(\d+):(\d+)\s*$/)).find(match => match && (match[1] || match[4]) === testFile);
+  const framePath = frame && (frame[1] || frame[4]), relative = framePath && path.relative(ROOT, framePath);
+  if (frame) section('at', [`${relative.startsWith('..') || path.isAbsolute(relative) ? framePath : relative.split(path.sep).join('/')}:${frame[2] || frame[5]}:${frame[3] || frame[6]}`], 1);
+  // A test's diagnostics follow its YAML block at the result's own indentation.
+  const diagnosticPrefix = `${' '.repeat(indentation)}# `, diagnostics = [];
+  for (let index = end + 1; index < lines.length && lines[index].startsWith(diagnosticPrefix) && !lines[index].startsWith(`${diagnosticPrefix}Subtest: `); index++) {
+    diagnostics.push(lines[index].slice(diagnosticPrefix.length));
+  }
+  const used = sections.reduce((total, item) => total + item.kept.length, 0);
+  sections.push({ kept: diagnostics.slice(0, Math.max(0, FAILURE_DETAIL_TEST_LINES - used)).map(text => detailLine(`diagnostic: ${text}`)), cut: Math.max(0, diagnostics.length - Math.max(0, FAILURE_DETAIL_TEST_LINES - used)) });
+  const details = sections.flatMap(item => item.kept), cut = sections.reduce((total, item) => total + item.cut, 0);
+  if (cut) details.push(`… ${cut} more detail line${cut === 1 ? '' : 's'} cut; the full output is in test.tap.`);
+  return details;
+}
+
+// The failed run's stderr: each issue on its own line, a failed case's details
+// indented under its failure line, within the job's cap.
+function failureLog(status, issues, cases) {
+  const detailsByIssue = new Map();
+  for (const item of cases.filter(entry => entry.status === 'failed' && entry.failureDetails?.length)) {
+    for (const prefix of ['Test case failed: ', 'Nightly case failed: ']) detailsByIssue.set(`${prefix}${failedCaseLabel(item)}`, item.failureDetails);
+  }
+  const output = [];
+  let printed = 0, cutTests = 0;
+  for (const [index, issue] of issues.entries()) {
+    output.push(index ? issue : `${status}: ${issue}`);
+    const details = detailsByIssue.get(issue);
+    if (!details) continue;
+    if (printed + details.length > FAILURE_DETAIL_JOB_LINES) { cutTests++; continue; }
+    output.push(...details.map(line => `  ${line}`));
+    printed += details.length;
+  }
+  if (cutTests) output.push(`Failure details for ${cutTests} more failed test${cutTests === 1 ? ' was' : 's were'} cut at the job's ${FAILURE_DETAIL_JOB_LINES}-line cap; the full output is in test.tap.`);
+  return `${output.join('\n')}\n`;
+}
+
 function parseTap(text) {
   if (!/^TAP version \d+/m.test(text)) fail('The test process did not produce a TAP stream.');
   const stack = [];
@@ -849,7 +936,7 @@ function parseTap(text) {
       status,
       skipReason: directive === 'skip' ? (result[5] || '').trim() : null,
       line,
-      ...(status === 'failed' ? { failureReason: tapFailureReason(lines, lineIndex, indentation) } : {}),
+      ...(status === 'failed' ? { failureReason: tapFailureReason(lines, lineIndex, indentation), failureDetails: tapFailureDetails(lines, lineIndex, indentation) } : {}),
     });
   }
   return cases;
@@ -1303,7 +1390,7 @@ async function main() {
     issues: [],
     ...(options.cpuLoad ? { cpuLoad: { workers: options.cpuLoad } } : {}),
   };
-  let nativeDir;
+  let nativeDir, childCases = [];
   try {
     const files = testFiles();
     const inventoryBytes = fs.readFileSync(INVENTORY_PATH);
@@ -1412,6 +1499,7 @@ async function main() {
     if (options.group === 'core') result.unclassifiedRootGuard = await unclassifiedRootGuard(files,assignmentIndex,outputDir);
     const heapMb = nightly ? undefined : assignments.groups.find(group => group.id === options.group)?.nodeMaxOldSpaceSizeMb;
     const childResult = await runChild(selectedFiles, selectedRoots, outputDir, options, source, heapMb);
+    childCases = childResult.cases;
     nativeDir = childResult.nativeDir;
     result.process = {
       exitCode: childResult.exit.code,
@@ -1454,7 +1542,7 @@ async function main() {
   result.finishedAt = new Date().toISOString();
   atomicWrite(path.join(outputDir, 'result.json'), result);
   if (result.status !== 'passed' && result.status !== LOADED_PASS_STATUS) {
-    process.stderr.write(`${result.status}: ${result.issues.join('\n')}\n`);
+    process.stderr.write(failureLog(result.status, result.issues, childCases));
     return 1;
   }
   process.stdout.write(result.status === LOADED_PASS_STATUS
