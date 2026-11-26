@@ -25483,6 +25483,104 @@
   {
     "baseCommit": "a33205a6fc8ca53d554d83be063b3eb8fe2e7f65",
     "weakenedTestLines": [
+      "tests/shared.js:-const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(message)),Math.max(0,deadline-performance.now()));});"
+    ],
+    "reason": "#2414: the corrupt work budget fixture's 20000ms action deadline sometimes rejected at 19,999ms by performance.now(), so 'the earned action stall reaches the original single 20s limit' failed with nothing wrong in the app. fixtureDeadline armed one Node timer for the remaining time; Node's timers run on a millisecond loop clock and truncate a fractional delay, so that timer can fire about 1ms before the deadline (a scratch check on Node 23.10: 12 of 200 timers fired early, earliest by 1.112ms). The changed line is that single timer; it is replaced, not loosened.",
+    "previousBehavior": "fixtureDeadline rejected whenever its one host timer fired, which could be up to about 1ms before its own performance.now() deadline. On main a33205a6, 6 of 30 runs of the fixture test six at a time failed at 19,999ms.",
+    "intendedBehavior": "The tolerance for Node's timer granularity lives in fixtureDeadline, not in any assertion: when the timer fires it checks performance.now() against the deadline and, if time is left, re-arms for the rest (rounded up), so it rejects only once the whole deadline has passed. The fixture test keeps its exact elapsed>=20000 check. This cannot hide a shorter limit: the deadline is still the ms the caller passes, measured from performance.now(), and the helper never rejects late by more than a timer tick, so an action budget shortened to 19s rejects at about 19,000ms and fails the 20000ms check, as does any budget below 20000ms.",
+    "replacementTests": [
+      "RISK corrupt work budget fixture: a shared action deadline never rejects before its own deadline when the host timer fires early"
+    ],
+    "preservedCoverage": [
+      "RISK corrupt work budget fixture: one shared action deadline rejects an actually held device commit keeps its exact elapsed>=20000 check, unchanged; a budget shortened to 19s still fails it (19003ms).",
+      "Every fixtureDeadline caller keeps its message, its ms and its success-path check that a result arriving at or after the deadline still fails. A rejection can now come at most one timer tick later than before, never earlier than the deadline.",
+      "The wait() polling and its cleanup on rejection are unchanged."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <git-common-dir>/agent-test-runs/issue-2414 --purpose preimplementation-red -- node --test --test-reporter=tap \"--test-name-pattern=^RISK corrupt work budget fixture: a shared action deadline never rejects\" tests/persistence-recovery.test.js, with only the new test added on a33205a6. Load baseline: --purpose later-baseline-sensitivity -- node <scratch>/load-runs.mjs <worktree> 5 6 (the fixture test, 30 runs, six at a time).",
+      "failure": "Record 2026-11-26T10-17-54-912Z-718537f4: 'the deadline rejects no earlier than its 50ms by performance.now(): 48.78354200000001'. Load baseline on main, record 2026-11-26T10-15-12-319Z-29283bd6: 6 failed of 30, each 'the earned action stall reaches the original single 20s limit' at 19999ms. After the fix: record 2026-11-26T10-18-04-681Z-0c1040ba (both fixture tests pass) and record 2026-11-26T10-18-37-348Z-6cf3c75a (0 failed of 30 six at a time, minimum 20000ms). Mutation, action budget 20000 to 19000 in the consumer: record 2026-11-26T10-21-22-279Z-e68b19f1, the fixture test fails at 19003ms."
+    }
+  },
+  {
+    "baseCommit": "a33205a6fc8ca53d554d83be063b3eb8fe2e7f65",
+    "weakenedTestLines": [
+      "tests/core.test.js:-assert.deepEqual(layout.actions,['cand-done','edit','cand-worked','delete-task']);",
+      "tests/core.test.js:-assert.equal(await page.evaluate(()=>state.tasks.find(t=>t.title==='Dotted task').done),true,'deemphasis never disables task actions');",
+      "tests/core.test.js:-assert.equal(await page.locator('.actionrow').evaluate(e=>getComputedStyle(e).opacity),'1','finishing scanning restores full emphasis');",
+      "tests/core.test.js:-assert.equal(await page.locator('.actionrow').evaluate(e=>getComputedStyle(e).opacity),'1','keyboard focus restores readable brightness');",
+      "tests/core.test.js:-assert.equal(await page.locator('.btnwrap').evaluate(e=>getComputedStyle(e).opacity),'1','resume action is readable on keyboard focus');",
+      "tests/core.test.js:-assert.equal(await page.locator('.decide').evaluate(e=>getComputedStyle(e).opacity),'1','Yes/No decisions remain prominent');",
+      "tests/core.test.js:-assert.equal(layout.buttons[0].y,layout.buttons[1].y,'buttons begin in a horizontal row');",
+      "tests/core.test.js:-assert.ok(!layout.overflow,`no horizontal page overflow at ${width}px`);",
+      "tests/core.test.js:-assert.ok(await page.locator('.actionrow').evaluate(e=>+getComputedStyle(e).opacity)<1,'benchmark actions must visibly dim after all stylesheets load');",
+      "tests/core.test.js:-assert.ok(await page.locator('.siderail').evaluate(e=>+getComputedStyle(e).opacity)<1,'candidate management actions dim too');",
+      "tests/core.test.js:-assert.ok(layout.buttons.every(b=>b.x>=0&&b.right<=width),'every button stays inside the viewport');",
+      "tests/core.test.js:-assert.ok(layout.rail.y>=layout.card.bottom,`actions must be below the yellow card at ${width}px`);",
+      "tests/core.test.js:-await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));",
+      "tests/core.test.js:-await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));",
+      "tests/core.test.js:-await page.evaluate(()=>{addTask('Dotted task',true);addTask('Next task',false);state.interventionActive=false;render();});",
+      "tests/core.test.js:-await page.evaluate(()=>{addTask('Dotted task',true);addTask('Next task',false);state.interventionActive=false;render();});",
+      "tests/core.test.js:-await page.evaluate(theme=>document.documentElement.setAttribute('data-theme',theme),theme);",
+      "tests/core.test.js:-await page.goto(process.env.LANDSCAPE_BROWSER_URL);",
+      "tests/core.test.js:-await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'networkidle'});",
+      "tests/core.test.js:-await page.locator('#modalRoot [data-act=\"close-modal\"]').click();",
+      "tests/core.test.js:-await page.locator('#modalRoot [data-act=\"close-modal\"]').click();",
+      "tests/core.test.js:-await page.locator('.actionrow [data-act=\"bench-done\"]').click();",
+      "tests/core.test.js:-await page.locator('.actionrow [data-act=\"edit\"]').focus();",
+      "tests/core.test.js:-await page.locator('.btnwrap [data-act=\"resume-scan\"]').focus();",
+      "tests/core.test.js:-await page.locator('.decide [data-act=\"yes\"]').focus();",
+      "tests/core.test.js:-await page.locator('[data-act=\"start-working\"]').click();await page.mouse.move(0,0);",
+      "tests/core.test.js:-await page.mouse.move(0,0);",
+      "tests/core.test.js:-await page.setViewportSize({width,height:900});",
+      "tests/core.test.js:-const browser=await chromium.launch({headless:true,channel:'chrome'});",
+      "tests/core.test.js:-const browser=await chromium.launch({headless:true,channel:'chrome'});",
+      "tests/core.test.js:-const layout=await page.evaluate(()=>{",
+      "tests/core.test.js:-const page=await browser.newPage();",
+      "tests/core.test.js:-const page=await browser.newPage({viewport:{width:1000,height:900}});",
+      "tests/core.test.js:-const rail=document.querySelector('.siderail');",
+      "tests/core.test.js:-const rect=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom};};",
+      "tests/core.test.js:-const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT);",
+      "tests/core.test.js:-const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT);",
+      "tests/core.test.js:-for(const theme of ['light','dark']){",
+      "tests/core.test.js:-for(const width of [1000,390,320]){",
+      "tests/core.test.js:-if(width===1000) assert.ok(layout.buttons.every(b=>b.y===layout.buttons[0].y),'all buttons fit on one desktop row');",
+      "tests/core.test.js:-return {card:rect(document.querySelector('.cand')),rail:rect(rail),buttons:[...rail.querySelectorAll('button')].map(rect),actions:[...rail.querySelectorAll('button')].map(e=>e.dataset.act),overflow:document.documentElement.scrollWidth>innerWidth};",
+      "tests/core.test.js:-test('Scanner browser: secondary actions dim during scanning and brighten for focus or work', {skip:!process.env.LANDSCAPE_BROWSER_URL}, async()=>{",
+      "tests/core.test.js:-test('Scanner browser: yellow task actions run horizontally below the card and wrap on mobile', {skip:!process.env.LANDSCAPE_BROWSER_URL}, async()=>{",
+      "tests/core.test.js:-try{",
+      "tests/core.test.js:-try{",
+      "tests/core.test.js:-}",
+      "tests/core.test.js:-}",
+      "tests/core.test.js:-});",
+      "tests/core.test.js:-}finally{await browser.close();}",
+      "tests/core.test.js:-}finally{await browser.close();}",
+      "tests/shared.js:-const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(message)),Math.max(0,deadline-performance.now()));});"
+    ],
+    "reason": "Combined entry for the whole 2026-11-26 slice diff (integration/slice-2026-11-26 against main a33205a6), which the test-first gate checks as one diff. It covers the weakened lines of #2479 (the two Scanner browser tests re-indented inside an engine loop) and #2414 (the fixtureDeadline timer line); each lane's own entry above gives its reason.",
+    "previousBehavior": "See the #2479 and #2414 entries above with base a33205a6.",
+    "intendedBehavior": "Unchanged from those entries: #2479 keeps every original Scanner browser assertion, now in Chromium and WebKit; #2414 moves the timer tolerance into fixtureDeadline and keeps the fixture test's exact 20000 ms check.",
+    "replacementTests": [
+      "Scanner browser: yellow task actions run horizontally below the card and wrap on mobile",
+      "Scanner browser: secondary actions dim during scanning and brighten for focus or work",
+      "RISK corrupt work budget fixture: a shared action deadline never rejects before its own deadline when the host timer fires early"
+    ],
+    "preservedCoverage": [
+      "Every assertion of the yellow-actions test is kept at 1000, 390 and 320 px (below the card, a horizontal first row, one row on desktop, the four actions in order, no overflow, every button inside the viewport); messages gain the engine and width only.",
+      "Every assertion of the dim test is kept in both themes (benchmark and candidate rows dim, Yes/No stays at 1, keyboard focus restores 1, Start working restores 1, Resume readable on focus, Done completes the dotted task); messages gain the engine and theme only.",
+      "Chromium still runs on the Chrome channel by default as before; WebKit is added. A mutation check on this branch (siderail/actionrow dim set to opacity 1 and the rail stacked as a column in index.html, reverted) fails both tests: 'chromium: buttons begin in a horizontal row at 1000px' and 'chromium light: benchmark actions must visibly dim after all stylesheets load'.",
+      "#2461's press guard keeps its own tests (the persistence-recovery #2461/#2481/#2486 seam tests and the held-press browser tests); this test only waits for it, as a person would. A probe on this branch confirmed the guard holds a Done clicked straight after Start working in both engines (answerBeforeCandidateCouldBeRead() true, the dotted task not done).",
+      "RISK corrupt work budget fixture: one shared action deadline rejects an actually held device commit keeps its exact elapsed>=20000 check, unchanged; a budget shortened to 19s still fails it (19003ms).",
+      "Every fixtureDeadline caller keeps its message, its ms and its success-path check that a result arriving at or after the deadline still fails. A rejection can now come at most one timer tick later than before, never earlier than the deadline.",
+      "The wait() polling and its cleanup on rejection are unchanged."
+    ],
+    "redEvidence": {
+      "command": "See the #2479 and #2414 entries above.",
+      "failure": "Record 2026-11-26T10-13-45-096Z-2e4d5287-f163-423a-a0b2-79a0ab0bc223 (preimplementation-red): both tests fail with 'locator.click: Timeout 30000ms exceeded' on '#modalRoot [data-act=\"close-modal\"]', the call log showing '<dialog open=\"\" id=\"motionDialog\" class=\"motion-dialog\" ...> intercepts pointer events' (core.test.js 24244 and 24270). Record 2026-11-26T10-15-23-070Z-a9c31d77-0069-4012-8908-49a49585caae (green): 2 pass, 0 fail, 0 skipped, each in Chromium and WebKit; 36 of 36 passed in three rounds of six concurrent runs. | Record 2026-11-26T10-17-54-912Z-718537f4: 'the deadline rejects no earlier than its 50ms by performance.now(): 48.78354200000001'. Load baseline on main, record 2026-11-26T10-15-12-319Z-29283bd6: 6 failed of 30, each 'the earned action stall reaches the original single 20s limit' at 19999ms. After the fix: record 2026-11-26T10-18-04-681Z-0c1040ba (both fixture tests pass) and record 2026-11-26T10-18-37-348Z-6cf3c75a (0 failed of 30 six at a time, minimum 20000ms). Mutation, action budget 20000 to 19000 in the consumer: record 2026-11-26T10-21-22-279Z-e68b19f1, the fixture test fails at 19003ms."
+    }
+  },
+  {
+    "baseCommit": "a33205a6fc8ca53d554d83be063b3eb8fe2e7f65",
+    "weakenedTestLines": [
       "tests/persistence-recovery.test.js:-const LONG_SCAN_GROWTH_GUARD_MIB={chromium:193,webkit:453};",
       "tests/persistence-recovery.test.js:-if(longScanWork.floatArrays>LONG_SCAN_ANSWERS*LONG_SCAN_RANK_BUFFERS_PER_ANSWER)failures.push(`${engineName}: 60 answers allocated ${longScanWork.floatArrays} rank buffers, above ${LONG_SCAN_ANSWERS*LONG_SCAN_RANK_BUFFERS_PER_ANSWER}`);"
     ],

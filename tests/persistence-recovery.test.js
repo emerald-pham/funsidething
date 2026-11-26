@@ -3831,6 +3831,24 @@ test('RISK corrupt work budget fixture: one shared action deadline rejects an ac
  assert.match(output,/# tests 1\b/);assert.match(output,/# fail 1\b/);assert.match(output,/# cancelled 0\b/);
 });
 
+test('RISK corrupt work budget fixture: a shared action deadline never rejects before its own deadline when the host timer fires early',async()=>{
+ // Node arms a timer on its millisecond loop clock and truncates a fractional
+ // delay, so the 20000ms action deadline above fired at 19,999ms by
+ // performance.now() in 6 of 30 loaded runs on main (#2414). This host timer
+ // always fires 3ms early, past that granularity, so only a deadline judged by
+ // performance.now() itself passes; a margin in the assertion would not.
+ const host=globalThis.setTimeout;
+ globalThis.setTimeout=(fn,ms,...args)=>host(fn,Math.max(0,ms-3),...args);
+ let rejectedAfter;
+ try{
+  const started=performance.now();
+  await assert.rejects(fixtureDeadline(new Promise(()=>{}),'a held action outlives its deadline',50),/a held action outlives its deadline/);
+  rejectedAfter=performance.now()-started;
+ }
+ finally{globalThis.setTimeout=host;}
+ assert.ok(rejectedAfter>=50,'the deadline rejects no earlier than its 50ms by performance.now(): '+rejectedAfter);
+});
+
 test('RISK recovery observation budget: the first actual Add prefix belongs to the single action deadline',async t=>{
  const os=await import('node:os'),root=fs.mkdtempSync(path.join(os.tmpdir(),'scanner-action-prefix-'));
  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
