@@ -8,8 +8,8 @@
 // hand: a detached worktree at main, six parallel `node --test` processes and
 // greps over TAP files.
 
-import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { constants, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -62,9 +62,11 @@ function positiveInteger(name, text) {
 }
 
 // Test runs in flight, each the leader of its own process group, and the
-// signal that interrupted the comparison, if one did.
+// signal that interrupted the comparison, if one did. Each run's process id is
+// also kept as a file in the base's run directory, for the janitor.
 const testRuns = new Set();
 let interruption;
+let runDirectory;
 
 // Stops every test run with everything it started, then forces any left after
 // a grace period, so no run outlives an interrupted comparison.
@@ -89,9 +91,14 @@ function interrupt(signal) {
 function run(command, args, { cwd, env = process.env, testRun = false } = {}) {
   return new Promise((resolvePromise) => {
     const child = spawn(command, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], detached: testRun });
-    if (testRun) {
+    if (testRun && child.pid) {
       testRuns.add(child);
-      child.on('close', () => testRuns.delete(child));
+      const marker = join(runDirectory, String(child.pid));
+      writeFileSync(marker, '');
+      child.on('close', () => {
+        testRuns.delete(child);
+        rmSync(marker, { force: true });
+      });
     }
     let stdout = '';
     let stderr = '';
@@ -189,23 +196,66 @@ function tally(results) {
   return side;
 }
 
+// The base worktree lives at <parent>/base and its runs' process ids under
+// <parent>/runs. A janitor process, in its own process group, waits for this
+// comparison to end and then stops any run left and removes whatever of the
+// base is left. The test-run recorder kills an interrupted comparison's process
+// group outright after 750 ms, which can land in the middle of removing a base
+// worktree; the janitor finishes that removal (#2494).
 async function prepareBase(headRoot, baseSha) {
   const parent = realpathSync(mkdtempSync(join(tmpdir(), 'chain-head-vs-base-')));
-  const worktree = join(parent, 'base');
-  await git(headRoot, 'worktree', 'add', '--quiet', '--detach', worktree, baseSha);
+  runDirectory = join(parent, 'runs');
+  mkdirSync(runDirectory);
+  const janitor = spawn(process.execPath, [self, '--janitor', String(process.pid), headRoot, parent], { detached: true, stdio: 'ignore' });
+  janitor.unref();
+  const base = { parent, worktree: join(parent, 'base'), janitor };
+  await git(headRoot, 'worktree', 'add', '--quiet', '--detach', base.worktree, baseSha);
   // The existing worktree flow gives the base its own dependencies and ports.
-  const ready = await run(process.execPath, [worktreeReady, 'prepare'], { cwd: worktree });
+  const ready = await run(process.execPath, [worktreeReady, 'prepare'], { cwd: base.worktree });
   process.stderr.write(`${ready.stdout}${ready.stderr}`);
-  return { parent, worktree };
+  return base;
 }
 
-async function removeBase(headRoot, base) {
-  if (!base) return;
-  await run('git', ['worktree', 'remove', '--force', base.worktree], { cwd: headRoot });
-  rmSync(base.parent, { recursive: true, force: true });
-  await run('git', ['worktree', 'prune'], { cwd: headRoot });
-  const pruned = await run(process.execPath, [worktreeReady, 'prune'], { cwd: headRoot });
-  process.stderr.write(`${pruned.stdout}${pruned.stderr}`);
+// Removes the base worktree, its temporary directory and git's record of it,
+// then lets worktree-ready finish the base's ledger entry and free its ports.
+// Each step tolerates an earlier, partial removal.
+function removeBase(headRoot, parent) {
+  const worktree = join(parent, 'base');
+  if (existsSync(worktree)) spawnSync('git', ['worktree', 'remove', '--force', worktree], { cwd: headRoot, stdio: 'ignore' });
+  rmSync(parent, { recursive: true, force: true });
+  spawnSync('git', ['worktree', 'prune'], { cwd: headRoot, stdio: 'ignore' });
+  return spawnSync(process.execPath, [worktreeReady, 'prune'], { cwd: headRoot, encoding: 'utf8' });
+}
+
+function processAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === 'EPERM';
+  }
+}
+
+function janitor([ownerText, headRoot, parent]) {
+  const owner = Number(ownerText);
+  const timer = setInterval(() => {
+    if (processAlive(owner)) return;
+    clearInterval(timer);
+    let runs = [];
+    try {
+      runs = readdirSync(join(parent, 'runs')).map(Number);
+    } catch {
+      // The comparison already removed its base.
+    }
+    for (const pid of runs) {
+      try {
+        process.kill(-pid, 'SIGKILL');
+      } catch {
+        // That run already ended.
+      }
+    }
+    if (existsSync(parent)) removeBase(headRoot, parent);
+  }, 100);
 }
 
 // A comparison started from inside a Node test run inherits its
@@ -302,7 +352,11 @@ async function main() {
     process.exitCode = clean ? 0 : 1;
   } finally {
     // Runs even after an interrupt, which only stopped the test runs.
-    await removeBase(headRoot, base);
+    if (base) {
+      const pruned = removeBase(headRoot, base.parent);
+      process.stderr.write(`${pruned.stdout ?? ''}${pruned.stderr ?? ''}`);
+      base.janitor.kill();
+    }
     if (interruption) {
       console.error(`head-vs-base: interrupted by ${interruption}; the base worktree is removed and no result was reported.`);
       process.exitCode = 128 + constants.signals[interruption];
@@ -310,13 +364,15 @@ async function main() {
   }
 }
 
-// Under the recorder, the recorder stops the comparison and records that.
-for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
-  process.on(signal, () => (recorder ? recorder.kill(signal) : interrupt(signal)));
+if (process.argv[2] === '--janitor') janitor(process.argv.slice(3));
+else {
+  // Under the recorder, the recorder stops the comparison and records that.
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+    process.on(signal, () => (recorder ? recorder.kill(signal) : interrupt(signal)));
+  }
+  main().catch((error) => {
+    console.error(`head-vs-base: ${error.message}`);
+    if (error instanceof UsageError) console.error(USAGE);
+    process.exitCode = 2;
+  });
 }
-
-main().catch((error) => {
-  console.error(`head-vs-base: ${error.message}`);
-  if (error instanceof UsageError) console.error(USAGE);
-  process.exitCode = 2;
-});

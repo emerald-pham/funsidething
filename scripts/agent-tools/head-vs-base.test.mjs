@@ -180,6 +180,50 @@ test('an interrupted head-vs-base stops its test runs and still removes the base
   }
 });
 
+// The test-run recorder forwards an interrupt to the comparison's process
+// group, then kills that group outright 750 ms later, which can land while the
+// comparison is still removing its base worktree.
+test('a head-vs-base killed outright during its interrupt cleanup still has its base worktree removed', async () => {
+  const probe = `${PROBE_HEADER}test('slow probe', async () => {
+  require('node:fs').writeFileSync(require('node:path').join(process.env.PROBE_PIDS, String(process.pid)), '');
+  await new Promise((done) => setTimeout(done, 60000));
+});\n`;
+  const setup = createFixture('chain-head-vs-base-killed-', { base: probe, head: `${probe}// head edit\n` });
+  const pids = join(setup.fixture, 'pids');
+  mkdirSync(pids);
+  try {
+    const child = spawn(process.execPath, [entrypoint, '--file', 'probe.test.js', '--pattern', 'slow probe', '--runs', '1', '--parallel', '2', '--base', 'main'], {
+      cwd: setup.repo,
+      env: { ...process.env, CI: '', CODEX_COORDINATION_FILE: '', DOW_EMULATOR_COORDINATION_FILE: '', CHAIN_WORKTREE_READY_NPM: setup.npm, PROBE_PIDS: pids },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: true,
+    });
+    let stderr = '';
+    child.stderr.on('data', (chunk) => { stderr += chunk; });
+    const exited = new Promise((done) => child.on('close', (status, signal) => done({ status, signal })));
+    let deadline = Date.now() + 30000;
+    while (readdirSync(pids).length < 2) {
+      assert.ok(Date.now() < deadline, `both sides' runs start\n${stderr}`);
+      await new Promise((done) => setTimeout(done, 50));
+    }
+    const runs = readdirSync(pids).map(Number);
+    const [baseWorktree] = worktreePaths(setup.repo).filter((path) => path !== setup.repo);
+    assert.ok(baseWorktree, `the base worktree exists while its run waits\n${stderr}`);
+    // No grace at all: the kill can land at any point of the cleanup.
+    process.kill(-child.pid, 'SIGINT');
+    process.kill(-child.pid, 'SIGKILL');
+    assert.equal((await exited).signal, 'SIGKILL', 'the comparison itself was killed');
+    deadline = Date.now() + 20000;
+    while (worktreePaths(setup.repo).length > 1 || existsSync(baseWorktree)) {
+      assert.ok(Date.now() < deadline, `the base worktree is removed after its comparison was killed\n${worktreePaths(setup.repo).join('\n')}`);
+      await new Promise((done) => setTimeout(done, 100));
+    }
+    assert.deepEqual(runs.filter(processAlive), [], 'no test run outlives the killed comparison');
+  } finally {
+    rmSync(setup.fixture, { recursive: true, force: true });
+  }
+});
+
 test("head-vs-base gives the base runs the ports worktree-ready claimed for the base, not the caller's, and frees that claim afterwards", () => {
   // The caller's shell exported port 1; a base run that inherited it would
   // share the head runs' servers.
