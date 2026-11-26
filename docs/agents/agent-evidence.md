@@ -16,6 +16,7 @@ procedure, output and limits; package script names are the command entry points.
 | Run an isolated browser audit and preserve partial results | `npm run agent:browser-audit --` | [Browser audits](browser-audits.md) |
 | Read a failed CI run's logs, or follow one exact CI run and commit | `npm run agent:ci-monitor --` | [CI monitor](ci-monitor.md) |
 | Run an independently accounted scanner test group, or an environment-gated test | `npm run test:group --` | [Test groups](test-groups.md) |
+| Check whether a test failure is new or already fails on the base | `npm run agent:head-vs-base --` | [Test groups](test-groups.md#is-a-failure-new) |
 | Update an authorized PR body from UTF-8 text | `npm run agent:pr-body-update --` | [PR body update](pr-body-update.md) |
 
 Pass tool arguments after `--`. Read the linked guide before invoking its
