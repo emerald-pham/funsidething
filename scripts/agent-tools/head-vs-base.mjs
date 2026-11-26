@@ -13,6 +13,7 @@ import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { constants, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { PORT_VARIABLES, applyPreparedPorts } from './worktree-ports.mjs';
 
 const worktreeReady = fileURLToPath(new URL('./worktree-ready.mjs', import.meta.url));
 const MESSAGE_LIMIT = 200;
@@ -202,10 +203,14 @@ async function removeBase(headRoot, base) {
 
 // A comparison started from inside a Node test run inherits its
 // NODE_TEST_CONTEXT, which makes each child `node --test` report to that run
-// instead of printing TAP.
-function testEnvironment() {
+// instead of printing TAP. The base runs drop the caller's port variables for
+// the ports worktree-ready claimed for the base worktree, so the two sides
+// never share a server port; the head keeps any the caller exported.
+function testEnvironment(root, { ownPorts }) {
   const environment = { ...process.env };
   delete environment.NODE_TEST_CONTEXT;
+  if (ownPorts) for (const name of PORT_VARIABLES) delete environment[name];
+  applyPreparedPorts(environment, root);
   return environment;
 }
 
@@ -221,7 +226,7 @@ async function runSides(options, sides) {
       const file = resolve(side.root, options.file);
       const output = await run(process.execPath, [
         ...options.nodeOptions, '--test', '--test-reporter=tap', `--test-name-pattern=${options.pattern}`, file,
-      ], { cwd: side.root, env: testEnvironment(), testRun: true });
+      ], { cwd: side.root, env: side.env, testRun: true });
       results.get(side).push(readRun(output, new Set([file, options.file])));
     }
   };
@@ -250,8 +255,8 @@ async function main() {
   try {
     base = await prepareBase(headRoot, baseSha);
     if (interruption) return;
-    const head = { root: headRoot };
-    const baseSide = { root: base.worktree };
+    const head = { root: headRoot, env: testEnvironment(headRoot, { ownPorts: false }) };
+    const baseSide = { root: base.worktree, env: testEnvironment(base.worktree, { ownPorts: true }) };
     const results = await runSides(options, [head, baseSide]);
     if (interruption) return;
     const report = {

@@ -1,7 +1,7 @@
 import '../../tests/isolate-git-env.js';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -175,6 +175,27 @@ test('an interrupted head-vs-base stops its test runs and still removes the base
     assert.deepEqual(runs.filter(processAlive), [], 'no test run outlives the interrupted comparison');
     assert.equal(existsSync(baseWorktree), false, 'the interrupted comparison removed the base worktree directory');
     assert.deepEqual(worktreePaths(setup.repo), [setup.repo], 'git lists no base worktree after the interrupt');
+  } finally {
+    rmSync(setup.fixture, { recursive: true, force: true });
+  }
+});
+
+test("head-vs-base gives the base runs the ports worktree-ready claimed for the base, not the caller's, and frees that claim afterwards", () => {
+  // The caller's shell exported port 1; a base run that inherited it would
+  // share the head runs' servers.
+  const probe = `${PROBE_HEADER}test('port probe', () => { assert.notEqual(process.env.CHAIN_NATIVE_PORT, '1', 'inherited the caller port'); assert.match(process.env.CHAIN_NATIVE_PORT, /^\\d+$/); });\n`;
+  const setup = createFixture('chain-head-vs-base-ports-', { base: probe, head: `${probe}// head edit\n` });
+  const ledger = join(setup.fixture, 'host-ledger.json');
+  writeFileSync(ledger, `${JSON.stringify({ version: 1, scope: 'codex-wide', entries: [], reservations: [], configurations: [] }, null, 2)}\n`);
+  try {
+    const result = compare(['--file', 'probe.test.js', '--pattern', 'port probe', '--runs', '2', '--parallel', '2', '--base', 'main', '--json'], setup, {
+      CODEX_COORDINATION_FILE: ledger, CHAIN_NATIVE_PORT: '1', CHAIN_NATIVE_SMOKE_PORT: '2',
+    });
+    const report = JSON.parse(result.stdout);
+    assert.deepEqual([report.head.failed, report.base.passed], [2, 2], `only the head runs keep the caller's port\n${result.stderr}`);
+    const entries = JSON.parse(readFileSync(ledger, 'utf8')).entries.filter((entry) => entry.worktree === report.base.worktree);
+    assert.equal(entries.length, 1, 'worktree-ready registered the base worktree in the ledger');
+    assert.notEqual(entries[0].status, 'active', 'its entry and ports were freed once the base worktree was removed');
   } finally {
     rmSync(setup.fixture, { recursive: true, force: true });
   }
