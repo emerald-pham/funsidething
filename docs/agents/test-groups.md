@@ -183,6 +183,30 @@ A failed group's log gives each failed test's first assertion line, capped at 20
 characters. Compared values on later assertion lines stay in the `test.tap`
 artifact, because job logs are public.
 
+## Is a failure new?
+
+To check whether a failing test, in CI or locally, is new on a branch or already
+fails on main, compare its repeated runs on both (#2494):
+
+```sh
+npm run agent:head-vs-base -- --file tests/persistence-recovery.test.js \
+  --pattern 'RISK cloud save loop guard' --runs 18 --parallel 6 \
+  --node-option --max-old-space-size=8192
+```
+
+It runs the pattern `--runs` times on the current checkout, uncommitted changes
+included, and `--runs` times on `--base` (default `origin/main`; fetch first),
+in a temporary worktree it readies with `agent:worktree-ready` and removes
+afterwards, even when interrupted. The two sides' runs alternate,
+`--parallel` at a time, so both run under the same load. It prints each side's
+passed, failed and not-run counts and each distinct failure message with its
+count, and exits 0 only when every run on both sides passed. A run that skipped
+a selected test, or matched none, counts as not run, never as a pass. Add
+`--json` for the report as JSON, or `--evidence-dir <dir> --purpose <purpose>`
+to record the comparison through the [test-run recorder](test-run-provenance.md).
+The base runs get the base worktree's own ports. A browser test runs against
+whatever `LANDSCAPE_BROWSER_URL` serves, on both sides, so compare Node tests.
+
 ## Nightly cross-engine cohort
 
 `scripts/test-group-assignments.json` lists cross-engine native roots under
