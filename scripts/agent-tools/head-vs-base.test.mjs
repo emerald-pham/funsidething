@@ -1,7 +1,7 @@
 import '../../tests/isolate-git-env.js';
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -129,6 +129,52 @@ test('head-vs-base reports a skipped test, or a pattern that matches nothing, as
     assert.deepEqual(compareJson('probe'), [skipped, skipped], 'a run that skipped one selected test is not a pass, though another passed');
     const unmatched = { passed: 0, failed: 0, notRun: 2, notRunReasons: [{ reason: 'no test matched the pattern', count: 2 }] };
     assert.deepEqual(compareJson('no such probe'), [unmatched, unmatched], "Node's passing file-level point for a file with no match is not a pass");
+  } finally {
+    rmSync(setup.fixture, { recursive: true, force: true });
+  }
+});
+
+function processAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+test('an interrupted head-vs-base stops its test runs and still removes the base worktree', async () => {
+  // Each run records its process id, then waits far longer than the test.
+  const probe = `${PROBE_HEADER}test('slow probe', async () => {
+  require('node:fs').writeFileSync(require('node:path').join(process.env.PROBE_PIDS, String(process.pid)), '');
+  await new Promise((done) => setTimeout(done, 60000));
+});\n`;
+  const setup = createFixture('chain-head-vs-base-interrupt-', { base: probe, head: `${probe}// head edit\n` });
+  const pids = join(setup.fixture, 'pids');
+  mkdirSync(pids);
+  try {
+    const child = spawn(process.execPath, [entrypoint, '--file', 'probe.test.js', '--pattern', 'slow probe', '--runs', '1', '--parallel', '2', '--base', 'main'], {
+      cwd: setup.repo,
+      env: { ...process.env, CI: '', CODEX_COORDINATION_FILE: '', DOW_EMULATOR_COORDINATION_FILE: '', CHAIN_WORKTREE_READY_NPM: setup.npm, PROBE_PIDS: pids },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stderr = '';
+    child.stderr.on('data', (chunk) => { stderr += chunk; });
+    const exited = new Promise((done) => child.on('close', (status, signal) => done({ status, signal })));
+    const deadline = Date.now() + 30000;
+    while (readdirSync(pids).length < 2) {
+      assert.ok(Date.now() < deadline, `both sides' runs start\n${stderr}`);
+      await new Promise((done) => setTimeout(done, 50));
+    }
+    const runs = readdirSync(pids).map(Number);
+    const [baseWorktree] = worktreePaths(setup.repo).filter((path) => path !== setup.repo);
+    assert.ok(baseWorktree && existsSync(baseWorktree), `the base worktree exists while its run waits\n${stderr}`);
+    child.kill('SIGINT');
+    const { status } = await exited;
+    assert.equal(status, 130, `an interrupt exits 128 plus SIGINT's number\n${stderr}`);
+    assert.deepEqual(runs.filter(processAlive), [], 'no test run outlives the interrupted comparison');
+    assert.equal(existsSync(baseWorktree), false, 'the interrupted comparison removed the base worktree directory');
+    assert.deepEqual(worktreePaths(setup.repo), [setup.repo], 'git lists no base worktree after the interrupt');
   } finally {
     rmSync(setup.fixture, { recursive: true, force: true });
   }

@@ -10,12 +10,13 @@
 
 import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { constants, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const worktreeReady = fileURLToPath(new URL('./worktree-ready.mjs', import.meta.url));
 const MESSAGE_LIMIT = 200;
+const KILL_GRACE_MS = 750;
 const USAGE = `usage: head-vs-base.mjs --file <test file> --pattern <test name pattern>
   [--runs <n per side, default 6>] [--parallel <p, default 6>] [--base <ref, default origin/main>]
   [--node-option <option>]... [--json]`;
@@ -52,11 +53,38 @@ function positiveInteger(name, text) {
   return number;
 }
 
+// Test runs in flight, each the leader of its own process group, and the
+// signal that interrupted the comparison, if one did.
+const testRuns = new Set();
+let interruption;
+
+// Stops every test run with everything it started, then forces any left after
+// a grace period, so no run outlives an interrupted comparison.
+function interrupt(signal) {
+  if (interruption) return;
+  interruption = signal;
+  const signalGroups = (name) => {
+    for (const child of testRuns) {
+      try {
+        process.kill(-child.pid, name);
+      } catch {
+        // The run already ended.
+      }
+    }
+  };
+  signalGroups('SIGTERM');
+  setTimeout(() => signalGroups('SIGKILL'), KILL_GRACE_MS).unref();
+}
+
 // Every child is collected asynchronously, so a signal reaches this process's
 // handlers while children run.
-function run(command, args, { cwd, env = process.env } = {}) {
+function run(command, args, { cwd, env = process.env, testRun = false } = {}) {
   return new Promise((resolvePromise) => {
-    const child = spawn(command, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(command, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], detached: testRun });
+    if (testRun) {
+      testRuns.add(child);
+      child.on('close', () => testRuns.delete(child));
+    }
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', (chunk) => { stdout += chunk; });
@@ -187,13 +215,13 @@ async function runSides(options, sides) {
   const results = new Map(sides.map((side) => [side, []]));
   let next = 0;
   const worker = async () => {
-    while (next < jobs.length) {
+    while (next < jobs.length && !interruption) {
       const side = jobs[next];
       next += 1;
       const file = resolve(side.root, options.file);
       const output = await run(process.execPath, [
         ...options.nodeOptions, '--test', '--test-reporter=tap', `--test-name-pattern=${options.pattern}`, file,
-      ], { cwd: side.root, env: testEnvironment() });
+      ], { cwd: side.root, env: testEnvironment(), testRun: true });
       results.get(side).push(readRun(output, new Set([file, options.file])));
     }
   };
@@ -221,9 +249,11 @@ async function main() {
   let base;
   try {
     base = await prepareBase(headRoot, baseSha);
+    if (interruption) return;
     const head = { root: headRoot };
     const baseSide = { root: base.worktree };
     const results = await runSides(options, [head, baseSide]);
+    if (interruption) return;
     const report = {
       file: options.file,
       pattern: options.pattern,
@@ -237,9 +267,16 @@ async function main() {
     const clean = [report.head, report.base].every((side) => side.failed === 0 && side.notRun === 0);
     process.exitCode = clean ? 0 : 1;
   } finally {
+    // Runs even after an interrupt, which only stopped the test runs.
     await removeBase(headRoot, base);
+    if (interruption) {
+      console.error(`head-vs-base: interrupted by ${interruption}; the base worktree is removed and no result was reported.`);
+      process.exitCode = 128 + constants.signals[interruption];
+    }
   }
 }
+
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => interrupt(signal));
 
 main().catch((error) => {
   console.error(`head-vs-base: ${error.message}`);
