@@ -833,8 +833,11 @@ const failedCaseLabel = item => `${item.id}${item.failureReason ? `: ${item.fail
 // failure line in the job log. The artifact is as public as the log on this
 // repository, so the log adds no exposure; the caps keep a mass failure from
 // flooding it, and every cut says where the rest is.
+// GitHub's runner trims leading whitespace and runs a log line that then
+// starts with `::` as a workflow command, so a detail line never starts with
+// it (#2498 review N7): its leading `::` gets a backslash.
 function detailLine(text) {
-  const characters = Array.from(text.replace(/[\p{C}\p{Zl}\p{Zp}]/gu, ' ').trimEnd());
+  const characters = Array.from(text.replace(/[\p{C}\p{Zl}\p{Zp}]/gu, ' ').trimEnd().replace(/^(\s*)::/, '$1\\::'));
   return characters.length > FAILURE_REASON_MAX_CHARS ? `${characters.slice(0, FAILURE_REASON_MAX_CHARS - 1).join('')}…` : characters.join('');
 }
 
@@ -868,10 +871,14 @@ function tapFailureDetails(lines, resultIndex, indentation) {
   section('error', (fields.get('error') || []).map((value, index) => index ? value : unquote(value)), FAILURE_DETAIL_SECTION_LINES);
   section('expected', fields.get('expected') || [], FAILURE_DETAIL_VALUE_LINES);
   section('actual', fields.get('actual') || [], FAILURE_DETAIL_VALUE_LINES);
-  // The first frame in the failed test's own file, named relative to the
-  // checkout; runner frames say nothing about which assertion failed.
+  // The first frame in a test file (*.test.js, .mjs or .cjs), named relative
+  // to the checkout; runner frames say nothing about which assertion failed.
+  // Every tests/*.test.js test registers through the wrapper in
+  // tests/shared.js, so Node gives the wrapper as its location (#2498 review
+  // B2); the location's own file is the fallback for a test file named otherwise.
   const testFile = unquote(fields.get('location')?.[0] || '').replace(/:\d+:\d+$/, '');
-  const frame = testFile && (fields.get('stack') || []).map(line => line.match(/\((?:file:\/\/)?([^()]+):(\d+):(\d+)\)\s*$|^(?:file:\/\/)?([^\s()]+):(\d+):(\d+)\s*$/)).find(match => match && (match[1] || match[4]) === testFile);
+  const frames = (fields.get('stack') || []).map(line => line.match(/\((?:file:\/\/)?([^()]+):(\d+):(\d+)\)\s*$|^(?:file:\/\/)?([^\s()]+):(\d+):(\d+)\s*$/)).filter(Boolean);
+  const frame = frames.find(match => /\.test\.[cm]?js$/.test(match[1] || match[4])) || (testFile && frames.find(match => (match[1] || match[4]) === testFile));
   const framePath = frame && (frame[1] || frame[4]), relative = framePath && path.relative(ROOT, framePath);
   if (frame) section('at', [`${relative.startsWith('..') || path.isAbsolute(relative) ? framePath : relative.split(path.sep).join('/')}:${frame[2] || frame[5]}:${frame[3] || frame[6]}`], 1);
   // A test's diagnostics follow its YAML block at the result's own indentation.

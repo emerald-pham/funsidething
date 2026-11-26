@@ -504,9 +504,24 @@ test('test group runner names why a test failed in the job log', t => {
 
 // Roots appended here throw exactly what their source says; the expected log
 // text below is written out by hand, not derived from the runner's own parsing.
+// They register through a wrapper module, as every tests/*.test.js file does
+// through tests/shared.js, so Node reports the wrapper as each test's location
+// and only the stack names the test file (#2498 review B2).
 function failingRootsFixture(t, roots) {
   const fixture = createFixture(t);
-  fs.appendFileSync(path.join(fixture.root, suiteFile), roots.map(([title, body]) => `\ntest(${JSON.stringify(title)}, t => { ${body} });\n`).join(''));
+  fs.writeFileSync(path.join(fixture.root, 'tests/shared.js'), `import nodeTest from 'node:test';
+export function test(...args) {
+  const run = args.at(-1);
+  if (typeof run !== 'function') return nodeTest(...args);
+  return nodeTest(...args.slice(0, -1), async context => {
+    try { return await run(context); } finally { /* fixtures released here */ }
+  });
+}
+`);
+  const suite = path.join(fixture.root, suiteFile), source = fs.readFileSync(suite, 'utf8');
+  assert.ok(source.includes("import { test } from 'node:test';"), 'the fixture suite imports test from node:test');
+  fs.writeFileSync(suite, source.replace("import { test } from 'node:test';", "import { test } from './shared.js';"));
+  fs.appendFileSync(suite, roots.map(([title, body]) => `\ntest(${JSON.stringify(title)}, t => { ${body} });\n`).join(''));
   const file = path.join(fixture.root, 'scripts/test-group-assignments.json'), catalog = JSON.parse(fs.readFileSync(file, 'utf8'));
   catalog.rootAssignments.push(...roots.map(([root]) => ({ root, group: 'core', file: suiteFile })));
   writeJson(file, catalog);
@@ -604,6 +619,23 @@ test('test group runner caps failure details per test and per job and says where
   const detailCount = lines.filter(line => line.startsWith('  ')).length;
   assert.ok(detailCount <= 240, `the job prints at most 240 detail lines: ${detailCount}`);
   assert.match(mass.stderr, /^Failure details for \d+ more failed tests were cut at the job's 240-line cap; the full output is in test\.tap\.$/m, 'the log says the job\'s details were cut');
+});
+
+// #2498 review N7: GitHub's runner trims leading whitespace and then runs any
+// log line that starts with `::` as a workflow command, so an indented detail
+// line from a test's error or values must never start with it.
+test('test group runner keeps a failed test\'s details from reading as GitHub workflow commands', t => {
+  const fixture = failingRootsFixture(t, [
+    ['fixture workflow command failure root', 'throw new Error("first line\\n::warning file=x::injected from the error\\n  ::error::indented too");'],
+    ['fixture workflow command values root', 'assert.equal("first value line\\n::add-mask::x", "first value line\\n::group::y", "values differ");'],
+  ]);
+  const result = invoke(fixture);
+  assert.notEqual(result.status, 0);
+  const details = [...failureDetails(result.stderr, 'fixture workflow command failure root'), ...failureDetails(result.stderr, 'fixture workflow command values root')];
+  assert.ok(details.some(line => line.includes('warning file=x::injected from the error')), `the error's later lines are still shown: ${details.join('\n')}`);
+  assert.ok(details.some(line => line.includes('add-mask::x')) && details.some(line => line.includes('group::y')), `the compared values are still shown: ${details.join('\n')}`);
+  const commands = result.stderr.split('\n').filter(line => line.trimStart().startsWith('::'));
+  assert.deepEqual(commands, [], 'no job log line starts with a workflow command');
 });
 
 test('test group runner fails closed when a required native child registration is missing or duplicated', t => {

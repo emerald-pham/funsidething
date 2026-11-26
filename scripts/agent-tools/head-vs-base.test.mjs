@@ -1,7 +1,7 @@
 import '../../tests/isolate-git-env.js';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -64,6 +64,10 @@ function compare(args, { repo, npm }, environment = {}) {
       CODEX_COORDINATION_FILE: '',
       DOW_EMULATOR_COORDINATION_FILE: '',
       CHAIN_WORKTREE_READY_NPM: npm,
+      // Only a case that sets them gives the head runs ports: a base with no
+      // ledger to claim its own from would be an unprepared base (#2498 N1).
+      CHAIN_NATIVE_PORT: '',
+      CHAIN_NATIVE_SMOKE_PORT: '',
       ...environment,
     },
   });
@@ -155,7 +159,7 @@ test('an interrupted head-vs-base stops its test runs and still removes the base
   try {
     const child = spawn(process.execPath, [entrypoint, '--file', 'probe.test.js', '--pattern', 'slow probe', '--runs', '1', '--parallel', '2', '--base', 'main'], {
       cwd: setup.repo,
-      env: { ...process.env, CI: '', CODEX_COORDINATION_FILE: '', DOW_EMULATOR_COORDINATION_FILE: '', CHAIN_WORKTREE_READY_NPM: setup.npm, PROBE_PIDS: pids },
+      env: { ...process.env, CI: '', CODEX_COORDINATION_FILE: '', DOW_EMULATOR_COORDINATION_FILE: '', CHAIN_WORKTREE_READY_NPM: setup.npm, CHAIN_NATIVE_PORT: '', CHAIN_NATIVE_SMOKE_PORT: '', PROBE_PIDS: pids },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stderr = '';
@@ -194,7 +198,7 @@ test('a head-vs-base killed outright during its interrupt cleanup still has its 
   try {
     const child = spawn(process.execPath, [entrypoint, '--file', 'probe.test.js', '--pattern', 'slow probe', '--runs', '1', '--parallel', '2', '--base', 'main'], {
       cwd: setup.repo,
-      env: { ...process.env, CI: '', CODEX_COORDINATION_FILE: '', DOW_EMULATOR_COORDINATION_FILE: '', CHAIN_WORKTREE_READY_NPM: setup.npm, PROBE_PIDS: pids },
+      env: { ...process.env, CI: '', CODEX_COORDINATION_FILE: '', DOW_EMULATOR_COORDINATION_FILE: '', CHAIN_WORKTREE_READY_NPM: setup.npm, CHAIN_NATIVE_PORT: '', CHAIN_NATIVE_SMOKE_PORT: '', PROBE_PIDS: pids },
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true,
     });
@@ -263,6 +267,101 @@ test('head-vs-base records its comparison through the test-run recorder when giv
     assert.match(record.execution.output.stdout, /^head .*: 0 passed, 2 failed, 0 not run$/m, "the record holds the head side's counts");
     assert.match(record.execution.output.stdout, /^base main .*: 2 passed, 0 failed, 0 not run$/m, "the record holds the base side's counts");
     assert.ok(!record.command.args.includes('--evidence-dir'), 'the recorded comparison is the plain command, not a second recording');
+  } finally {
+    rmSync(setup.fixture, { recursive: true, force: true });
+  }
+});
+
+// #2498 review B1: an absolute --file once ran the head's file on both sides,
+// so the base loaded the head's code and a head-only failure read as one the
+// base already had. Agents are told to pass absolute paths.
+test("head-vs-base runs the base commit's own copy of a test file given by its absolute path in the checkout, and refuses a file outside the checkout", () => {
+  const setup = createFixture('chain-head-vs-base-absolute-', {
+    base: `${PROBE_HEADER}test('save loop probe', () => {});\n`,
+    head: `${PROBE_HEADER}test('save loop probe', () => { assert.equal(1, 2, 'head broke the save loop'); });\n`,
+  });
+  try {
+    const common = ['--pattern', 'save loop', '--runs', '2', '--parallel', '2', '--base', 'main', '--json'];
+    const absolute = compare(['--file', join(setup.repo, 'probe.test.js'), ...common], setup);
+    assert.equal(absolute.status, 1, `the head's failure fails the comparison\n${absolute.stderr}`);
+    const report = JSON.parse(absolute.stdout);
+    assert.deepEqual([report.head.passed, report.head.failed], [0, 2], 'every head run fails');
+    assert.deepEqual(
+      { passed: report.base.passed, failed: report.base.failed, failures: report.base.failures },
+      { passed: 2, failed: 0, failures: [] },
+      "the base runs its own probe, not the head's, so the failure is the head's alone",
+    );
+    assert.equal(report.file, 'probe.test.js', 'the report names the file relative to the checkout');
+
+    const outside = join(setup.fixture, 'outside.test.js');
+    writeFileSync(outside, `${PROBE_HEADER}test('save loop probe', () => {});\n`);
+    for (const file of [outside, '../outside.test.js']) {
+      const refused = compare(['--file', file, ...common], setup);
+      assert.equal(refused.status, 2, `a file outside the checkout is refused: ${file}\n${refused.stdout}${refused.stderr}`);
+      assert.match(refused.stderr, /outside the checkout/, `the refusal says why: ${file}`);
+      assert.equal(refused.stdout, '', `no comparison is reported for ${file}`);
+    }
+    assert.deepEqual(worktreePaths(setup.repo), [setup.repo], 'no base worktree is left behind');
+  } finally {
+    rmSync(setup.fixture, { recursive: true, force: true });
+  }
+});
+
+// #2498 review N1: worktree-ready never fails, so a base it could not give
+// dependencies or ports once ran anyway, and its runs failed for that reason
+// alone, which read as "already fails on base".
+test('head-vs-base reports a base worktree that could not be prepared as an environment failure and runs neither side', () => {
+  const probe = `${PROBE_HEADER}test('dependency probe', () => { assert.equal(require('fixture-dep'), 'installed'); });\n`;
+  const setup = createFixture('chain-head-vs-base-unprepared-', { base: probe, head: `${probe}// head edit\n` });
+  try {
+    // The head's lockfile differs from the base's, so worktree-ready cannot
+    // clone the main checkout's dependencies for the base, and npm ci fails.
+    commitFile(setup.repo, 'package-lock.json', '{"name":"fixture","version":"1.0.1","lockfileVersion":3,"packages":{}}\n', 'head lockfile');
+    const failingNpm = join(setup.fixture, 'failing-npm.mjs');
+    writeFileSync(failingNpm, '#!/usr/bin/env node\nconsole.error("network is down");\nprocess.exit(1);\n');
+    chmodSync(failingNpm, 0o755);
+    const withoutDependencies = compare(['--file', 'probe.test.js', '--pattern', 'dependency probe', '--runs', '2', '--parallel', '2', '--base', 'main'],
+      { ...setup, npm: failingNpm });
+    assert.equal(withoutDependencies.status, 2, `an unprepared base is an environment failure\n${withoutDependencies.stdout}${withoutDependencies.stderr}`);
+    assert.match(withoutDependencies.stderr, /environment failure/, 'the failure is named as the environment');
+    assert.match(withoutDependencies.stderr, /dependencies/, 'it names the missing dependencies');
+    assert.equal(withoutDependencies.stdout, '', 'neither side is reported');
+    assert.deepEqual(worktreePaths(setup.repo), [setup.repo], 'the unprepared base worktree is removed');
+
+    // The base now shares the head's lockfile, so it gets dependencies, but the
+    // caller's runs have a port and no ledger can give the base its own.
+    const portProbe = `${PROBE_HEADER}test('port probe', () => { assert.match(process.env.CHAIN_NATIVE_PORT ?? '', /^\\d+$/); });\n`;
+    commitFile(setup.repo, 'probe.test.js', portProbe, 'port probe');
+    commitFile(setup.repo, 'probe.test.js', `${portProbe}// head edit\n`, 'head port probe');
+    const withoutPorts = compare(['--file', 'probe.test.js', '--pattern', 'port probe', '--runs', '2', '--parallel', '2', '--base', 'HEAD~1'], setup, {
+      CHAIN_NATIVE_PORT: '1', CHAIN_NATIVE_SMOKE_PORT: '2',
+    });
+    assert.equal(withoutPorts.status, 2, `a base without the ports the head runs have is an environment failure\n${withoutPorts.stdout}${withoutPorts.stderr}`);
+    assert.match(withoutPorts.stderr, /environment failure/, 'the failure is named as the environment');
+    assert.match(withoutPorts.stderr, /CHAIN_NATIVE_PORT/, 'it names the missing port');
+    assert.equal(withoutPorts.stdout, '', 'neither side is reported');
+    assert.deepEqual(worktreePaths(setup.repo), [setup.repo], 'the unprepared base worktree is removed');
+  } finally {
+    rmSync(setup.fixture, { recursive: true, force: true });
+  }
+});
+
+// #2498 specialist review N5: a repository-wide `git worktree prune` once
+// deregistered every other worktree whose directory was missing for a moment,
+// such as one on an unmounted disk, which host coordination still counts as owned.
+test("head-vs-base removes only its own base worktree's registration and leaves another worktree whose directory is missing", () => {
+  const probe = `${PROBE_HEADER}test('steady probe', () => {});\n`;
+  const setup = createFixture('chain-head-vs-base-prune-', { base: probe, head: `${probe}// head edit\n` });
+  try {
+    const other = join(setup.fixture, 'other');
+    git(setup.repo, 'worktree', 'add', '--quiet', '--detach', other, 'main');
+    const away = join(setup.fixture, 'other-away');
+    renameSync(other, away);
+    const result = compare(['--file', 'probe.test.js', '--pattern', 'steady probe', '--runs', '1', '--parallel', '2', '--base', 'main'], setup);
+    assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
+    assert.deepEqual(worktreePaths(setup.repo), [setup.repo, other], 'the other worktree is still registered, and the base worktree is gone');
+    renameSync(away, other);
+    assert.equal(git(other, 'rev-parse', 'HEAD'), git(setup.repo, 'rev-parse', 'main'), 'the other worktree works again once its directory is back');
   } finally {
     rmSync(setup.fixture, { recursive: true, force: true });
   }

@@ -692,6 +692,77 @@ test('RISK repository process: release plan --summary prints only the mode, revi
  }finally{cleanupReleaseGateFixture(fixture);}
 });
 
+// #2498 review N2: a ref that resolves to the wrong commit (HEAD in a checkout
+// sitting on the base) printed a plausible plan with no trace of the commits,
+// so the plan names the full SHAs it resolved and the changed-file count.
+// The base here is two commits behind the candidate, so a command that bound
+// the candidate's parent instead of the base it resolved is caught (#2498
+// specialist review N2).
+test('RISK repository process: release plan, plan --summary and prepare bind and name the resolved base two commits back, with the candidate and the changed-file count',()=>{
+ const fixture=datedReleaseFixture({candidate:{'scripts/tool.mjs':'export const value = 2;\n'}});
+ try{
+  const middleSha=fixture.candidateSha;
+  atReleaseCommitDate(()=>{
+   fs.writeFileSync(path.join(fixture.repo,'docs-notes.md'),'Notes\n');
+   releaseGateGit(fixture.repo,['add','--all']);releaseGateGit(fixture.repo,['commit','-q','-m','Second candidate commit']);
+  });
+  fixture.candidateSha=releaseGateGit(fixture.repo,['rev-parse','HEAD']);
+  fixture.treeSha=releaseGateGit(fixture.repo,['rev-parse','HEAD^{tree}']);
+  releaseGateGit(fixture.repo,['branch','release-base',fixture.baseSha]);
+  assert.notEqual(middleSha,fixture.baseSha,'positive control: the candidate’s parent is not the base');
+  for(const args of [['plan','HEAD','release-base'],['plan','--summary','HEAD','release-base']]){
+   const printed=releaseCommand(fixture,...args);
+   assert.equal(printed.status,0,args.join(' ')+': '+printed.stdout+printed.stderr);
+   assert.ok(printed.stderr.includes(`candidate ${fixture.candidateSha} (HEAD)`),args.join(' ')+' names the resolved candidate: '+printed.stderr);
+   assert.ok(printed.stderr.includes(`base ${fixture.baseSha} (release-base)`),args.join(' ')+' names the resolved base: '+printed.stderr);
+   assert.match(printed.stderr,/\b2 changed files\b/,args.join(' ')+' counts the changed files since the base: '+printed.stderr);
+   assert.doesNotThrow(()=>JSON.parse(printed.stdout),'standard output stays the plan alone');
+  }
+  assert.deepEqual(JSON.parse(releaseCommand(fixture,'plan','HEAD','release-base').stdout).changedFiles,['docs-notes.md','scripts/tool.mjs'],
+   'the plan covers both commits since the base');
+  const owner=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T12:00:33.000Z')+'The owner read the exact diff.\n';
+  const independent=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T11:53:58.000Z')+'The reviewer read the exact diff.\n';
+  const reports=writeReleaseReports(fixture,{'owner-review.md':owner,'independent-review.md':independent});
+  const prepared=releaseCommand(fixture,'prepare','HEAD','release-base',reports,'2498');
+  assert.equal(prepared.status,0,prepared.stdout+prepared.stderr);
+  assert.ok(prepared.stderr.includes(`base ${fixture.baseSha} (release-base)`),'prepare names the resolved base: '+prepared.stderr);
+  const input=JSON.parse(fs.readFileSync(path.join(reports,'receipt-input.json'),'utf8'));
+  assert.deepEqual(input.candidate,{commitSha:fixture.candidateSha,treeSha:fixture.treeSha,baseSha:fixture.baseSha},'prepare records the base it resolved, not the candidate’s parent');
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+// git prefers a branch or tag over a commit whose abbreviated SHA has the same
+// name, and says so only in a warning (#2498 reviews N3 and specialist N1).
+test('RISK repository process: release plan and prepare refuse an abbreviated SHA that also names a branch or tag',()=>{
+ const fixture=datedReleaseFixture({candidate:{'scripts/tool.mjs':'export const value = 2;\n'}});
+ try{
+  const shortCandidate=fixture.candidateSha.slice(0,8),shortBase=fixture.baseSha.slice(0,8);
+  releaseGateGit(fixture.repo,['tag',shortCandidate,fixture.baseSha]);
+  releaseGateGit(fixture.repo,['branch',shortBase,fixture.candidateSha]);
+  const owner=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T12:00:33.000Z')+'The owner read the exact diff.\n';
+  const independent=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T11:53:58.000Z')+'The reviewer read the exact diff.\n';
+  const reports=writeReleaseReports(fixture,{'owner-review.md':owner,'independent-review.md':independent});
+  for(const [candidate,base,named] of [[shortCandidate,fixture.baseSha,`Candidate "${shortCandidate}"`],[fixture.candidateSha,shortBase,`Base "${shortBase}"`]]){
+   for(const args of [['plan',candidate,base],['prepare',candidate,base,reports,'2498']]){
+    const refused=releaseCommand(fixture,...args);
+    assert.notEqual(refused.status,0,args.join(' ')+' must be refused: '+refused.stdout);
+    assert.ok(refused.stderr.includes(named)&&/ambiguous/.test(refused.stderr),args.join(' ')+' names the ambiguous ref: '+refused.stderr);
+    assert.equal(fs.existsSync(path.join(reports,'receipt-input.json')),false,'no receipt input is written');
+   }
+  }
+  const plain=releaseCommand(fixture,'plan',fixture.candidateSha.slice(0,12),fixture.baseSha.slice(0,12));
+  assert.equal(plain.status,0,'a longer abbreviation that names no ref still resolves: '+plain.stderr);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+// The summary briefs reviewers, so a decision field added to the plan later
+// must not vanish from it (#2498 specialist review N3).
+test('RISK repository process: release plan summary drops only the changed-file list and schema version, so any other plan field stays',async()=>{
+ const {releasePlanSummary}=await import('../scripts/release-evidence.mjs');
+ const plan={schemaVersion:2,changedFiles:['a.mjs'],mode:'dual-review',requiresCodeReview:true,specialistDomains:['memory-cloud-sync'],futureDecision:'kept'};
+ assert.deepEqual(releasePlanSummary(plan),{mode:'dual-review',requiresCodeReview:true,specialistDomains:['memory-cloud-sync'],futureDecision:'kept'});
+});
+
 const releaseReportHeader=(commit,verdict,completed)=>`Commit: ${commit}\nVerdict: ${verdict}\nCompleted: ${completed}\n\n`;
 function writeReleaseReports(fixture,reports){
  const directory=path.join(fixture.root,'reports');
@@ -2631,6 +2702,19 @@ test('RISK repository process: a failed group prints capped diagnostics and erro
  const output=[result.stdout,result.stderr].filter(Boolean).join('\n');t.diagnostic(output);
  assert.equal(result.error,undefined,'The failure-detail contracts must start: '+(result.error?.message||output));
  assert.equal(result.status,0,'A failed group must print capped diagnostics and error details under each failure line: '+output);
+ assert.match(result.stdout||'',/^# tests 2$/m,'Both failure-detail contracts must run');
+ assert.match(result.stdout||'',/^# skipped 0$/m,'These contracts cannot pass through a skip');
+});
+
+// #2498 review: every tests/*.test.js test registers through tests/shared.js,
+// so a failure's location is the wrapper; the frame named must still be the
+// test file's own. And no detail line may read as a GitHub workflow command.
+test('RISK repository process: a failed group names the frame in the test file for a test registered through a wrapper, and no detail line reads as a workflow command',t=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group runner (prints the diagnostics and error details of a failed test under its failure line|keeps a failed test\'s details from reading as GitHub workflow commands)$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:180000,maxBuffer:8*1024*1024});
+ const output=[result.stdout,result.stderr].filter(Boolean).join('\n');t.diagnostic(output);
+ assert.equal(result.error,undefined,'The failure-detail contracts must start: '+(result.error?.message||output));
+ assert.equal(result.status,0,'A failed group must name the test file frame and print no workflow command: '+output);
  assert.match(result.stdout||'',/^# tests 2$/m,'Both failure-detail contracts must run');
  assert.match(result.stdout||'',/^# skipped 0$/m,'These contracts cannot pass through a skip');
 });

@@ -189,8 +189,11 @@ needs the same groups as a scenery change.
 
 A failed group's log gives each failed test's first assertion line, capped at 200
 characters. Indented under it come the test's details (#2495): the first lines of
-its error, its `expected` and `actual` values, its first stack frame in the test
-file, and its `t.diagnostic` lines. Read them there before reproducing a CI
+its error, its `expected` and `actual` values, its first stack frame in a
+`*.test.js` or `*.test.mjs` file (not the `test` wrapper in tests/shared.js that
+Node reports as the location), and its `t.diagnostic` lines. A detail line that
+would start with `::` gets a backslash first, so GitHub never runs it as a
+workflow command. Read them there before reproducing a CI
 failure locally. A test prints at most 24 detail lines and the job at most 240;
 each cut says so, and the full output stays in the `test.tap` artifact. Passing
 and skipped tests print nothing.
@@ -216,7 +219,12 @@ count, and exits 0 only when every run on both sides passed. A run that skipped
 a selected test, or matched none, counts as not run, never as a pass. Add
 `--json` for the report as JSON, or `--evidence-dir <dir> --purpose <purpose>`
 to record the comparison through the [test-run recorder](test-run-provenance.md).
-The base runs get the base worktree's own ports. A browser test runs against
+`--file` may be absolute or relative to the checkout root; each side runs its
+own commit's copy, and a file outside the checkout is refused. The base runs get
+the base worktree's own ports. If `agent:worktree-ready` could not give the base
+the dependencies the checkout has, or ports when the head runs have them, it
+exits 2 as an environment failure and runs neither side, so nothing reads as
+already failing on the base. A browser test runs against
 whatever `LANDSCAPE_BROWSER_URL` serves, on both sides, so compare Node tests.
 
 ## Nightly cross-engine cohort

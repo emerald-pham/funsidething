@@ -33,10 +33,12 @@ version 2 and the risk plan derived from the exact diff.
 
 Create the final candidate commit first. Print the plan before reviews start:
 `npm run release:plan -- <candidate> <base>`. Both commands take any commit ref
-(`HEAD`, `origin/main`, a branch or an abbreviated SHA), resolve it to the full
-SHA, and refuse one that names no commit; the receipt records full SHAs as
-before. Add `--summary` to print only the plan's mode, review flags and
-specialist domains, without the changed-file list.
+(`HEAD`, `origin/main` (fetch first), a branch or an abbreviated SHA), resolve
+it to the full SHA, and refuse one that names no commit or an abbreviated SHA
+that also names a branch or tag; the receipt records full SHAs as before. Both
+print the resolved candidate and base SHAs on stderr (the plan also counts the
+changed files), so check them. Add `--summary` to print the plan without its
+changed-file list and schema version.
 
 Put each required report outside the checkout in one directory, named
 `owner-review.md`, `independent-review.md` and `specialist-review.md`. Each

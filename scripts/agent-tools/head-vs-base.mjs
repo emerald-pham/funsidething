@@ -9,9 +9,9 @@
 // greps over TAP files.
 
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { constants, tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PORT_VARIABLES, applyPreparedPorts } from './worktree-ports.mjs';
 
@@ -207,6 +207,7 @@ async function prepareBase(headRoot, baseSha) {
   runDirectory = join(parent, 'runs');
   mkdirSync(runDirectory);
   const janitor = spawn(process.execPath, [self, '--janitor', String(process.pid), headRoot, parent], { detached: true, stdio: 'ignore' });
+  janitor.on('error', (error) => console.error(`head-vs-base: the cleanup janitor did not start: ${error.message}`));
   janitor.unref();
   const base = { parent, worktree: join(parent, 'base'), janitor };
   await git(headRoot, 'worktree', 'add', '--quiet', '--detach', base.worktree, baseSha);
@@ -218,13 +219,39 @@ async function prepareBase(headRoot, baseSha) {
 
 // Removes the base worktree, its temporary directory and git's record of it,
 // then lets worktree-ready finish the base's ledger entry and free its ports.
-// Each step tolerates an earlier, partial removal.
+// Each step tolerates an earlier, partial removal. Only the base's own record
+// goes: a repository-wide `git worktree prune` also dropped every other
+// worktree whose directory was missing for a moment, which host coordination
+// still counts as owned (#2498 specialist review N5).
 function removeBase(headRoot, parent) {
   const worktree = join(parent, 'base');
   if (existsSync(worktree)) spawnSync('git', ['worktree', 'remove', '--force', worktree], { cwd: headRoot, stdio: 'ignore' });
   rmSync(parent, { recursive: true, force: true });
-  spawnSync('git', ['worktree', 'prune'], { cwd: headRoot, stdio: 'ignore' });
+  removeWorktreeRecord(headRoot, worktree);
   return spawnSync(process.execPath, [worktreeReady, 'prune'], { cwd: headRoot, encoding: 'utf8' });
+}
+
+// git keeps each linked worktree's record in <common dir>/worktrees/<name>,
+// whose gitdir file names the worktree's .git file.
+function removeWorktreeRecord(headRoot, worktree) {
+  const common = spawnSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: headRoot, encoding: 'utf8' });
+  if (common.status !== 0) return;
+  const records = join(common.stdout.trim(), 'worktrees');
+  let names = [];
+  try {
+    names = readdirSync(records);
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    let gitdir = '';
+    try {
+      gitdir = readFileSync(join(records, name, 'gitdir'), 'utf8').trim();
+    } catch {
+      continue;
+    }
+    if (gitdir === join(worktree, '.git')) rmSync(join(records, name), { recursive: true, force: true });
+  }
 }
 
 function processAlive(pid) {
@@ -248,6 +275,8 @@ function janitor([ownerText, headRoot, parent]) {
       // The comparison already removed its base.
     }
     for (const pid of runs) {
+      // kill(-1) would signal every process this user owns.
+      if (!Number.isInteger(pid) || pid <= 1) continue;
       try {
         process.kill(-pid, 'SIGKILL');
       } catch {
@@ -271,6 +300,44 @@ function testEnvironment(root, { ownPorts }) {
   return environment;
 }
 
+// The checkout-relative path of --file, so each side runs its own commit's
+// copy. An absolute path once ran the head's file, and through its relative
+// imports the head's code, on the base side too (#2498 review B1).
+function checkoutFile(headRoot, file) {
+  const absolute = resolve(headRoot, file);
+  let real = absolute;
+  try {
+    real = realpathSync(absolute);
+  } catch {
+    try {
+      real = join(realpathSync(dirname(absolute)), basename(absolute));
+    } catch {
+      // Neither exists; the runs report the missing file.
+    }
+  }
+  const inside = relative(headRoot, real);
+  if (!inside || inside === '..' || inside.startsWith(`..${sep}`) || isAbsolute(inside)) {
+    throw new UsageError(`--file ${file} is outside the checkout ${headRoot}; name a test file inside it, absolute or relative to its root`);
+  }
+  return inside.split(sep).join('/');
+}
+
+// worktree-ready never fails, so it can leave the base without dependencies or
+// ports. Its runs would then fail for that reason alone, which reads as
+// "already fails on the base" (#2498 review N1). CI runs use ephemeral ports.
+function unpreparedBase(head, base) {
+  const reasons = [];
+  if (existsSync(join(head.root, 'node_modules')) && !existsSync(join(base.root, 'node_modules'))) {
+    reasons.push('it has no dependencies (node_modules), though the head checkout does');
+  }
+  if (process.env.CI !== 'true') {
+    for (const name of PORT_VARIABLES) {
+      if (head.env[name]?.trim() && !base.env[name]?.trim()) reasons.push(`no ${name} could be claimed for it, though the head runs have one`);
+    }
+  }
+  return reasons;
+}
+
 async function runSides(options, sides) {
   const jobs = [];
   for (let index = 0; index < options.runs; index += 1) for (const side of sides) jobs.push(side);
@@ -280,7 +347,7 @@ async function runSides(options, sides) {
     while (next < jobs.length && !interruption) {
       const side = jobs[next];
       next += 1;
-      const file = resolve(side.root, options.file);
+      const file = join(side.root, options.file);
       const output = await run(process.execPath, [
         ...options.nodeOptions, '--test', '--test-reporter=tap', `--test-name-pattern=${options.pattern}`, file,
       ], { cwd: side.root, env: side.env, testRun: true });
@@ -323,6 +390,7 @@ function recordComparison(headRoot, options) {
 async function main() {
   const options = parseArguments(process.argv.slice(2));
   const headRoot = realpathSync(await git(process.cwd(), 'rev-parse', '--show-toplevel'));
+  options.file = checkoutFile(headRoot, options.file);
   if (options.evidenceDir !== undefined) {
     process.exitCode = await recordComparison(headRoot, options);
     return;
@@ -336,6 +404,12 @@ async function main() {
     if (interruption) return;
     const head = { root: headRoot, env: testEnvironment(headRoot, { ownPorts: false }) };
     const baseSide = { root: base.worktree, env: testEnvironment(base.worktree, { ownPorts: true }) };
+    const unprepared = unpreparedBase(head, baseSide);
+    if (unprepared.length) {
+      console.error(`head-vs-base: environment failure: worktree-ready could not prepare the base worktree: ${unprepared.join('; ')}. Neither side ran, and nothing is known about the base; fix what worktree-ready reported above and run again.`);
+      process.exitCode = 2;
+      return;
+    }
     const results = await runSides(options, [head, baseSide]);
     if (interruption) return;
     const report = {

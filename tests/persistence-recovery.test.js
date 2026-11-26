@@ -16179,10 +16179,13 @@ function answeringBoard2408({tasks=300,padBytes=3_000_000}={}){
 // above. The fixtures keep the default 25% check-in threshold, and a long run
 // of Yes answers makes the benchmark strong enough that the check-in can
 // replace the next card, so the next tap found no Yes.
-// #2493: every large-fixture test that answers in the scanner on a harness
-// device takes its board from here, whether it answers once or forty times;
-// none of them is about the check-in, which has tests of its own. The long scan
-// memory browser test keeps 25% because it clicks Continue whenever the
+// #2493: the large-fixture tests that answer in the scanner on a harness
+// device take their board from here, whether they answer once or forty times;
+// none of them is about the check-in, which has tests of its own. Two push-work
+// tests (oneCountedPush2427, acknowledgedPush2436) keep the fixture's 25%: each
+// answers one No right after Start, before any Yes could make the benchmark
+// strong enough for the check-in to replace a card (#2498 review N6). The long
+// scan memory browser test keeps 25% because it clicks Continue whenever the
 // check-in shows and counts only answers.
 function answeringLargeBoard2490(fixture){
  const board=JSON.parse(fixture.payload);
@@ -21202,6 +21205,10 @@ test('RISK rank work per answer: on the large board, ranks sampled in parts allo
   perAnswer.push(allocated()-from);
  }
  t.diagnostic(JSON.stringify({open,perAnswer}));
+ // #2498 review N4: a count that stopped seeing the app's allocations would
+ // read [0,0,0,0,0] and pass every bound below, so the first answer's spare
+ // set must be seen.
+ assert.ok(perAnswer[0]>0,`positive control: the count sees the first answer allocate its spare set of rank arrays: ${perAnswer[0]}`);
  assert.ok(perAnswer[0]<=2*open,`the first answer allocates at most one set of rank arrays (${2*open}): ${perAnswer[0]}`);
  assert.deepEqual(perAnswer.slice(1),[0,0,0,0],'later answers reuse the two sets of rank arrays');
 });
