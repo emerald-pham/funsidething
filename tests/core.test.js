@@ -24234,58 +24234,71 @@ test('Landscape wings fold toward the body with mirrored motion',()=>{
  assert.ok(Math.max(...spreads)-Math.min(...spreads)>.7,'wings open and close');
 });
 
+// #2479: these two ran with a plain-string motion choice, which the app
+// retired for {choice,savedAt}; the motion dialog then opened over the page
+// and caught their first click, so they never started. CI baseline-skips
+// them, which hid it. They now write the current format and run in Chromium
+// and WebKit.
+const scannerActionsMotionChoice=()=>localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+const scannerActionsLaunch=(engineName,engine)=>engine.launch({headless:true,...(engineName==='chromium'?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chrome'}:{})});
 test('Scanner browser: yellow task actions run horizontally below the card and wrap on mobile', {skip:!process.env.LANDSCAPE_BROWSER_URL}, async()=>{
- const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT);
- const browser=await chromium.launch({headless:true,channel:'chrome'});
- try{
-  const page=await browser.newPage();
-  await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));
-  await page.goto(process.env.LANDSCAPE_BROWSER_URL);
-  await page.locator('#modalRoot [data-act="close-modal"]').click();
-  await page.evaluate(()=>{addTask('Dotted task',true);addTask('Next task',false);state.interventionActive=false;render();});
-  for(const width of [1000,390,320]){
-   await page.setViewportSize({width,height:900});
-   const layout=await page.evaluate(()=>{
-    const rect=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom};};
-    const rail=document.querySelector('.siderail');
-    return {card:rect(document.querySelector('.cand')),rail:rect(rail),buttons:[...rail.querySelectorAll('button')].map(rect),actions:[...rail.querySelectorAll('button')].map(e=>e.dataset.act),overflow:document.documentElement.scrollWidth>innerWidth};
-   });
-   assert.ok(layout.rail.y>=layout.card.bottom,`actions must be below the yellow card at ${width}px`);
-   assert.equal(layout.buttons[0].y,layout.buttons[1].y,'buttons begin in a horizontal row');
-   if(width===1000) assert.ok(layout.buttons.every(b=>b.y===layout.buttons[0].y),'all buttons fit on one desktop row');
-   assert.deepEqual(layout.actions,['cand-done','edit','cand-worked','delete-task']);
-   assert.ok(!layout.overflow,`no horizontal page overflow at ${width}px`);
-   assert.ok(layout.buttons.every(b=>b.x>=0&&b.right<=width),'every button stays inside the viewport');
-  }
- }finally{await browser.close();}
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await scannerActionsLaunch(engineName,engine);
+  try{
+   const page=await browser.newPage();
+   await page.addInitScript(scannerActionsMotionChoice);
+   await page.goto(process.env.LANDSCAPE_BROWSER_URL);
+   await page.locator('#modalRoot [data-act="close-modal"]').click();
+   await page.evaluate(()=>{addTask('Dotted task',true);addTask('Next task',false);state.interventionActive=false;render();});
+   for(const width of [1000,390,320]){
+    await page.setViewportSize({width,height:900});
+    const layout=await page.evaluate(()=>{
+     const rect=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom};};
+     const rail=document.querySelector('.siderail');
+     return {card:rect(document.querySelector('.cand')),rail:rect(rail),buttons:[...rail.querySelectorAll('button')].map(rect),actions:[...rail.querySelectorAll('button')].map(e=>e.dataset.act),overflow:document.documentElement.scrollWidth>innerWidth};
+    });
+    assert.ok(layout.rail.y>=layout.card.bottom,`${engineName}: actions must be below the yellow card at ${width}px`);
+    assert.equal(layout.buttons[0].y,layout.buttons[1].y,`${engineName}: buttons begin in a horizontal row at ${width}px`);
+    if(width===1000) assert.ok(layout.buttons.every(b=>b.y===layout.buttons[0].y),`${engineName}: all buttons fit on one desktop row`);
+    assert.deepEqual(layout.actions,['cand-done','edit','cand-worked','delete-task']);
+    assert.ok(!layout.overflow,`${engineName}: no horizontal page overflow at ${width}px`);
+    assert.ok(layout.buttons.every(b=>b.x>=0&&b.right<=width),`${engineName}: every button stays inside the viewport at ${width}px`);
+   }
+  }finally{await browser.close();}
+ }
 });
 
 test('Scanner browser: secondary actions dim during scanning and brighten for focus or work', {skip:!process.env.LANDSCAPE_BROWSER_URL}, async()=>{
- const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT);
- const browser=await chromium.launch({headless:true,channel:'chrome'});
- try{
-  const page=await browser.newPage({viewport:{width:1000,height:900}});
-  await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));
-  await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'networkidle'});
-  await page.locator('#modalRoot [data-act="close-modal"]').click();
-  await page.evaluate(()=>{addTask('Dotted task',true);addTask('Next task',false);state.interventionActive=false;render();});
-  await page.mouse.move(0,0);
-  for(const theme of ['light','dark']){
-   await page.evaluate(theme=>document.documentElement.setAttribute('data-theme',theme),theme);
-   assert.ok(await page.locator('.actionrow').evaluate(e=>+getComputedStyle(e).opacity)<1,'benchmark actions must visibly dim after all stylesheets load');
-   assert.ok(await page.locator('.siderail').evaluate(e=>+getComputedStyle(e).opacity)<1,'candidate management actions dim too');
-   assert.equal(await page.locator('.decide').evaluate(e=>getComputedStyle(e).opacity),'1','Yes/No decisions remain prominent');
-   await page.locator('.actionrow [data-act="edit"]').focus();
-   assert.equal(await page.locator('.actionrow').evaluate(e=>getComputedStyle(e).opacity),'1','keyboard focus restores readable brightness');
-   await page.locator('.decide [data-act="yes"]').focus();
-  }
-  await page.locator('[data-act="start-working"]').click();await page.mouse.move(0,0);
-  assert.equal(await page.locator('.actionrow').evaluate(e=>getComputedStyle(e).opacity),'1','finishing scanning restores full emphasis');
-  await page.locator('.btnwrap [data-act="resume-scan"]').focus();
-  assert.equal(await page.locator('.btnwrap').evaluate(e=>getComputedStyle(e).opacity),'1','resume action is readable on keyboard focus');
-  await page.locator('.actionrow [data-act="bench-done"]').click();
-  assert.equal(await page.evaluate(()=>state.tasks.find(t=>t.title==='Dotted task').done),true,'deemphasis never disables task actions');
- }finally{await browser.close();}
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await scannerActionsLaunch(engineName,engine);
+  try{
+   const page=await browser.newPage({viewport:{width:1000,height:900}});
+   await page.addInitScript(scannerActionsMotionChoice);
+   await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'networkidle'});
+   await page.locator('#modalRoot [data-act="close-modal"]').click();
+   await page.evaluate(()=>{addTask('Dotted task',true);addTask('Next task',false);state.interventionActive=false;render();});
+   await page.mouse.move(0,0);
+   for(const theme of ['light','dark']){
+    await page.evaluate(theme=>document.documentElement.setAttribute('data-theme',theme),theme);
+    const label=`${engineName} ${theme}`;
+    assert.ok(await page.locator('.actionrow').evaluate(e=>+getComputedStyle(e).opacity)<1,`${label}: benchmark actions must visibly dim after all stylesheets load`);
+    assert.ok(await page.locator('.siderail').evaluate(e=>+getComputedStyle(e).opacity)<1,`${label}: candidate management actions dim too`);
+    assert.equal(await page.locator('.decide').evaluate(e=>getComputedStyle(e).opacity),'1',`${label}: Yes/No decisions remain prominent`);
+    await page.locator('.actionrow [data-act="edit"]').focus();
+    assert.equal(await page.locator('.actionrow').evaluate(e=>getComputedStyle(e).opacity),'1',`${label}: keyboard focus restores readable brightness`);
+    await page.locator('.decide [data-act="yes"]').focus();
+   }
+   await page.locator('[data-act="start-working"]').click();await page.mouse.move(0,0);
+   assert.equal(await page.locator('.actionrow').evaluate(e=>getComputedStyle(e).opacity),'1',`${engineName}: finishing scanning restores full emphasis`);
+   await page.locator('.btnwrap [data-act="resume-scan"]').focus();
+   assert.equal(await page.locator('.btnwrap').evaluate(e=>getComputedStyle(e).opacity),'1',`${engineName}: resume action is readable on keyboard focus`);
+   // Start working redraws the panel, so #2461's press guard holds a press
+   // on its new buttons until they could be read; a person would wait too.
+   await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead()&&!document.querySelector('#scan .btn.held'),null,{timeout:5000});
+   await page.locator('.actionrow [data-act="bench-done"]').click();
+   assert.equal(await page.evaluate(()=>state.tasks.find(t=>t.title==='Dotted task').done),true,`${engineName}: deemphasis never disables task actions`);
+  }finally{await browser.close();}
+ }
 });
 
 // #2312 (spec #2308 slice 4) built this journey; #2420 moved Yes, No and Can't
